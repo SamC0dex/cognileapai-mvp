@@ -1,0 +1,41 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Next.js
+.next/
+out/
+.vercel/
+
+# Env
+.env*
+!.env.example
+PRIVATE_CREDENTIALS.txt
+SETUP_INSTRUCTIONS.md
+
+# Hide internal development files
+prompts/
+docs/EXECUTION_PLAYBOOK.md
+docs/COORDINATOR_GUIDE.md
+docs/TESTING_GUIDE.md
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+*.log.*
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Editor
+.vscode/
+.idea/
+
