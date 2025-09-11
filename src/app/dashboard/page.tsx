@@ -128,7 +128,7 @@ export default function DashboardPage() {
         )}
 
         {/* Header */}
-        <DashboardHeader userName="Sam" />
+        <DashboardHeader userName="Swami" />
         
         {/* Action Cards */}
         <DashboardActionCards
@@ -147,4 +147,3 @@ export default function DashboardPage() {
     </DashboardLayout>
   )
 }
-

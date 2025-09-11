@@ -18,7 +18,6 @@ import {
   ChevronDown,
   MoreHorizontal,
   User,
-  Sparkles,
   Sun,
   Moon
 } from 'lucide-react'
@@ -161,7 +160,7 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange }: SidebarProps
       </div>
 
       {/* Workspace Selector */}
-      <div className="p-4">
+  <div className="px-4 pt-4 pb-2">
         {!collapsed ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -211,7 +210,7 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange }: SidebarProps
       </div>
 
       {/* Primary Action Button */}
-      <div className="px-4 mb-4">
+      <div className="px-4 py-2">
         {!collapsed ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -246,7 +245,7 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange }: SidebarProps
 
 
       {/* Navigation */}
-      <nav className="flex-1 px-4 space-y-1">
+      <nav className="flex-1 px-4 py-2 space-y-2">
         {navigation.map((item) => {
           const Icon = item.icon
           return (
@@ -254,6 +253,7 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange }: SidebarProps
               <div
                 className={cn(
                   "penseum-nav-item group",
+                  item.name === 'Settings' && 'mt-1.5',
                   item.current && "active",
                   collapsed && "justify-center"
                 )}
@@ -293,8 +293,8 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange }: SidebarProps
                   </AvatarFallback>
                 </Avatar>
                 <div className="text-left flex-1">
-                  <div className="text-sm font-medium text-sidebar-foreground">Sam</div>
-                  <div className="text-xs text-sidebar-foreground/60">sam@example.com</div>
+                  <div className="text-sm font-medium text-sidebar-foreground">Swami</div>
+                  <div className="text-xs text-sidebar-foreground/60">swami@example.com</div>
                 </div>
                 <MoreHorizontal className="h-4 w-4 text-sidebar-foreground/60" />
               </Button>
@@ -303,10 +303,6 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange }: SidebarProps
               <DropdownMenuItem>
                 <User className="h-4 w-4 mr-2" />
                 Profile Settings
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Sparkles className="h-4 w-4 mr-2" />
-                Upgrade to Pro
               </DropdownMenuItem>
               <Separator />
               <DropdownMenuItem className="text-red-600">

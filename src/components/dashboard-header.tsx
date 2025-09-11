@@ -6,7 +6,7 @@ interface DashboardHeaderProps {
   userName?: string
 }
 
-export function DashboardHeader({ userName = "Sam" }: DashboardHeaderProps) {
+export function DashboardHeader({ userName = "Swami" }: DashboardHeaderProps) {
 
   return (
     <div className="relative overflow-hidden bg-gradient-to-br from-background via-background to-muted/20 border-b border-border">
