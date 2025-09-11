@@ -1,4 +1,4 @@
--- CogniLeap MVP schema (run in Supabase SQL editor)
+-- CogniLeapAI MVP schema (run in Supabase SQL editor)
 create extension if not exists "uuid-ossp";
 
 -- Type for outputs

@@ -1,4 +1,4 @@
-# UI Inspiration → CogniLeap Translation
+# UI Inspiration → CogniLeapAI Translation
 
 Sources: NotebookLM, Penseum.
 

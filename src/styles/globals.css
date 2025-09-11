@@ -1,0 +1,292 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Core Design Tokens */
+    --radius: 0.75rem;
+    
+    /* Light Theme - Purple Primary (Penseum-inspired) with Amber Accents */
+    --background: 0 0% 100%;
+    --foreground: 224 71.4% 4.1%;
+    
+    /* Cards and Surfaces */
+    --card: 0 0% 100%;
+    --card-foreground: 224 71.4% 4.1%;
+    
+    /* Interactive Elements */
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 71.4% 4.1%;
+    
+    /* Borders and Inputs */
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 262.1 83.3% 57.8%;
+    
+    /* Primary Brand - Purple (Penseum-style) */
+    --primary: 262.1 83.3% 57.8%;
+    --primary-foreground: 210 20% 98%;
+    --primary-50: 270 100% 98%;
+    --primary-100: 269 100% 95%;
+    --primary-200: 269 100% 92%;
+    --primary-300: 268 100% 86%;
+    --primary-400: 270 95% 75%;
+    --primary-500: 262.1 83.3% 57.8%;
+    --primary-600: 258 90% 66%;
+    --primary-700: 253 56% 58%;
+    --primary-800: 253 56% 49%;
+    --primary-900: 250 63% 40%;
+    
+    /* Secondary - Amber for Light Mode */
+    --secondary: 38 90% 50%;
+    --secondary-foreground: 38 100% 10%;
+    
+    /* Muted Elements */
+    --muted: 220 14.3% 95.9%;
+    --muted-foreground: 220 8.9% 46.1%;
+    
+    /* Accent Elements */
+    --accent: 220 14.3% 95.9%;
+    --accent-foreground: 220 8.9% 46.1%;
+    
+    /* Destructive Actions */
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 20% 98%;
+    
+    /* Sidebar Variables */
+    --sidebar: 0 0% 100%;
+    --sidebar-foreground: 224 71.4% 4.1%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-accent: 220 14.3% 95.9%;
+    --sidebar-accent-foreground: 220 8.9% 46.1%;
+  }
+  
+  .dark {
+    /* Dark Theme — Teal/Amber vibe (vibrant) */
+    --background: 220 40% 6%;
+    --foreground: 210 20% 98%;
+
+    /* Cards and Surfaces */
+    --card: 220 35% 8%;
+    --card-foreground: 210 20% 98%;
+
+    /* Interactive Elements */
+    --popover: 220 35% 8%;
+    --popover-foreground: 210 20% 98%;
+
+    /* Borders and Inputs */
+    --border: 215 20% 22%;
+    --input: 215 20% 22%;
+    --ring: 170 70% 50%;
+
+    /* Primary — Teal */
+    --primary: 170 70% 50%;
+    --primary-foreground: 170 100% 97%;
+    --primary-50: 170 60% 94%;
+    --primary-100: 170 60% 88%;
+    --primary-200: 170 55% 74%;
+    --primary-300: 170 65% 60%;
+    --primary-400: 170 70% 52%;
+    --primary-500: 170 70% 50%;
+    --primary-600: 170 75% 42%;
+    --primary-700: 170 80% 35%;
+    --primary-800: 170 80% 28%;
+    --primary-900: 170 85% 20%;
+
+    /* Secondary — Amber accents */
+    --secondary: 38 92% 55%;
+    --secondary-foreground: 38 100% 10%;
+
+    /* Muted Elements */
+    --muted: 215 20% 12%;
+    --muted-foreground: 217.9 12.6% 72%;
+
+    /* Accent — Teal-tinted surfaces */
+    --accent: 170 40% 12%;
+    --accent-foreground: 210 20% 98%;
+
+    /* Destructive Actions */
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 20% 98%;
+
+    /* Sidebar Variables */
+    --sidebar: 220 35% 10%;
+    --sidebar-foreground: 210 20% 98%;
+    --sidebar-border: 215 22% 18%;
+    --sidebar-accent: 215 20% 14%;
+    --sidebar-accent-foreground: 210 20% 98%;
+  }
+  
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    transition: none;
+  }
+  
+  /* Instant theme switching - keep things snappy without animating layout transforms globally. */
+  /*
+    Note: Avoid applying transform transitions globally because Popper-positioned
+    elements (e.g., Radix dropdown content) use transform for positioning. Global
+    transform transitions cause an unintended "slide from top" effect.
+  */
+  *, *::before, *::after {
+    transition-property: opacity, box-shadow, filter, backdrop-filter;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 120ms;
+  }
+}
+
+@layer components {
+  /* Penseum-inspired components */
+  .penseum-sidebar {
+    @apply bg-sidebar border-r border-sidebar-border;
+  }
+  
+  .penseum-nav-item {
+    @apply flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200;
+    @apply text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+  }
+  
+  .penseum-nav-item.active {
+    @apply bg-primary text-primary-foreground shadow-sm;
+  }
+  
+  .penseum-card {
+    @apply rounded-2xl border bg-card text-card-foreground shadow-soft;
+    @apply transition-all duration-300 hover:shadow-hover;
+  }
+  
+  .penseum-button-primary {
+    @apply bg-gradient-to-r from-primary to-primary/90 text-primary-foreground;
+    @apply shadow-lg hover:shadow-xl transition-all duration-200;
+    @apply hover:scale-[1.02] active:scale-[0.98];
+  }
+  
+  .penseum-dropdown {
+    @apply rounded-lg border bg-popover p-1 text-popover-foreground shadow-dropdown;
+    /* Ultra-fast, smooth fade — no sliding */
+    opacity: 0;
+    will-change: opacity;
+    transition: opacity 80ms ease-out;
+  }
+  .penseum-dropdown[data-state='open'] { opacity: 1; }
+  .penseum-dropdown[data-state='closed'] { opacity: 0; }
+
+  /* Prevent Popper wrapper from animating its transform (kills the slide). */
+  [data-radix-popper-content-wrapper] {
+    transition: none !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .penseum-dropdown { transition: none !important; }
+  }
+
+/* Theme switching helper: momentarily disables all transitions */
+html.theme-instant, html.theme-instant *, html.theme-instant *::before, html.theme-instant *::after {
+  transition: none !important;
+}
+
+/* Overlay used to mask the theme flip with a very fast cross-fade */
+.theme-switch-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  will-change: opacity;
+  transition: opacity 45ms ease-out;
+  z-index: 9999;
+}
+  
+  .glass-effect {
+    @apply bg-background/80 backdrop-blur-sm border border-border/50;
+  }
+  
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent;
+  }
+}
+
+@layer utilities {
+  .animate-reduced-motion {
+    @apply motion-reduce:transition-none motion-reduce:animate-none;
+  }
+  
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+  
+  /* Text utilities */
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  /* Layout utilities */
+  .grid-auto-fit {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
+  
+  .grid-auto-fill {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+  
+  /* Animation utilities */
+  .animate-gradient {
+    background-size: 200% 200%;
+    animation: gradient 4s ease-in-out infinite;
+  }
+  
+  @keyframes gradient {
+    0%, 100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+  
+  /* Scroll utilities */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted)) hsl(var(--background));
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 3px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+  }
+}
+
+/* Loading states */
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.loading-shimmer {
+  background: linear-gradient(90deg, hsl(var(--muted)) 25%, hsl(var(--muted-foreground) / 0.1) 50%, hsl(var(--muted)) 75%);
+  background-size: 200px 100%;
+  animation: shimmer 1.5s infinite;
+}

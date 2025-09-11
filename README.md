@@ -1,4 +1,4 @@
-# CogniLeap MVP
+# CogniLeapAI MVP
 
 🧠 **Transform PDFs into AI-powered study materials**
 
