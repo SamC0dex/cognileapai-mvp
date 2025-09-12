@@ -128,7 +128,7 @@ export function ChatHistoryDrawer({ open, onClose, onSelectThread, onNewChat }: 
             <div className="p-3 border-t border-border">
               <button
                 onClick={() => { onNewChat?.(); onClose() }}
-                className="w-full h-10 rounded-lg bg-primary text-primary-foreground font-medium hover:opacity-90 transition"
+                className="w-full h-10 rounded-lg bg-primary text-primary-foreground font-medium hover:opacity-90 transition dark:bg-gradient-to-r dark:from-teal-600 dark:to-teal-700 dark:hover:from-teal-700 dark:hover:to-teal-800"
               >
                 New Chat
               </button>

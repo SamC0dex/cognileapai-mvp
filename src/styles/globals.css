@@ -167,6 +167,10 @@
     @apply bg-primary text-primary-foreground shadow-sm;
   }
   
+  .dark .penseum-nav-item.active {
+    @apply bg-gradient-to-r from-teal-600 to-teal-700 text-white shadow-sm;
+  }
+  
   .penseum-card {
     @apply rounded-2xl border bg-card text-card-foreground shadow-soft;
     @apply transition-all duration-300 hover:shadow-hover;

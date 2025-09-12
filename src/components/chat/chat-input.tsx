@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { GEMINI_MODELS, GeminiModelKey } from '@/lib/ai-config'
 import { useChatStore } from '@/lib/chat-store'
+import { GeminiLogo } from '@/components/icons/gemini-logo'
 import type { ChatInputProps } from './types'
 
 const MIN_HEIGHT = 44 // Minimum height for textarea
@@ -248,9 +249,7 @@ export const ChatInput: React.FC<ChatInputProps & {
                     onClick={toggleModelSelector}
                     className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium bg-primary/10 text-primary rounded-lg border border-primary/20 hover:bg-primary/15 transition-all duration-200 dark:bg-primary/20 dark:border-primary/40"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
+                    <GeminiLogo size={16} />
                     <span>{GEMINI_MODELS[selectedModel].displayName}</span>
                     <svg className={`w-3 h-3 transition-transform duration-200 ${showModelSelector ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -281,9 +280,12 @@ export const ChatInput: React.FC<ChatInputProps & {
                               }`}
                             >
                               <div className="flex items-center justify-between">
-                                <div>
-                                  <div className="font-medium text-sm">{model.displayName}</div>
-                                  <div className="text-xs text-muted-foreground mt-0.5">{model.description}</div>
+                                <div className="flex items-center gap-2">
+                                  <GeminiLogo size={14} />
+                                  <div>
+                                    <div className="font-medium text-sm">{model.displayName}</div>
+                                    <div className="text-xs text-muted-foreground mt-0.5">{model.description}</div>
+                                  </div>
                                 </div>
                                 <div className={`px-2 py-1 text-xs rounded-full ${
                                   model.costTier === 'low' ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300' :

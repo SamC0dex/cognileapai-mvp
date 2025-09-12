@@ -88,7 +88,7 @@ export function DashboardTabs({
                   <TabsTrigger
                     key={tab.id}
                     value={tab.id}
-                    className="flex items-center gap-2 px-4 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-md transition-all"
+                    className="flex items-center gap-2 px-4 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-md transition-all dark:data-[state=active]:bg-gradient-to-r dark:data-[state=active]:from-teal-600 dark:data-[state=active]:to-teal-700"
                   >
                     <Icon className="h-4 w-4" />
                     <span className="font-medium">{tab.label}</span>
@@ -117,7 +117,7 @@ export function DashboardTabs({
               </div>
 
               {/* Filter */}
-              <Button variant="outline" size="icon" className="h-10 w-10">
+              <Button variant="outline" size="icon" className="h-10 w-10 dark:border-teal-600/40 dark:text-teal-300 dark:hover:bg-teal-600/10 dark:hover:text-teal-200 dark:hover:border-teal-500/60">
                 <Filter className="h-4 w-4" />
               </Button>
 
@@ -129,7 +129,7 @@ export function DashboardTabs({
                   onClick={() => handleViewModeChange('grid')}
                   className={cn(
                     "h-10 w-10 rounded-none",
-                    viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
+                    viewMode === 'grid' ? 'bg-primary text-primary-foreground dark:bg-gradient-to-r dark:from-teal-600 dark:to-teal-700' : 'hover:bg-muted'
                   )}
                 >
                   <Grid3x3 className="h-4 w-4" />
@@ -140,7 +140,7 @@ export function DashboardTabs({
                   onClick={() => handleViewModeChange('list')}
                   className={cn(
                     "h-10 w-10 rounded-none",
-                    viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
+                    viewMode === 'list' ? 'bg-primary text-primary-foreground dark:bg-gradient-to-r dark:from-teal-600 dark:to-teal-700' : 'hover:bg-muted'
                   )}
                 >
                   <List className="h-4 w-4" />
@@ -150,7 +150,7 @@ export function DashboardTabs({
               {/* Upload Button */}
               <Button 
                 onClick={onUpload}
-                className="h-10 px-4 bg-primary text-primary-foreground hover:bg-primary/90 penseum-button-primary"
+                className="h-10 px-4 bg-primary text-primary-foreground hover:bg-primary/90 penseum-button-primary dark:bg-gradient-to-r dark:from-teal-600 dark:to-teal-700 dark:hover:from-teal-700 dark:hover:to-teal-800"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Upload PDF
@@ -178,8 +178,7 @@ export function DashboardTabs({
                   </p>
                   <Button 
                     onClick={onUpload}
-                    variant="outline"
-                    className="gap-2"
+                    className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90 dark:bg-gradient-to-r dark:from-teal-600 dark:to-teal-700 dark:hover:from-teal-700 dark:hover:to-teal-800"
                   >
                     <Plus className="h-4 w-4" />
                     Get Started
