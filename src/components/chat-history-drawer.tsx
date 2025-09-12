@@ -48,7 +48,7 @@ export function ChatHistoryDrawer({ open, onClose, onSelectThread, onNewChat }: 
             animate={{ opacity: 0.25 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.12 }}
-            className="fixed inset-0 bg-black z-40"
+            className="fixed inset-0 bg-black z-[300]"
             onClick={onClose}
           />
 
@@ -59,7 +59,7 @@ export function ChatHistoryDrawer({ open, onClose, onSelectThread, onNewChat }: 
             animate={{ x: 0 }}
             exit={{ x: 360 }}
             transition={{ duration: 0.16, ease: 'easeOut' }}
-            className="fixed right-0 top-0 bottom-0 z-50 w-[320px] sm:w-[360px] bg-gradient-to-b from-[hsl(var(--background))] to-[hsl(var(--background)/0.96)] border-l border-border shadow-2xl"
+            className="fixed right-0 top-0 bottom-0 z-[310] w-[320px] sm:w-[360px] bg-gradient-to-b from-[hsl(var(--background))] to-[hsl(var(--background)/0.96)] border-l border-border shadow-2xl"
           >
             <div className="h-14 px-4 flex items-center justify-between border-b border-border">
               <div className="text-sm font-semibold">Chat History</div>
@@ -139,4 +139,3 @@ export function ChatHistoryDrawer({ open, onClose, onSelectThread, onNewChat }: 
     </AnimatePresence>
   )
 }
-

@@ -246,7 +246,7 @@ export const ChatInput: React.FC<ChatInputProps & {
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={toggleModelSelector}
-                    className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium bg-primary/10 text-primary rounded-lg border border-primary/20 hover:bg-primary/15 transition-all duration-200"
+                    className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium bg-primary/10 text-primary rounded-lg border border-primary/20 hover:bg-primary/15 transition-all duration-200 dark:bg-primary/20 dark:border-primary/40"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -306,7 +306,7 @@ export const ChatInput: React.FC<ChatInputProps & {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => console.log('attach')}
-                  className="flex items-center gap-2 px-2.5 py-1.5 text-sm font-medium rounded-lg border border-border hover:bg-muted/50 text-foreground"
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg border border-border hover:bg-muted/50 text-foreground"
                   title="Attach"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -422,7 +422,7 @@ export const ChatInput: React.FC<ChatInputProps & {
                   disabled={!canSend}
                   className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 ${
                     canSend
-                      ? 'bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg hover:shadow-xl hover:shadow-primary/25'
+                      ? 'bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg hover:shadow-xl hover:shadow-primary/25 dark:from-teal-600 dark:to-teal-700 dark:text-white dark:hover:from-teal-700 dark:hover:to-teal-800'
                       : 'bg-muted text-muted-foreground cursor-not-allowed'
                   }`}
                   title={isSending ? 'Sending...' : 'Send message'}

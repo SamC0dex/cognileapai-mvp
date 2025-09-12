@@ -3,6 +3,16 @@
 @tailwind utilities;
 
 @layer base {
+  /* Hide browser extension injected elements */
+  #coupon-birds-embed-div,
+  [id*="honey-"],
+  [id*="capital-one"],
+  [id*="rakuten"],
+  [id*="coupon"],
+  [bis_skin_checked] {
+    display: none !important;
+  }
+  
   :root {
     /* Core Design Tokens */
     --radius: 0.75rem;

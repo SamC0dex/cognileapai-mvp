@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
-  swcMinify: true,
+  reactStrictMode: false, // Temporarily disabled to avoid hydration issues with browser extensions
   experimental: {
     optimizePackageImports: ['lucide-react', 'framer-motion'],
   },

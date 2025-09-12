@@ -7,27 +7,23 @@ import {
   ChevronLeft, 
   ChevronRight, 
   Plus, 
-  Home,
   LayoutDashboard, 
-  Compass, 
   Settings,
   FileText,
-  BookOpen,
   Lightbulb,
   ChevronDown,
   MoreHorizontal,
   User,
   Sun,
-  Moon
+  Moon,
+  Palette
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import {
   Button,
-  Badge,
   Avatar,
-  AvatarImage,
   AvatarFallback,
   DropdownMenu,
   DropdownMenuContent,
@@ -35,6 +31,7 @@ import {
   DropdownMenuTrigger,
   Separator
 } from '@/components/ui'
+import { ClientOnly } from '@/components/client-only'
 
 interface SidebarProps {
   isCollapsed?: boolean
@@ -132,11 +129,13 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange }: SidebarProps
               onClick={toggleTheme}
               className="h-8 w-8 hover:bg-sidebar-accent transition-colors duration-150"
             >
-              {theme === 'dark' ? (
-                <Sun className="h-4 w-4" />
-              ) : (
-                <Moon className="h-4 w-4" />
-              )}
+              <ClientOnly fallback={<Palette className="h-4 w-4" />}>
+                {theme === 'dark' ? (
+                  <Sun className="h-4 w-4" />
+                ) : (
+                  <Moon className="h-4 w-4" />
+                )}
+              </ClientOnly>
             </Button>
             
             {/* Collapse Toggle */}
@@ -164,55 +163,7 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange }: SidebarProps
         )}
       </div>
 
-      {/* Workspace Selector */}
-  <div className="px-4 pt-4 pb-2">
-        {!collapsed ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                className="w-full justify-between h-auto p-3 bg-sidebar-accent/50 hover:bg-sidebar-accent"
-              >
-                <div className="text-left">
-                  <div className="text-sm font-medium text-sidebar-foreground">Home</div>
-                  <div className="text-xs text-sidebar-foreground/60">Change Workspaces</div>
-                </div>
-                <ChevronDown className="h-4 w-4 text-sidebar-foreground/60" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56 penseum-dropdown">
-              <DropdownMenuItem>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
-                    <Home className="h-4 w-4 text-primary-foreground" />
-                  </div>
-                  <div>
-                    <div className="font-medium">Home Workspace</div>
-                    <div className="text-xs text-muted-foreground">Personal documents</div>
-                  </div>
-                </div>
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
-                    <BookOpen className="h-4 w-4 text-white" />
-                  </div>
-                  <div>
-                    <div className="font-medium">Study Group</div>
-                    <div className="text-xs text-muted-foreground">Shared workspace</div>
-                  </div>
-                </div>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : (
-          <div className="flex justify-center">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
-              <Home className="h-5 w-5 text-primary-foreground" />
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Workspace Selector removed per request */}
 
       {/* Primary Action Button */}
       <div className="px-4 py-2">
@@ -221,7 +172,7 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange }: SidebarProps
             <DropdownMenuTrigger asChild>
               <Button 
                 variant="purple" 
-                className="w-full gap-2 penseum-button-primary"
+                className="w-full gap-2 penseum-button-primary dark:from-teal-600 dark:to-teal-700 dark:hover:from-teal-700 dark:hover:to-teal-800"
               >
                 <Plus className="h-4 w-4" />
                 New Course
@@ -251,7 +202,7 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange }: SidebarProps
           </DropdownMenu>
         ) : (
           <div className="flex justify-center">
-            <Button variant="purple" size="icon" className="w-10 h-10">
+            <Button variant="purple" size="icon" className="w-10 h-10 dark:from-teal-600 dark:to-teal-700 dark:hover:from-teal-700 dark:hover:to-teal-800">
               <Plus className="h-5 w-5" />
             </Button>
           </div>
