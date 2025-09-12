@@ -87,6 +87,12 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange }: SidebarProps
       current: pathname === '/dashboard'
     },
     {
+      name: 'Chat',
+      href: '/chat',
+      icon: Lightbulb,
+      current: pathname?.startsWith('/chat') || false
+    },
+    {
       name: 'Settings',
       href: '/settings',
       icon: Settings,
@@ -224,14 +230,18 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange }: SidebarProps
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-48 penseum-dropdown">
-              <DropdownMenuItem>
-                <Plus className="h-4 w-4 mr-2" />
-                New Lesson
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Lightbulb className="h-4 w-4 mr-2" />
-                New Solution
-              </DropdownMenuItem>
+              <Link href="/chat?type=course&title=New%20Course" prefetch>
+                <DropdownMenuItem>
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Course
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/chat?type=lesson&title=New%20Lesson" prefetch>
+                <DropdownMenuItem>
+                  <Lightbulb className="h-4 w-4 mr-2" />
+                  New Lesson
+                </DropdownMenuItem>
+              </Link>
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
@@ -253,7 +263,6 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange }: SidebarProps
               <div
                 className={cn(
                   "penseum-nav-item group",
-                  item.name === 'Settings' && 'mt-1.5',
                   item.current && "active",
                   collapsed && "justify-center"
                 )}
@@ -265,11 +274,6 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange }: SidebarProps
                 {!collapsed && (
                   <div className="flex items-center justify-between w-full">
                     <span className="truncate">{item.name}</span>
-                    {item.badge && (
-                      <Badge variant={item.badge.variant} className="ml-auto">
-                        {item.badge.text}
-                      </Badge>
-                    )}
                   </div>
                 )}
               </div>

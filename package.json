@@ -25,7 +25,7 @@
     "@radix-ui/react-toast": "^1.2.1",
     "@supabase/supabase-js": "^2.45.4",
     "@tanstack/react-query": "^5.56.2",
-    "ai": "^3.3.5",
+    "ai": "^3.4.33",
     "autoprefixer": "^10.4.20",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
@@ -40,13 +40,17 @@
     "react-dom": "^18.3.1",
     "react-dropzone": "^14.2.3",
     "react-hook-form": "^7.53.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "sonner": "^1.5.0",
     "tailwind-merge": "^2.5.2",
     "tailwindcss": "^3.4.10",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@types/node": "^20.16.10",
+    "@types/prismjs": "^1.26.5",
     "@types/react": "^18.3.6",
     "@types/react-dom": "^18.3.0",
     "eslint": "^8.57.0",
@@ -55,4 +59,3 @@
   },
   "packageManager": "pnpm@9.10.0"
 }
-

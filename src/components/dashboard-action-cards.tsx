@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { BookOpen, Lightbulb, Upload, FileText } from 'lucide-react'
 import { ActionCard } from '@/components/ui'
+import Link from 'next/link'
 
 interface DashboardActionCardsProps {
   onStartCourse?: () => void
@@ -10,17 +11,27 @@ interface DashboardActionCardsProps {
   onUploadDocument?: () => void
 }
 
+type CardItem = {
+  title: string
+  description: string
+  icon: React.ReactNode
+  variant: 'default' | 'purple' | 'teal'
+  onClick?: () => void
+  href?: string
+}
+
 export function DashboardActionCards({ 
   onStartCourse, 
   onStartLesson,
   onUploadDocument 
 }: DashboardActionCardsProps) {
-  const actionCards = [
+  const actionCards: CardItem[] = [
     {
       title: "Start a Course",
       description: "Plan for a Course",
       icon: <BookOpen className="h-6 w-6" />,
       variant: "purple" as const,
+      href: '/chat?type=course&title=New%20Course',
       onClick: onStartCourse
     },
     {
@@ -28,6 +39,7 @@ export function DashboardActionCards({
       description: "Learn something new!",
       icon: <Lightbulb className="h-6 w-6" />,
       variant: "teal" as const,
+      href: '/chat?type=lesson&title=New%20Lesson',
       onClick: onStartLesson
     },
     {
@@ -44,17 +56,24 @@ export function DashboardActionCards({
       <div className="space-y-6">
         {/* Action Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl">
-          {actionCards.map((card) => (
-            <ActionCard
-              key={card.title}
-              title={card.title}
-              description={card.description}
-              icon={card.icon}
-              variant={card.variant}
-              onClick={card.onClick}
-              className="h-24 hover:shadow-glow"
-            />
-          ))}
+          {actionCards.map((card) => {
+            const content = (
+              <ActionCard
+                key={card.title}
+                title={card.title}
+                description={card.description}
+                icon={card.icon}
+                variant={card.variant}
+                onClick={card.href ? undefined : card.onClick}
+                className="h-24 hover:shadow-glow"
+              />
+            )
+            return card.href ? (
+              <Link key={card.title} href={card.href} prefetch>
+                {content}
+              </Link>
+            ) : content
+          })}
         </div>
 
         {/* Feature Highlights */}

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { useDropzone } from 'react-dropzone'
 import { DashboardLayout } from '@/components/dashboard-layout'
@@ -22,8 +23,10 @@ export default function DashboardPage() {
       })
       
       if (response.ok) {
+        const result = await response.json()
         toast.success(`"${file.name}" uploaded successfully!`)
-        // Handle successful upload - could update state, refresh data, etc.
+        // Navigate to chat with document context (instant, no delay)
+        router.push(`/chat?type=document&documentId=${result.documentId || 'new'}&title=${encodeURIComponent(file.name)}`)
       } else {
         const error = await response.json()
         toast.error(error.error || 'Upload failed')
@@ -72,12 +75,21 @@ export default function DashboardPage() {
     input.click()
   }
 
+  const router = useRouter()
+
+  // Prefetch chat routes to make transitions instant
+  useEffect(() => {
+    router.prefetch('/chat')
+    router.prefetch('/chat?type=course&title=New%20Course')
+    router.prefetch('/chat?type=lesson&title=New%20Lesson')
+  }, [router])
+
   const handleStartCourse = () => {
-    toast.info('Course creation coming soon!')
+    router.push('/chat?type=course&title=New Course')
   }
 
   const handleStartLesson = () => {
-    toast.info('Lesson creation coming soon!')
+    router.push('/chat?type=lesson&title=New Lesson')
   }
 
   const handleViewModeChange = (mode: 'grid' | 'list') => {
