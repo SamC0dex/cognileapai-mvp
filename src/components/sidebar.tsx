@@ -2,7 +2,6 @@
 
 import * as React from 'react'
 import { useState } from 'react'
-import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { 
   ChevronLeft, 
@@ -103,7 +102,7 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange }: SidebarProps
   return (
     <motion.div 
       className={cn(
-        "flex flex-col h-screen penseum-sidebar",
+        "relative z-[200] flex flex-col h-screen penseum-sidebar pointer-events-auto",
         collapsed ? "w-16" : "w-64"
       )}
       initial={false}
@@ -230,18 +229,24 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange }: SidebarProps
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-48 penseum-dropdown">
-              <Link href="/chat?type=course&title=New%20Course" prefetch>
-                <DropdownMenuItem>
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Course
-                </DropdownMenuItem>
-              </Link>
-              <Link href="/chat?type=lesson&title=New%20Lesson" prefetch>
-                <DropdownMenuItem>
-                  <Lightbulb className="h-4 w-4 mr-2" />
-                  New Lesson
-                </DropdownMenuItem>
-              </Link>
+              <DropdownMenuItem 
+                onClick={() => {
+                  console.log('New Course clicked - direct navigation');
+                  window.location.href = '/chat?type=course&title=New%20Course';
+                }}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                New Course
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => {
+                  console.log('New Lesson clicked - direct navigation');
+                  window.location.href = '/chat?type=lesson&title=New%20Lesson';
+                }}
+              >
+                <Lightbulb className="h-4 w-4 mr-2" />
+                New Lesson
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
@@ -259,25 +264,31 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange }: SidebarProps
         {navigation.map((item) => {
           const Icon = item.icon
           return (
-            <Link key={item.name} href={item.href}>
-              <div
+            <button
+              key={item.name}
+              onClick={() => {
+                console.log(`Direct navigation to ${item.href}`);
+                window.location.href = item.href;
+              }}
+              className={cn(
+                "penseum-nav-item group w-full",
+                item.current && "active",
+                collapsed && "justify-center"
+              )}
+              type="button"
+            >
+              <Icon
                 className={cn(
-                  "penseum-nav-item group",
-                  item.current && "active",
-                  collapsed && "justify-center"
-                )}
-              >
-                <Icon className={cn(
                   "shrink-0",
                   collapsed ? "h-5 w-5" : "h-5 w-5"
-                )} />
-                {!collapsed && (
-                  <div className="flex items-center justify-between w-full">
-                    <span className="truncate">{item.name}</span>
-                  </div>
                 )}
-              </div>
-            </Link>
+              />
+              {!collapsed && (
+                <div className="flex items-center justify-between w-full">
+                  <span className="truncate">{item.name}</span>
+                </div>
+              )}
+            </button>
           )
         })}
       </nav>

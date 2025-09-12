@@ -268,7 +268,7 @@ export const ChatContainer: React.FC<{
 
   return (
     <ErrorBoundary onRetry={handleRetry}>
-      <div className="h-full flex flex-col bg-background">
+      <div className="relative h-full flex flex-col bg-background">
         {/* Demo Mode Banner */}
         {isDemoMode && (
           <div className="flex-shrink-0 px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">

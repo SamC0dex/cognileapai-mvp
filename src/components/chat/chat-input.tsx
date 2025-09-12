@@ -173,12 +173,17 @@ export const ChatInput: React.FC<ChatInputProps & {
       // Let default paste behavior handle this, but recalculate height
       setTimeout(calculateHeight, 0)
     }
-  }, [handleSendMessage, handleClear, inputValue, messages, calculateHeight])
+  }, [handleSendMessage, inputValue, messages, calculateHeight])
 
   // Listen for custom clear event
   useEffect(() => {
     const handleCustomClear = () => {
-      handleClear()
+      setInputValue('')
+      setTextareaHeight(MIN_HEIGHT)
+      if (textareaRef.current) {
+        textareaRef.current.style.height = `${MIN_HEIGHT}px`
+        textareaRef.current.focus()
+      }
     }
 
     const textarea = textareaRef.current
@@ -186,7 +191,7 @@ export const ChatInput: React.FC<ChatInputProps & {
       textarea.addEventListener('chat-clear', handleCustomClear)
       return () => textarea.removeEventListener('chat-clear', handleCustomClear)
     }
-  }, [handleClear])
+  }, [])
 
   const isOverLimit = inputValue.length > maxLength * 0.8
   const showCharacterCount = inputValue.length > 500 || isOverLimit

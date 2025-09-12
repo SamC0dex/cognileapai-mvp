@@ -155,9 +155,14 @@ export default function ChatPage({}: ChatPageProps) {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <button
-                  onClick={handleBackToDashboard}
+                  onClick={() => {
+                    console.log('Back button clicked - using direct navigation');
+                    window.location.href = '/dashboard';
+                  }}
                   className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                   title="Back to Dashboard"
+                  aria-label="Back to Dashboard"
+                  type="button"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />

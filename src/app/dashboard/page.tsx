@@ -10,6 +10,7 @@ import { DashboardActionCards } from '@/components/dashboard-action-cards'
 import { DashboardTabs } from '@/components/dashboard-tabs'
 
 export default function DashboardPage() {
+  const router = useRouter()
   const [isUploading, setIsUploading] = useState(false)
 
   const uploadFile = async (file: File) => {
@@ -74,8 +75,6 @@ export default function DashboardPage() {
     }
     input.click()
   }
-
-  const router = useRouter()
 
   // Prefetch chat routes to make transitions instant
   useEffect(() => {

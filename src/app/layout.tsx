@@ -19,10 +19,15 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <ThemeProvider 
+          attribute="class" 
+          defaultTheme="system" 
+          enableSystem
+          disableTransitionOnChange
+        >
           {children}
-          <Toaster richColors closeButton position="top-right" />
         </ThemeProvider>
+        <Toaster richColors closeButton position="top-right" />
       </body>
     </html>
   )
