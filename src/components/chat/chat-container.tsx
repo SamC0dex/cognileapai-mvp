@@ -157,7 +157,8 @@ export const ChatContainer: React.FC<{
 
   // Load conversation when document/conversation changes
   useEffect(() => {
-    if (documentId && conversationId) {
+    if (conversationId) {
+      // Load existing conversation (documentId is optional)
       loadConversation(conversationId, documentId)
     } else if (documentId) {
       // Set document context for new conversations
