@@ -6,7 +6,7 @@ import { Settings as SettingsIcon } from 'lucide-react'
 import { DashboardLayout } from '@/components/dashboard-layout'
 import { ChatContainer } from '@/components/chat/chat-container'
 import { ChatHistoryDrawer } from '@/components/chat-history-drawer'
-import { upsertThread, type ChatThread } from '@/lib/chat-history'
+import { createThreadId, upsertThread, type ChatThread } from '@/lib/chat-history'
 import type { GeminiModelKey } from '@/lib/ai-config'
 
 interface ChatPageProps {
@@ -135,6 +135,11 @@ export default function ChatPage({ params }: ChatPageProps) {
     router.push(`/chat/${t.id}`)
   }, [router])
 
+  const handleCurrentChatDeleted = useCallback(() => {
+    // Redirect to new chat when current chat is deleted
+    router.push('/chat')
+  }, [router])
+
   // Don't render until we have a conversation ID
   if (!conversationId) {
     return (
@@ -247,6 +252,8 @@ export default function ChatPage({ params }: ChatPageProps) {
           onClose={handleCloseHistory}
           onSelectThread={handleSelectThread}
           onNewChat={handleNewChat}
+          currentConversationId={conversationId}
+          onCurrentChatDeleted={handleCurrentChatDeleted}
         />
       </div>
     </DashboardLayout>

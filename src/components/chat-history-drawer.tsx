@@ -9,9 +9,18 @@ interface ChatHistoryDrawerProps {
   onClose: () => void
   onSelectThread?: (thread: ChatThread) => void
   onNewChat?: () => void
+  currentConversationId?: string | null
+  onCurrentChatDeleted?: () => void
 }
 
-export function ChatHistoryDrawer({ open, onClose, onSelectThread, onNewChat }: ChatHistoryDrawerProps) {
+export function ChatHistoryDrawer({
+  open,
+  onClose,
+  onSelectThread,
+  onNewChat,
+  currentConversationId,
+  onCurrentChatDeleted
+}: ChatHistoryDrawerProps) {
   const [query, setQuery] = useState("")
   const [threads, setThreads] = useState<ChatThread[]>([])
   const [filteredThreads, setFilteredThreads] = useState<ChatThread[]>([])
@@ -61,9 +70,18 @@ export function ChatHistoryDrawer({ open, onClose, onSelectThread, onNewChat }: 
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
+
+    // Check if we're deleting the currently active chat
+    const isDeletingCurrentChat = currentConversationId === id
+
     try {
       await deleteThread(id)
       await refresh()
+
+      // If we deleted the current chat, trigger redirect
+      if (isDeletingCurrentChat && onCurrentChatDeleted) {
+        onCurrentChatDeleted()
+      }
     } catch (error) {
       console.error('Failed to delete thread:', error)
     }
