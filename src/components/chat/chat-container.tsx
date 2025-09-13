@@ -4,7 +4,6 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChatMessage } from './chat-message'
 import { ChatInput } from './chat-input'
-import { StreamingIndicator } from './streaming-indicator'
 import { useChatStore, getSuggestedQuestions } from '@/lib/chat-store'
 import type { Citation } from './types'
 
@@ -208,11 +207,7 @@ export const ChatContainer: React.FC<{
 
   // Check if the last message is streaming
   const lastMessage = messages[messages.length - 1]
-  const showStreamingIndicator = useMemo(() => {
-    // Don't show the old streaming indicator if we have a streaming assistant message
-    const hasStreamingAssistant = messages.some(msg => msg.role === 'assistant' && msg.isStreaming)
-    return Boolean(streamingMessage && !hasStreamingAssistant)
-  }, [streamingMessage, messages])
+  const hasStreamingMessage = messages.some(msg => msg.role === 'assistant' && msg.isStreaming)
 
   // Get suggested questions based on document context
   const suggestedQuestions = useMemo(() => {
@@ -358,8 +353,8 @@ export const ChatContainer: React.FC<{
             />
           )}
 
-          {/* Messages */}
-          {!isLoading && messages.length > 0 && (
+          {/* Messages - Always render to show streaming placeholders immediately */}
+          {!isLoading && (
             <div className="p-4 space-y-1">
               <AnimatePresence initial={false}>
                 {messages.map((message) => (
@@ -372,33 +367,6 @@ export const ChatContainer: React.FC<{
                   />
                 ))}
               </AnimatePresence>
-
-              {/* Show current streaming content */}
-              {streamingMessage && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex justify-start"
-                >
-                  <div className="group relative">
-                    <div className="text-xs text-muted-foreground mb-1 ml-4">AI</div>
-                    <div className="max-w-[85%] px-4 py-3 rounded-2xl rounded-bl-sm text-[15px] leading-relaxed bg-muted text-foreground border border-border">
-                      {streamingMessage}
-                      <motion.span
-                        animate={{ opacity: [1, 0] }}
-                        transition={{ duration: 1, repeat: Infinity }}
-                        className="inline-block w-2 h-5 bg-primary ml-1"
-                      />
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Streaming Indicator */}
-              <StreamingIndicator 
-                isVisible={showStreamingIndicator && !streamingMessage}
-                text="AI is thinking..."
-              />
             </div>
           )}
 
@@ -432,7 +400,7 @@ export const ChatContainer: React.FC<{
         {/* Input Area */}
         <ChatInput
           onSendMessage={handleSendMessage}
-          disabled={showStreamingIndicator}
+          disabled={hasStreamingMessage}
           placeholder="Ask about concepts, request summaries, or get explanations..."
           maxLength={4000}
           autoFocus={false}
