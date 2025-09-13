@@ -9,7 +9,6 @@ import {
   Plus, 
   LayoutDashboard, 
   Settings,
-  FileText,
   Lightbulb,
   ChevronDown,
   MoreHorizontal,
@@ -32,6 +31,7 @@ import {
   Separator
 } from '@/components/ui'
 import { ClientOnly } from '@/components/client-only'
+import { Logo } from './logo'
 
 interface SidebarProps {
   isCollapsed?: boolean
@@ -108,18 +108,20 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange }: SidebarProps
     >
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
-        {!collapsed && (
+        {!collapsed ? (
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
-              <FileText className="h-5 w-5 text-primary-foreground" />
-            </div>
+            <Logo width={36} height={36} />
             <span className="text-lg font-semibold text-sidebar-foreground">
               CogniLeap
             </span>
           </div>
+        ) : (
+          <div className="flex justify-center">
+            <Logo width={32} height={32} />
+          </div>
         )}
         
-        {/* Show theme toggle only when not collapsed, otherwise show collapse toggle centered */}
+        {/* Show theme toggle only when not collapsed, otherwise show collapse toggle */}
         {!collapsed ? (
           <div className="flex items-center gap-2">
             {/* Theme Toggle */}
@@ -148,20 +150,22 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange }: SidebarProps
               <ChevronLeft className="h-4 w-4" />
             </Button>
           </div>
-        ) : (
-          <div className="flex justify-center">
-            {/* Collapse Toggle - centered when collapsed */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleToggle}
-              className="h-8 w-8 hover:bg-sidebar-accent transition-colors duration-150"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
+        ) : null}
       </div>
+
+      {/* Collapse toggle for collapsed state */}
+      {collapsed && (
+        <div className="flex justify-center py-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleToggle}
+            className="h-8 w-8 hover:bg-sidebar-accent transition-colors duration-150"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
 
       {/* Workspace Selector removed per request */}
 

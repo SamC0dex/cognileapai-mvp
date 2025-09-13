@@ -1,8 +1,9 @@
 'use client'
 
-import { Sun, Moon, FileText } from 'lucide-react'
+import { Sun, Moon } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import Link from 'next/link'
+import { Logo } from './logo'
 
 export function Header() {
   const { theme, setTheme } = useTheme()
@@ -44,7 +45,7 @@ export function Header() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-14 items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-primary" />
+            <Logo width={24} height={24} />
             <span className="text-lg font-semibold">CogniLeap</span>
           </Link>
           
