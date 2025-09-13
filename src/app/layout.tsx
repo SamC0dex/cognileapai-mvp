@@ -26,57 +26,114 @@ export default function RootLayout({
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `
-              // Clean up browser extension artifacts before React hydration
+              // Enhanced cleanup for browser extension artifacts
               if (typeof window !== 'undefined') {
-                // Remove extension-injected attributes
+                // Comprehensive list of extension attributes to clean
+                const extensionAttrs = [
+                  'bis_skin_checked',
+                  'data-coupon-processed',
+                  'data-darkreader-inline-bgcolor',
+                  'data-darkreader-inline-color',
+                  'data-darkreader-inline-fill',
+                  'data-darkreader-inline-stroke',
+                  'data-darkreader-inline-stopcolor',
+                  'data-adblockkey',
+                  'data-honey-extension',
+                  'data-capital-one-extension'
+                ];
+
+                // Function to clean all extension attributes from an element
+                function cleanExtensionAttributes(element) {
+                  if (!element || !element.removeAttribute) return;
+                  extensionAttrs.forEach(attr => {
+                    if (element.hasAttribute(attr)) {
+                      element.removeAttribute(attr);
+                    }
+                  });
+                }
+
+                // Initial cleanup before React hydration
+                function initialCleanup() {
+                  extensionAttrs.forEach(attr => {
+                    const elements = document.querySelectorAll('[' + attr + ']');
+                    elements.forEach(cleanExtensionAttributes);
+                  });
+                }
+
+                // Immediate cleanup
+                if (document.readyState === 'loading') {
+                  document.addEventListener('DOMContentLoaded', initialCleanup);
+                } else {
+                  initialCleanup();
+                }
+
+                // Continuous monitoring with mutation observer
                 const observer = new MutationObserver((mutations) => {
                   mutations.forEach((mutation) => {
                     if (mutation.type === 'attributes') {
                       const target = mutation.target;
-                      if (target && target.removeAttribute) {
-                        // Remove common extension attributes
-                        if (target.hasAttribute('bis_skin_checked')) {
-                          target.removeAttribute('bis_skin_checked');
-                        }
-                        if (target.hasAttribute('data-coupon-processed')) {
-                          target.removeAttribute('data-coupon-processed');
-                        }
+                      if (extensionAttrs.includes(mutation.attributeName)) {
+                        cleanExtensionAttributes(target);
                       }
+                    } else if (mutation.type === 'childList') {
+                      mutation.addedNodes.forEach(node => {
+                        if (node.nodeType === 1) { // Element node
+                          cleanExtensionAttributes(node);
+                          // Clean child elements too
+                          if (node.querySelectorAll) {
+                            extensionAttrs.forEach(attr => {
+                              const elements = node.querySelectorAll('[' + attr + ']');
+                              elements.forEach(cleanExtensionAttributes);
+                            });
+                          }
+                        }
+                      });
                     }
                   });
                 });
-                
-                // Start observing before React loads
+
+                // Start observing with more comprehensive options
                 observer.observe(document.documentElement, {
                   attributes: true,
                   childList: true,
                   subtree: true,
-                  attributeFilter: ['bis_skin_checked', 'data-coupon-processed']
+                  attributeFilter: extensionAttrs
                 });
-                
-                // Remove extension-injected divs and Dark Reader modifications
-                document.addEventListener('DOMContentLoaded', () => {
-                  const extensionDivs = document.querySelectorAll('#coupon-birds-embed-div, [id*="coupon"], [id*="honey"], [id*="capital"]');
-                  extensionDivs.forEach(div => {
-                    if (div && div.parentNode) {
-                      div.parentNode.removeChild(div);
+
+                // Cleanup extension-injected DOM elements
+                function removeExtensionElements() {
+                  const selectors = [
+                    '#coupon-birds-embed-div',
+                    '[id*="coupon"]',
+                    '[id*="honey"]',
+                    '[id*="capital"]',
+                    '[class*="darkreader"]',
+                    '[id*="adblock"]'
+                  ];
+
+                  selectors.forEach(selector => {
+                    try {
+                      const elements = document.querySelectorAll(selector);
+                      elements.forEach(el => {
+                        if (el && el.parentNode && !el.closest('[data-app-content]')) {
+                          el.parentNode.removeChild(el);
+                        }
+                      });
+                    } catch (e) {
+                      // Ignore selector errors
                     }
                   });
+                }
 
-                  // Clean up Dark Reader attributes that cause hydration issues
-                  const darkReaderAttrs = ['data-darkreader-inline-bgcolor', 'data-darkreader-inline-color', 'data-darkreader-inline-fill', 'data-darkreader-inline-stroke', 'data-darkreader-inline-stopcolor'];
-                  darkReaderAttrs.forEach(attr => {
-                    const elements = document.querySelectorAll('[' + attr + ']');
-                    elements.forEach(el => {
-                      el.removeAttribute(attr);
-                      const style = el.style;
-                      const cssProp = '--darkreader-inline-' + attr.replace('data-darkreader-inline-', '');
-                      if (style.getPropertyValue(cssProp)) {
-                        style.removeProperty(cssProp);
-                      }
-                    });
-                  });
-                });
+                // Run cleanup at multiple points
+                document.addEventListener('DOMContentLoaded', removeExtensionElements);
+                if (document.readyState === 'complete') {
+                  removeExtensionElements();
+                }
+
+                // Additional cleanup after a short delay to catch late-loading extensions
+                setTimeout(removeExtensionElements, 100);
+                setTimeout(initialCleanup, 200);
               }
             `,
           }}

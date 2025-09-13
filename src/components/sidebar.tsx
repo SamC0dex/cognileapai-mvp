@@ -130,13 +130,16 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange }: SidebarProps
               size="icon"
               onClick={toggleTheme}
               className="h-8 w-8 hover:bg-sidebar-accent transition-colors duration-150"
+              suppressHydrationWarning
             >
               <ClientOnly fallback={<Palette className="h-4 w-4" />}>
-                {theme === 'dark' ? (
-                  <Sun className="h-4 w-4" />
-                ) : (
-                  <Moon className="h-4 w-4" />
-                )}
+                <span suppressHydrationWarning>
+                  {theme === 'dark' ? (
+                    <Sun className="h-4 w-4" />
+                  ) : (
+                    <Moon className="h-4 w-4" />
+                  )}
+                </span>
               </ClientOnly>
             </Button>
             
