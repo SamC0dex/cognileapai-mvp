@@ -227,9 +227,21 @@ export function useChatStore(): StoreShape {
     const id = `u_${Date.now()}`
     const user: Message = { id, role: 'user', content, timestamp: new Date() }
 
-    // Optimistically add user message
+    // Instantly show user message (optimistic UI)
     setMessages(prev => [...prev, user])
-    setIsLoading(true)
+
+    // Immediately add assistant placeholder for streaming
+    const assistantId = `a_${Date.now()}`
+    const assistantPlaceholder: Message = {
+      id: assistantId,
+      role: 'assistant',
+      content: '',
+      timestamp: new Date(),
+      isStreaming: true
+    }
+    setMessages(prev => [...prev, assistantPlaceholder])
+
+    setIsLoading(false) // No loading state needed with optimistic UI
     setStreamingMessage('')
     setError(null)
 
@@ -257,13 +269,108 @@ export function useChatStore(): StoreShape {
       console.log(`[Chat] Sending message with model ${modelToUse}...`)
       const startTime = Date.now()
 
-      const response = await streamFromApi(payload)
-      const { text, metadata: streamMetadata } = response
+      // Ultra-smooth streaming: consistent pace like ChatGPT/T3.chat
+      let serverBuffer = '' // Buffer for chunks from server
+      let displayedText = '' // Text currently shown to user
+      let isStreamingActive = true
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+
+      if (!res.ok) {
+        throw new Error(`API error: ${res.status}`)
+      }
+
+      if (!res.body) {
+        throw new Error('No response body')
+      }
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+
+      // Smooth text streaming at consistent pace
+      const STREAM_SPEED = 25 // ms per character for smooth flow
+      let streamInterval: NodeJS.Timeout
+
+      const startSmoothStreaming = () => {
+        streamInterval = setInterval(() => {
+          if (displayedText.length < serverBuffer.length && isStreamingActive) {
+            // Stream one character at a time for ultra-smooth effect
+            displayedText = serverBuffer.slice(0, displayedText.length + 1)
+
+            // Update UI with smooth transition
+            setMessages(prev => prev.map(msg =>
+              msg.id === assistantId
+                ? { ...msg, content: displayedText, isStreaming: true }
+                : msg
+            ))
+          } else if (displayedText.length >= serverBuffer.length && !isStreamingActive) {
+            // Streaming complete - stop interval and mark as done
+            clearInterval(streamInterval)
+            setMessages(prev => prev.map(msg =>
+              msg.id === assistantId
+                ? { ...msg, content: displayedText, isStreaming: false }
+                : msg
+            ))
+          }
+        }, STREAM_SPEED)
+      }
+
+      // Start smooth streaming immediately
+      startSmoothStreaming()
+
+      // Collect chunks from server as fast as possible
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) {
+          isStreamingActive = false
+          break
+        }
+
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n').filter(line => line.trim())
+
+        for (const line of lines) {
+          try {
+            if (line.startsWith('0:')) {
+              const content = JSON.parse(line.slice(2))
+              if (typeof content === 'string') {
+                serverBuffer += content
+              }
+            } else if (line.startsWith('d:')) {
+              const data = line.slice(2)
+              try {
+                const parsed = JSON.parse(data)
+                if (parsed?.text) {
+                  serverBuffer += parsed.text
+                }
+              } catch {
+                if (data) {
+                  serverBuffer += data
+                }
+              }
+            }
+          } catch (parseError) {
+            continue
+          }
+        }
+      }
+
+      // Ensure smooth streaming completes
+      const waitForCompletion = setInterval(() => {
+        if (displayedText.length >= serverBuffer.length) {
+          clearInterval(waitForCompletion)
+          clearInterval(streamInterval)
+        }
+      }, 100)
 
       const duration = Date.now() - startTime
-      console.log(`[Chat] Received AI response in ${duration}ms:`, text?.slice(0, 100) + '...')
+      console.log(`[Chat] Streaming completed in ${duration}ms`)
 
-      if (!text || text.trim() === '') {
+      if (!serverBuffer || serverBuffer.trim() === '') {
         throw new Error('AI response was empty')
       }
 
@@ -271,25 +378,32 @@ export function useChatStore(): StoreShape {
       const { GeminiModelSelector } = await import('./ai-config')
       const modelConfig = GeminiModelSelector.getModelConfig(modelToUse)
 
-      const ai: Message = {
-        id: `a_${Date.now()}`,
-        role: 'assistant',
-        content: text,
-        timestamp: new Date(),
-        metadata: {
-          model: modelConfig.displayName,
-          modelKey: modelToUse,
-          duration,
-          ...streamMetadata
-        }
+      // Final update with metadata (will be handled by the interval completion)
+      const finalUpdate = () => {
+        setMessages(prev => prev.map(msg =>
+          msg.id === assistantId
+            ? {
+                ...msg,
+                content: serverBuffer,
+                isStreaming: false,
+                metadata: {
+                  model: modelConfig.displayName,
+                  modelKey: modelToUse,
+                  duration
+                }
+              }
+            : msg
+        ))
       }
-      setMessages(prev => [...prev, ai])
+
+      // Wait a bit for smooth streaming to complete, then add metadata
+      setTimeout(finalUpdate, 500)
 
       // Update chat history (debounced to avoid too frequent updates)
       if (typeof window !== 'undefined') {
         try {
           const { upsertThread, touchThread } = await import('./chat-history')
-          const preview = text.slice(0, 100) + (text.length > 100 ? '...' : '')
+          const preview = serverBuffer.slice(0, 100) + (serverBuffer.length > 100 ? '...' : '')
 
           if (allMessagesRef.current.length === 0) {
             // New conversation
@@ -319,8 +433,8 @@ export function useChatStore(): StoreShape {
       console.error('[Chat] sendMessage failed:', errorMessage, e)
       setError(`Failed to send message: ${errorMessage}`)
 
-      // Remove the optimistically added user message on error
-      setMessages(prev => prev.slice(0, -1))
+      // Remove both optimistically added user message and assistant placeholder on error
+      setMessages(prev => prev.slice(0, -2))
     } finally {
       setIsLoading(false)
       setStreamingMessage('')

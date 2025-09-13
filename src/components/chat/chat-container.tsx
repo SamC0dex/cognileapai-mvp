@@ -209,11 +209,10 @@ export const ChatContainer: React.FC<{
   // Check if the last message is streaming
   const lastMessage = messages[messages.length - 1]
   const showStreamingIndicator = useMemo(() => {
-    return Boolean(
-      streamingMessage || 
-      (lastMessage?.isStreaming && lastMessage.role === 'assistant')
-    )
-  }, [streamingMessage, lastMessage])
+    // Don't show the old streaming indicator if we have a streaming assistant message
+    const hasStreamingAssistant = messages.some(msg => msg.role === 'assistant' && msg.isStreaming)
+    return Boolean(streamingMessage && !hasStreamingAssistant)
+  }, [streamingMessage, messages])
 
   // Get suggested questions based on document context
   const suggestedQuestions = useMemo(() => {

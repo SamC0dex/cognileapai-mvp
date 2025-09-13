@@ -115,21 +115,23 @@ export const ChatInput: React.FC<ChatInputProps & {
 
   const handleSendMessage = useCallback(async () => {
     const trimmedValue = inputValue.trim()
-    
+
     if (!trimmedValue || isSending || disabled) return
 
+    // Instantly clear input for immediate feedback
+    setInputValue('')
+    setTextareaHeight(MIN_HEIGHT)
+    if (textareaRef.current) {
+      textareaRef.current.style.height = `${MIN_HEIGHT}px`
+      textareaRef.current.focus()
+    }
+
+    // Send message optimistically (UI updates happen in chat-store)
     try {
       await onSendMessage(trimmedValue)
-      setInputValue('')
-      
-      // Reset textarea height
-      setTextareaHeight(MIN_HEIGHT)
-      if (textareaRef.current) {
-        textareaRef.current.style.height = `${MIN_HEIGHT}px`
-        textareaRef.current.focus()
-      }
     } catch (error) {
       console.error('Failed to send message:', error)
+      // Error handling is managed in chat-store
     }
   }, [inputValue, isSending, disabled, onSendMessage])
 
@@ -416,18 +418,18 @@ export const ChatInput: React.FC<ChatInputProps & {
                   )}
                 </AnimatePresence>
 
-                {/* Send Button */}
+                {/* Send Button - Enhanced for instant feedback */}
                 <motion.button
                   whileHover={canSend ? { scale: 1.05, y: -1 } : {}}
                   whileTap={canSend ? { scale: 0.95 } : {}}
                   onClick={handleSendMessage}
                   disabled={!canSend}
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 ${
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-150 ${
                     canSend
                       ? 'bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg hover:shadow-xl hover:shadow-primary/25 dark:from-teal-600 dark:to-teal-700 dark:text-white dark:hover:from-teal-700 dark:hover:to-teal-800'
                       : 'bg-muted text-muted-foreground cursor-not-allowed'
                   }`}
-                  title={isSending ? 'Sending...' : 'Send message'}
+                  title={isSending ? 'AI is responding...' : 'Send message'}
                 >
                   {isSending ? (
                     <motion.svg

@@ -4,6 +4,7 @@ import React, { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { MemoizedMarkdown } from './memoized-markdown'
 import type { ChatMessageProps, Citation } from './types'
 
 const formatRelativeTime = (date: Date): string => {
@@ -211,27 +212,27 @@ export const ChatMessage: React.FC<ChatMessageProps & {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: 'easeOut' }}
-      className={`flex ${role === 'user' ? 'justify-end' : 'justify-start'} mb-4 group`}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+      className={`flex ${role === 'user' ? 'justify-end' : 'justify-start'} mb-6 group`}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
-      <div className={`flex ${role === 'user' ? 'flex-row-reverse' : 'flex-row'} items-start gap-3 max-w-[85%]`}>
-        {/* Avatar */}
+      <div className={`flex ${role === 'user' ? 'flex-row-reverse' : 'flex-row'} items-start gap-3 max-w-[90%] md:max-w-[85%]`}>
+        {/* Modern Avatar */}
         {showAvatar && (
-          <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-            role === 'user' 
-              ? 'bg-primary text-primary-foreground' 
-              : 'bg-muted border border-border'
+          <div className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center shadow-sm ${
+            role === 'user'
+              ? 'bg-gradient-to-br from-primary to-primary/80 text-primary-foreground'
+              : 'bg-gradient-to-br from-muted to-muted/80 border border-border/50'
           }`}>
             {role === 'user' ? (
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
               </svg>
             ) : (
-              <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
             )}
@@ -240,42 +241,44 @@ export const ChatMessage: React.FC<ChatMessageProps & {
 
         {/* Message Content */}
         <div className="flex flex-col space-y-1">
-          {/* Message Bubble */}
+          {/* Enhanced Message Bubble */}
           <div
-            className={`px-4 py-3 rounded-2xl text-[15px] leading-relaxed relative ${
+            className={`px-4 py-3 rounded-2xl text-[15px] leading-relaxed relative transition-all duration-200 ${
               role === 'user'
-                ? 'bg-primary/10 text-foreground rounded-br-sm border border-primary/20'
-                : 'bg-muted text-foreground rounded-bl-sm border border-border'
+                ? 'bg-primary/8 text-foreground rounded-br-md border border-primary/15 shadow-sm hover:shadow-md'
+                : 'bg-background text-foreground rounded-bl-md border border-border/40 shadow-sm hover:shadow-md hover:border-border/60'
             }`}
           >
-            {/* Streaming indicator */}
-            {isStreaming && role === 'assistant' && (
-              <div className="flex items-center space-x-1 mb-2">
-                <div className="flex space-x-1">
+            {/* Elegant loading dots - no text, just beautiful animation */}
+            {isStreaming && role === 'assistant' && content.length === 0 && (
+              <div className="flex items-center justify-start py-2">
+                <div className="flex items-center space-x-1">
                   {[0, 1, 2].map((i) => (
                     <motion.div
                       key={i}
-                      animate={{ scale: [1, 1.2, 1] }}
-                      transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
-                      className="w-2 h-2 bg-primary rounded-full"
+                      animate={{
+                        opacity: [0.3, 1, 0.3],
+                        scale: [0.8, 1, 0.8]
+                      }}
+                      transition={{
+                        duration: 1.4,
+                        repeat: Infinity,
+                        delay: i * 0.2,
+                        ease: "easeInOut"
+                      }}
+                      className="w-1.5 h-1.5 bg-primary/60 rounded-full"
                     />
                   ))}
                 </div>
-                <span className="text-xs text-muted-foreground ml-2">AI is typing...</span>
               </div>
             )}
 
-            {/* Markdown Content */}
-            <div className="prose prose-sm max-w-none prose-slate dark:prose-invert prose-headings:font-semibold prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-code:text-foreground prose-pre:bg-slate-900 prose-pre:text-slate-100">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={customComponents}
-                skipHtml={false}
-                allowedElements={undefined}
-              >
-                {content}
-              </ReactMarkdown>
-            </div>
+            {/* Optimized Markdown Content with Memoization */}
+            <MemoizedMarkdown
+              content={content}
+              isStreaming={isStreaming}
+              customComponents={customComponents}
+            />
 
             {/* Citations */}
             {citations && citations.length > 0 && !isStreaming && (
