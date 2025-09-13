@@ -26,9 +26,9 @@ const LoadingSkeleton: React.FC = React.memo(() => (
       </div>
     ))}
   </div>
-))
+));
 
-LoadingSkeleton.displayName = 'LoadingSkeleton'
+LoadingSkeleton.displayName = 'LoadingSkeleton';
 
 const EmptyState: React.FC<{
   suggestedQuestions: string[]
@@ -45,9 +45,9 @@ const EmptyState: React.FC<{
       </svg>
     </div>
     
-    <h3 className="text-xl font-semibold text-foreground mb-3">Start a conversation about your document</h3>
+    <h3 className="text-xl font-semibold text-foreground mb-3">Hey there! How can I help you today?</h3>
     <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-      Ask questions, request summaries, or get detailed explanations about any part of the document.
+      I'm powered by Gemini AI and ready to assist with your questions.
     </p>
     
     {/* Suggested Questions */}
@@ -78,9 +78,9 @@ const EmptyState: React.FC<{
       </div>
     )}
   </motion.div>
-))
+));
 
-EmptyState.displayName = 'EmptyState'
+EmptyState.displayName = 'EmptyState';
 
 const ErrorBoundary: React.FC<{ 
   children: React.ReactNode

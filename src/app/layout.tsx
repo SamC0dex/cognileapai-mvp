@@ -54,13 +54,27 @@ export default function RootLayout({
                   attributeFilter: ['bis_skin_checked', 'data-coupon-processed']
                 });
                 
-                // Remove extension-injected divs
+                // Remove extension-injected divs and Dark Reader modifications
                 document.addEventListener('DOMContentLoaded', () => {
                   const extensionDivs = document.querySelectorAll('#coupon-birds-embed-div, [id*="coupon"], [id*="honey"], [id*="capital"]');
                   extensionDivs.forEach(div => {
                     if (div && div.parentNode) {
                       div.parentNode.removeChild(div);
                     }
+                  });
+
+                  // Clean up Dark Reader attributes that cause hydration issues
+                  const darkReaderAttrs = ['data-darkreader-inline-bgcolor', 'data-darkreader-inline-color', 'data-darkreader-inline-fill', 'data-darkreader-inline-stroke', 'data-darkreader-inline-stopcolor'];
+                  darkReaderAttrs.forEach(attr => {
+                    const elements = document.querySelectorAll('[' + attr + ']');
+                    elements.forEach(el => {
+                      el.removeAttribute(attr);
+                      const style = el.style;
+                      const cssProp = '--darkreader-inline-' + attr.replace('data-darkreader-inline-', '');
+                      if (style.getPropertyValue(cssProp)) {
+                        style.removeProperty(cssProp);
+                      }
+                    });
                   });
                 });
               }
@@ -85,4 +99,3 @@ export default function RootLayout({
     </html>
   )
 }
-

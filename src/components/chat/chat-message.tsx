@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useCallback } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { ChatMessageProps, Citation } from './types'
@@ -77,13 +77,23 @@ const CitationLink: React.FC<{
 
 CitationLink.displayName = 'CitationLink'
 
-export const ChatMessage: React.FC<ChatMessageProps> = React.memo(({
+export const ChatMessage: React.FC<ChatMessageProps & {
+  onRegenerate?: () => void
+  onCopy?: (text: string) => void
+  onThumbsUp?: () => void
+  onThumbsDown?: () => void
+}> = React.memo(({
   message,
   onCitationClick,
   showAvatar = true,
-  showTimestamp = true
+  showTimestamp = true,
+  onRegenerate,
+  onCopy,
+  onThumbsUp,
+  onThumbsDown
 }) => {
-  const { role, content, timestamp, isStreaming, citations } = message
+  const { role, content, timestamp, isStreaming, citations, metadata } = message
+  const [showActions, setShowActions] = useState(false)
 
   const customComponents = {
     // Custom code block component with copy button
@@ -190,12 +200,23 @@ export const ChatMessage: React.FC<ChatMessageProps> = React.memo(({
     }
   }
 
+  const handleCopyMessage = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(content)
+      onCopy?.(content)
+    } catch (err) {
+      console.error('Failed to copy message:', err)
+    }
+  }, [content, onCopy])
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
       className={`flex ${role === 'user' ? 'justify-end' : 'justify-start'} mb-4 group`}
+      onMouseEnter={() => setShowActions(true)}
+      onMouseLeave={() => setShowActions(false)}
     >
       <div className={`flex ${role === 'user' ? 'flex-row-reverse' : 'flex-row'} items-start gap-3 max-w-[85%]`}>
         {/* Avatar */}
@@ -245,10 +266,12 @@ export const ChatMessage: React.FC<ChatMessageProps> = React.memo(({
             )}
 
             {/* Markdown Content */}
-            <div className="prose prose-sm max-w-none dark:prose-invert">
+            <div className="prose prose-sm max-w-none prose-slate dark:prose-invert prose-headings:font-semibold prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-code:text-foreground prose-pre:bg-slate-900 prose-pre:text-slate-100">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={customComponents}
+                skipHtml={false}
+                allowedElements={undefined}
               >
                 {content}
               </ReactMarkdown>
@@ -273,14 +296,97 @@ export const ChatMessage: React.FC<ChatMessageProps> = React.memo(({
 
             {/* Metadata for AI messages */}
             {role === 'assistant' && message.metadata && !isStreaming && (
-              <div className="mt-3 pt-2 border-t border-border/30 text-xs text-muted-foreground space-y-1">
-                {message.metadata.model && (
-                  <div>Model: {message.metadata.model}</div>
-                )}
-                {message.metadata.tokens && (
-                  <div>Tokens: {message.metadata.tokens}</div>
-                )}
+              <div className="mt-3 pt-2 border-t border-border/30 text-xs text-muted-foreground">
+                <div className="flex items-center justify-between">
+                  {message.metadata.model && (
+                    <span className="font-medium">{message.metadata.model}</span>
+                  )}
+                  {message.metadata.tokens && (
+                    <span>{message.metadata.tokens} tokens</span>
+                  )}
+                </div>
               </div>
+            )}
+
+            {/* Action Buttons */}
+            {role === 'assistant' && !isStreaming && (
+              <AnimatePresence>
+                {showActions && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 5 }}
+                    transition={{ duration: 0.15 }}
+                    className="flex items-center gap-1 mt-3 pt-2 border-t border-border/20"
+                  >
+                    {/* Copy Button */}
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={handleCopyMessage}
+                      className="p-2 rounded-md hover:bg-muted/50 transition-colors group/btn"
+                      title="Copy message"
+                    >
+                      <svg className="w-4 h-4 text-muted-foreground group-hover/btn:text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    </motion.button>
+
+                    {/* Thumbs Up */}
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={onThumbsUp}
+                      className="p-2 rounded-md hover:bg-muted/50 transition-colors group/btn"
+                      title="Good response"
+                    >
+                      <svg className="w-4 h-4 text-muted-foreground group-hover/btn:text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2v0a2 2 0 00-2 2v5m-4 0H4m0 0L2 10m2 0l2 2" />
+                      </svg>
+                    </motion.button>
+
+                    {/* Thumbs Down */}
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={onThumbsDown}
+                      className="p-2 rounded-md hover:bg-muted/50 transition-colors group/btn"
+                      title="Poor response"
+                    >
+                      <svg className="w-4 h-4 text-muted-foreground group-hover/btn:text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018c.163 0 .326.02.485.06L17 4m-7 10v2a2 2 0 002 2v0a2 2 0 002-2v-5m-4 0h8m0 0l2-2m-2 2l-2-2" />
+                      </svg>
+                    </motion.button>
+
+                    {/* Regenerate */}
+                    {onRegenerate && (
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={onRegenerate}
+                        className="p-2 rounded-md hover:bg-muted/50 transition-colors group/btn"
+                        title="Regenerate response"
+                      >
+                        <svg className="w-4 h-4 text-muted-foreground group-hover/btn:text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                      </motion.button>
+                    )}
+
+                    {/* More Options */}
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="p-2 rounded-md hover:bg-muted/50 transition-colors group/btn"
+                      title="More options"
+                    >
+                      <svg className="w-4 h-4 text-muted-foreground group-hover/btn:text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                      </svg>
+                    </motion.button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             )}
           </div>
 

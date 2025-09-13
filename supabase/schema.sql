@@ -41,5 +41,32 @@ create table if not exists public.outputs (
 );
 create index if not exists outputs_doc_sec_type_idx on public.outputs(document_id, section_id, type);
 
+-- Conversations for chat functionality
+create table if not exists public.conversations (
+  id uuid primary key default uuid_generate_v4(),
+  title text,
+  document_id uuid references public.documents(id) on delete cascade,
+  is_active boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- Messages for chat functionality
+create table if not exists public.messages (
+  id uuid primary key default uuid_generate_v4(),
+  conversation_id uuid not null references public.conversations(id) on delete cascade,
+  role text not null check (role in ('user', 'assistant')),
+  content text not null,
+  sequence_number int not null,
+  metadata jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(conversation_id, sequence_number)
+);
+
+create index if not exists messages_conversation_id_idx on public.messages(conversation_id);
+create index if not exists messages_sequence_idx on public.messages(conversation_id, sequence_number);
+create index if not exists conversations_document_id_idx on public.conversations(document_id);
+
 -- Storage bucket should be created as 'documents' via UI; ensure it's private
 

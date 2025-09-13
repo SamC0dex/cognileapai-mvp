@@ -9,8 +9,22 @@
   [id*="capital-one"],
   [id*="rakuten"],
   [id*="coupon"],
-  [bis_skin_checked] {
+  [bis_skin_checked],
+  /* Hide Dark Reader injection elements */
+  [data-darkreader-inline-bgcolor],
+  [data-darkreader-inline-color],
+  [data-darkreader-inline-fill],
+  [data-darkreader-inline-stroke] {
     display: none !important;
+  }
+
+  /* Prevent Dark Reader from modifying SVG elements */
+  svg[data-darkreader-inline-stroke] {
+    stroke: currentColor !important;
+  }
+
+  svg[data-darkreader-inline-fill] {
+    fill: currentColor !important;
   }
   
   :root {

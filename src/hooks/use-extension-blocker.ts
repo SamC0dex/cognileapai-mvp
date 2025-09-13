@@ -13,7 +13,15 @@ export function useExtensionBlocker() {
       'data-honey-installed',
       'data-rakuten-processed',
       'data-capital-one-shopping',
-      'data-joinhoney-installed'
+      'data-joinhoney-installed',
+      // Dark Reader extension attributes
+      'data-darkreader-inline-bgcolor',
+      'data-darkreader-inline-color',
+      'data-darkreader-inline-fill',
+      'data-darkreader-inline-stroke',
+      'data-darkreader-inline-stopcolor',
+      'data-darkreader-inline-border',
+      'data-darkreader-inline-boxshadow'
     ]
 
     const extensionIds = [
@@ -30,6 +38,14 @@ export function useExtensionBlocker() {
         const elements = document.querySelectorAll(`[${attr}]`)
         elements.forEach(el => {
           el.removeAttribute(attr)
+          // Also clean up associated CSS custom properties from Dark Reader
+          if (attr.startsWith('data-darkreader-inline-')) {
+            const style = (el as HTMLElement).style
+            const cssProp = `--darkreader-inline-${attr.replace('data-darkreader-inline-', '')}`
+            if (style.getPropertyValue(cssProp)) {
+              style.removeProperty(cssProp)
+            }
+          }
         })
       })
 

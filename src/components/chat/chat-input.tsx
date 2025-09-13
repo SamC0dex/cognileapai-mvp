@@ -452,7 +452,7 @@ export const ChatInput: React.FC<ChatInputProps & {
         </div>
 
         {/* Footer */}
-        {(showCharacterCount || isSending || disabled) && (
+        {(showCharacterCount || isSending) && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -460,13 +460,11 @@ export const ChatInput: React.FC<ChatInputProps & {
           >
             <div className="flex items-center gap-3">
               {/* Status Indicator */}
-              {(isSending || disabled) && (
+              {isSending && (
                 <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${
-                    isSending ? 'bg-blue-500 animate-pulse' : 'bg-gray-400'
-                  }`} />
+                  <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                   <span className="text-xs text-muted-foreground">
-                    {isSending ? 'AI is thinking...' : 'Disabled'}
+                    AI is thinking...
                   </span>
                 </div>
               )}

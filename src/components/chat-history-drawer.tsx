@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { getThreads, searchThreads, deleteThread, type ChatThread } from '@/lib/chat-history'
 
@@ -14,8 +14,34 @@ interface ChatHistoryDrawerProps {
 export function ChatHistoryDrawer({ open, onClose, onSelectThread, onNewChat }: ChatHistoryDrawerProps) {
   const [query, setQuery] = useState("")
   const [threads, setThreads] = useState<ChatThread[]>([])
+  const [filteredThreads, setFilteredThreads] = useState<ChatThread[]>([])
+  const [loading, setLoading] = useState(false)
 
-  const refresh = useCallback(() => setThreads(getThreads()), [])
+  const refresh = useCallback(async () => {
+    setLoading(true)
+    try {
+      const newThreads = await getThreads()
+      setThreads(newThreads)
+    } catch (error) {
+      console.error('Failed to load chat threads:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const updateFiltered = useCallback(async () => {
+    if (query) {
+      try {
+        const results = await searchThreads(query)
+        setFilteredThreads(results)
+      } catch (error) {
+        console.error('Failed to search threads:', error)
+        setFilteredThreads([])
+      }
+    } else {
+      setFilteredThreads(threads)
+    }
+  }, [query, threads])
 
   useEffect(() => {
     refresh()
@@ -24,17 +50,23 @@ export function ChatHistoryDrawer({ open, onClose, onSelectThread, onNewChat }: 
     return () => window.removeEventListener('chat:threads:changed', handler)
   }, [refresh])
 
-  const filtered = useMemo(() => query ? searchThreads(query) : threads, [query, threads])
+  useEffect(() => {
+    updateFiltered()
+  }, [updateFiltered])
 
   const handleSelect = (t: ChatThread) => {
     onSelectThread?.(t)
     onClose()
   }
 
-  const handleDelete = (e: React.MouseEvent, id: string) => {
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
-    deleteThread(id)
-    refresh()
+    try {
+      await deleteThread(id)
+      await refresh()
+    } catch (error) {
+      console.error('Failed to delete thread:', error)
+    }
   }
 
   return (
@@ -92,35 +124,43 @@ export function ChatHistoryDrawer({ open, onClose, onSelectThread, onNewChat }: 
             {/* List */}
             <div className="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-thin">
               <div className="px-1 text-xs font-medium text-primary/80">Today</div>
-              {filtered.length === 0 && (
+              {loading && (
+                <div className="text-sm text-muted-foreground px-1 py-8">Loading threads...</div>
+              )}
+              {!loading && filteredThreads.length === 0 && (
                 <div className="text-sm text-muted-foreground px-1 py-8">No threads yet.</div>
               )}
-              {filtered.map(t => (
-                <motion.button
+              {filteredThreads.map(t => (
+                <motion.div
                   key={t.id}
                   whileHover={{ y: -2 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => handleSelect(t)}
-                  className="w-full text-left p-3 rounded-xl bg-muted/40 hover:bg-muted/60 border border-border/80 hover:border-primary/20 transition-all group"
+                  className="relative w-full rounded-xl bg-muted/40 hover:bg-muted/60 border border-border/80 hover:border-primary/20 transition-all group"
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium truncate">{t.title || 'Untitled'}</div>
-                      {t.preview && (
-                        <div className="text-xs text-muted-foreground truncate mt-0.5">{t.preview}</div>
-                      )}
+                  <button
+                    onClick={() => handleSelect(t)}
+                    className="w-full text-left p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    aria-label={`Open chat: ${t.title || 'Untitled'}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium truncate">{t.title || 'Untitled'}</div>
+                        {t.preview && (
+                          <div className="text-xs text-muted-foreground truncate mt-0.5">{t.preview}</div>
+                        )}
+                      </div>
                     </div>
-                    <button
-                      onClick={(e) => handleDelete(e, t.id)}
-                      className="opacity-70 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-colors p-1 rounded-md hover:bg-muted"
-                      aria-label="Delete thread"
-                    >
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 7h12M10 11v6m4-6v6M9 7l1-2h4l1 2m-8 0l1 12a2 2 0 002 2h4a2 2 0 002-2l1-12" />
-                      </svg>
-                    </button>
-                  </div>
-                </motion.button>
+                  </button>
+                  <button
+                    onClick={(e) => handleDelete(e, t.id)}
+                    className="absolute top-2 right-2 opacity-70 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-colors p-1 rounded-md hover:bg-muted"
+                    aria-label="Delete thread"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 7h12M10 11v6m4-6v6M9 7l1-2h4l1 2m-8 0l1 12a2 2 0 002 2h4a2 2 0 002-2l1-12" />
+                    </svg>
+                  </button>
+                </motion.div>
               ))}
             </div>
 

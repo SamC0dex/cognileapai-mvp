@@ -72,13 +72,13 @@ export async function POST(req: NextRequest) {
     const model = GeminiModelSelector.getModelInstance(selectedModelKey)
     const modelConfig = GeminiModelSelector.getModelConfig(selectedModelKey)
 
-    console.log(`[AI] Using ${modelConfig.displayName} for ${chatType} chat`)
+    console.log(`[AI] Using ${modelConfig.displayName} for ${chatType} chat (${messageContext.hasDocumentContext ? 'with' : 'without'} document context)`)
 
     // Convert messages to format expected by AI SDK
     const coreMessages = convertToCoreMessages(messages)
 
-    // Add system prompt based on chat type
-    const systemPrompt = getSystemPrompt(chatType, documentId)
+    // Add system prompt based on chat type and context
+    const systemPrompt = getSystemPrompt(chatType, documentId, selectedModelKey)
 
     // Create the streaming response
     const result = await streamText({
@@ -163,8 +163,9 @@ function detectRequestedOutputType(content: string): MessageContext['requestedOu
   return undefined
 }
 
-function getSystemPrompt(chatType: string, documentId?: string): string {
-  const basePrompt = `You are CogniLeap AI, an intelligent learning assistant designed to help students and educators create, understand, and master educational content.`
+function getSystemPrompt(chatType: string, documentId?: string, modelKey?: GeminiModelKey): string {
+  const modelConfig = modelKey ? GeminiModelSelector.getModelConfig(modelKey) : null
+  const basePrompt = `You are CogniLeap AI, an intelligent learning assistant powered by ${modelConfig?.displayName || 'Google Gemini'}. You're designed to help students and educators create, understand, and master educational content.`
   
   const contextPrompts = {
     course: `You are helping to create and plan comprehensive courses. Focus on:
@@ -237,31 +238,68 @@ async function saveMessageToDatabase({
   content: string
   metadata?: Record<string, any>
 }) {
-  // Get current message count for sequence number
-  const { count } = await supabase
-    .from('messages')
-    .select('*', { count: 'exact', head: true })
-    .eq('conversation_id', conversationId)
+  try {
+    // Skip database saving if conversation ID is not a proper UUID
+    if (!conversationId || !conversationId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      console.log('[DB] Skipping save for non-UUID conversation ID:', conversationId)
+      return
+    }
 
-  const sequenceNumber = (count || 0) + 1
+    // Check if conversation exists, create if not
+    const { data: existingConv, error: convCheckError } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('id', conversationId)
+      .single()
 
-  const { error } = await supabase
-    .from('messages')
-    .insert({
-      conversation_id: conversationId,
-      role,
-      content,
-      sequence_number: sequenceNumber,
-      metadata
-    })
+    if (convCheckError && convCheckError.code === 'PGRST116') {
+      // Conversation doesn't exist, create it
+      console.log('[DB] Creating missing conversation:', conversationId)
+      const { error: createError } = await supabase
+        .from('conversations')
+        .insert({
+          id: conversationId,
+          document_id: null,
+          title: content.slice(0, 50) + (content.length > 50 ? '...' : '')
+        })
+      
+      if (createError) {
+        console.warn('[DB] Failed to create conversation:', createError.message)
+        return
+      }
+    }
 
-  if (error) {
-    throw new Error(`Failed to save message: ${error.message}`)
+    // Get current message count for sequence number
+    const { count } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('conversation_id', conversationId)
+
+    const sequenceNumber = (count || 0) + 1
+
+    const { error } = await supabase
+      .from('messages')
+      .insert({
+        conversation_id: conversationId,
+        role,
+        content,
+        sequence_number: sequenceNumber,
+        metadata
+      })
+
+    if (error) {
+      console.warn('[DB] Failed to save message, continuing without persistence:', error.message)
+      return
+    }
+
+    // Update conversation timestamp (let database handle updated_at with trigger)
+    await supabase
+      .from('conversations')
+      .update({ title: content.slice(0, 50) + (content.length > 50 ? '...' : '') })
+      .eq('id', conversationId)
+
+    console.log('[DB] Successfully saved message to conversation:', conversationId)
+  } catch (error) {
+    console.warn('[DB] Database save failed, continuing without persistence:', error)
   }
-
-  // Update conversation timestamp
-  await supabase
-    .from('conversations')  
-    .update({ updated_at: new Date().toISOString() })
-    .eq('id', conversationId)
 }
