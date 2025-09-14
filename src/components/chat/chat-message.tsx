@@ -90,7 +90,6 @@ export const ChatMessage: React.FC<ChatMessageProps & {
   message,
   onCitationClick,
   showAvatar = true,
-  showTimestamp = true,
   onRegenerate,
   onCopy
 }) => {
@@ -325,8 +324,13 @@ export const ChatMessage: React.FC<ChatMessageProps & {
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute top-1 left-0 flex items-center gap-1 z-10"
+                    className="absolute top-1 left-0 flex items-center gap-2 z-10"
                   >
+                  {/* Timestamp in prefix position */}
+                  <span className="text-xs text-muted-foreground mr-1 px-2 py-1.5 rounded-md bg-background/80 backdrop-blur-sm border border-border/40 shadow-sm">
+                    {formatRelativeTime(timestamp)}
+                  </span>
+
                   {/* Copy Button */}
                   <motion.button
                     whileHover={{ scale: 1.05 }}
@@ -438,14 +442,6 @@ export const ChatMessage: React.FC<ChatMessageProps & {
             </div>
           )}
 
-          {/* Timestamp */}
-          {showTimestamp && (
-            <div className={`text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${
-              role === 'user' ? 'text-right' : 'text-left'
-            }`}>
-              {formatRelativeTime(timestamp)}
-            </div>
-          )}
         </div>
       </div>
     </motion.div>
