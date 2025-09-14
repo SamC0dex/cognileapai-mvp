@@ -14,7 +14,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background" data-app-content>
+    <div className="flex h-screen overflow-hidden bg-background optimized-container" data-app-content>
       {/* Sidebar */}
       <Sidebar 
         isCollapsed={sidebarCollapsed}

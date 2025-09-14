@@ -244,10 +244,107 @@ html.theme-instant, html.theme-instant *, html.theme-instant *::before, html.the
   .animate-reduced-motion {
     @apply motion-reduce:transition-none motion-reduce:animate-none;
   }
-  
+
   .focus-ring {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
   }
+
+  /* High-performance CSS animations - Hardware accelerated */
+  .animate-fade-in {
+    animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    will-change: opacity, transform;
+  }
+
+  .animate-message-in {
+    animation: messageIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    will-change: opacity, transform;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    will-change: opacity, transform;
+  }
+
+  .animate-slide-down {
+    animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    will-change: opacity, transform;
+  }
+
+  /* Button hover effects with hardware acceleration */
+  .btn-hover {
+    transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 0.15s cubic-bezier(0.16, 1, 0.3, 1),
+                background-color 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform;
+  }
+
+  .btn-hover:hover {
+    transform: scale(1.02) translateY(-1px);
+  }
+
+  .btn-hover:active {
+    transform: scale(0.98) translateY(0px);
+  }
+
+  /* Scroll button animation */
+  .scroll-button-enter {
+    animation: slideInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .scroll-button-exit {
+    animation: slideOutDown 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  /* Question button hover effect */
+  .question-btn {
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+                background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+                border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform;
+  }
+
+  .question-btn:hover {
+    transform: scale(1.02) translateY(-2px);
+  }
+
+  .question-btn:active {
+    transform: scale(0.98) translateY(0px);
+  }
+
+  /* Enhanced scrollbar for better UX */
+  .scrollbar-enhanced::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scrollbar-enhanced::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-enhanced::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+  }
+
+  .scrollbar-enhanced::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  /* Container optimization */
+  .optimized-container {
+    contain: layout style paint;
+  }
+
+  /* Stagger animation utility */
+  .stagger-item {
+    animation-fill-mode: both;
+  }
+
+  .stagger-item:nth-child(1) { animation-delay: 0ms; }
+  .stagger-item:nth-child(2) { animation-delay: 100ms; }
+  .stagger-item:nth-child(3) { animation-delay: 200ms; }
+  .stagger-item:nth-child(4) { animation-delay: 300ms; }
+  .stagger-item:nth-child(5) { animation-delay: 400ms; }
   
   /* Text utilities */
   .text-balance {
@@ -317,4 +414,102 @@ html.theme-instant, html.theme-instant *, html.theme-instant *::before, html.the
   background: linear-gradient(90deg, hsl(var(--muted)) 25%, hsl(var(--muted-foreground) / 0.1) 50%, hsl(var(--muted)) 75%);
   background-size: 200px 100%;
   animation: shimmer 1.5s infinite;
+}
+
+/* High-performance animation keyframes */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes messageIn {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 20px, 0) scale(0.95);
+  }
+  60% {
+    opacity: 1;
+    transform: translate3d(0, -2px, 0) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -16px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes slideOutDown {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-message-in,
+  .animate-slide-up,
+  .animate-slide-down,
+  .scroll-button-enter,
+  .scroll-button-exit,
+  .stagger-item {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .btn-hover,
+  .question-btn {
+    transition: background-color 0.15s ease !important;
+  }
+
+  .btn-hover:hover,
+  .btn-hover:active,
+  .question-btn:hover,
+  .question-btn:active {
+    transform: none !important;
+  }
 }
