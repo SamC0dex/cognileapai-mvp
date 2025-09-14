@@ -34,8 +34,8 @@ CogniLeapAI MVP is a desktop-first web application that processes PDFs and gener
    - Risk assessment for existing functionality
 
 2. **Comprehensive Research** - Before any implementation:
-   - Use MCP tools to explore relevant codebase sections
-   - Read related components, utilities, and configurations
+   - Use MCP tools to explore relevant codebase sections, 
+   - You must use context7 MCP for understanding latest information/docs on used libraries/frameworks, or to update/change or add anything.
    - Understand existing patterns and conventions
    - Identify all files that might be affected
 

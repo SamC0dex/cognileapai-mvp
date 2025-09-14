@@ -10,22 +10,21 @@ import { useChatStore, createNewConversation, getSuggestedQuestions } from './ch
 export function useChat(documentId?: string, conversationId?: string) {
   const store = useChatStore()
 
-  // Initialize conversation when documentId changes
+  // Initialize conversation when documentId or conversationId changes
   useEffect(() => {
-    if (documentId) {
-      if (conversationId) {
-        // Load existing conversation
-        store.loadConversation(conversationId, documentId)
-      } else {
-        // Set up new conversation context
-        store.setDocumentContext({
-          id: documentId,
-          title: 'Document', // This should be fetched from document data
-          sections: []
-        })
-      }
+    if (conversationId) {
+      // Load existing conversation (with optional documentId)
+      store.loadConversation(conversationId, documentId)
+    } else if (documentId) {
+      // Set up new conversation context for document-specific chat
+      store.setDocumentContext({
+        id: documentId,
+        title: 'Document', // This should be fetched from document data
+        sections: []
+      })
     }
-  }, [documentId, conversationId, store])
+    // If neither conversationId nor documentId, this is a new general chat (no initialization needed)
+  }, [documentId, conversationId, store.loadConversation, store.setDocumentContext])
 
   // Send message with simplified API
   const sendMessage = useCallback(async (content: string, modelOverride?: import('./ai-config').GeminiModelKey) => {
@@ -42,10 +41,10 @@ export function useChat(documentId?: string, conversationId?: string) {
 
 
 
-  // Regenerate last message
-  const regenerateLastMessage = useCallback(async () => {
+  // Regenerate last message with optional model override
+  const regenerateLastMessage = useCallback(async (modelOverride?: import('./ai-config').GeminiModelKey) => {
     try {
-      await store.regenerateLastMessage()
+      await store.regenerateLastMessage(modelOverride)
       store.setError(null)
     } catch (error) {
       console.error('Failed to regenerate message:', error)

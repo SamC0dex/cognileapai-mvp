@@ -84,22 +84,19 @@ const CitationLink: React.FC<{
 CitationLink.displayName = 'CitationLink'
 
 export const ChatMessage: React.FC<ChatMessageProps & {
-  onRegenerate?: () => void
+  onRegenerate?: (modelOverride?: import('../../lib/ai-config').GeminiModelKey) => void
   onCopy?: (text: string) => void
-  onThumbsUp?: () => void
-  onThumbsDown?: () => void
 }> = React.memo(({
   message,
   onCitationClick,
   showAvatar = true,
   showTimestamp = true,
   onRegenerate,
-  onCopy,
-  onThumbsUp,
-  onThumbsDown
+  onCopy
 }) => {
   const { role, content, timestamp, isStreaming, citations } = message
   const [showActions, setShowActions] = useState(false)
+  const [showModelDropdown, setShowModelDropdown] = useState(false)
 
   const customComponents = {
     // Custom code block component with copy button
@@ -316,87 +313,130 @@ export const ChatMessage: React.FC<ChatMessageProps & {
               </div>
             )}
 
-            {/* Action Buttons */}
-            {role === 'assistant' && !isStreaming && (
+          </div>
+
+          {/* External Action Buttons - ChatGPT Style */}
+          {role === 'assistant' && !isStreaming && (
+            <div className="relative">
               <AnimatePresence>
                 {showActions && (
                   <motion.div
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 5 }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
                     transition={{ duration: 0.15 }}
-                    className="flex items-center gap-1 mt-3 pt-2 border-t border-border/20"
+                    className="absolute top-1 left-0 flex items-center gap-1 z-10"
                   >
-                    {/* Copy Button */}
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={handleCopyMessage}
-                      className="p-2 rounded-md hover:bg-muted/50 transition-colors group/btn"
-                      title="Copy message"
-                    >
-                      <svg className="w-4 h-4 text-muted-foreground group-hover/btn:text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                    </motion.button>
+                  {/* Copy Button */}
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleCopyMessage}
+                    className="p-1.5 rounded-md hover:bg-muted/70 transition-colors border border-border/40 bg-background/80 backdrop-blur-sm shadow-sm"
+                    title="Copy message"
+                  >
+                    <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                  </motion.button>
 
-                    {/* Thumbs Up */}
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={onThumbsUp}
-                      className="p-2 rounded-md hover:bg-muted/50 transition-colors group/btn"
-                      title="Good response"
-                    >
-                      <svg className="w-4 h-4 text-muted-foreground group-hover/btn:text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2v0a2 2 0 00-2 2v5m-4 0H4m0 0L2 10m2 0l2 2" />
-                      </svg>
-                    </motion.button>
-
-                    {/* Thumbs Down */}
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={onThumbsDown}
-                      className="p-2 rounded-md hover:bg-muted/50 transition-colors group/btn"
-                      title="Poor response"
-                    >
-                      <svg className="w-4 h-4 text-muted-foreground group-hover/btn:text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018c.163 0 .326.02.485.06L17 4m-7 10v2a2 2 0 002 2v0a2 2 0 002-2v-5m-4 0h8m0 0l2-2m-2 2l-2-2" />
-                      </svg>
-                    </motion.button>
-
-                    {/* Regenerate */}
-                    {onRegenerate && (
+                  {/* Regenerate Button with Model Dropdown */}
+                  {onRegenerate && (
+                    <div className="relative">
                       <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        onClick={onRegenerate}
-                        className="p-2 rounded-md hover:bg-muted/50 transition-colors group/btn"
+                        onClick={() => setShowModelDropdown(!showModelDropdown)}
+                        className="p-1.5 rounded-md hover:bg-muted/70 transition-colors border border-border/40 bg-background/80 backdrop-blur-sm shadow-sm flex items-center gap-1"
                         title="Regenerate response"
                       >
-                        <svg className="w-4 h-4 text-muted-foreground group-hover/btn:text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
+                        <svg className="w-3 h-3 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
                       </motion.button>
-                    )}
 
-                    {/* More Options */}
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="p-2 rounded-md hover:bg-muted/50 transition-colors group/btn"
-                      title="More options"
-                    >
-                      <svg className="w-4 h-4 text-muted-foreground group-hover/btn:text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                      </svg>
-                    </motion.button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            )}
-          </div>
+                      {/* Model Selection Dropdown */}
+                      <AnimatePresence>
+                        {showModelDropdown && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                            transition={{ duration: 0.15 }}
+                            className="absolute bottom-full mb-2 left-0 bg-background/95 backdrop-blur-md border border-border rounded-lg shadow-lg py-1 min-w-[180px] z-50"
+                            onMouseLeave={() => setShowModelDropdown(false)}
+                          >
+                            <div className="px-2 py-1 text-xs font-medium text-muted-foreground border-b border-border/50 mb-1">
+                              Regenerate with:
+                            </div>
+
+                            {/* Gemini Flash Lite */}
+                            <motion.button
+                              whileHover={{ backgroundColor: 'hsl(var(--muted) / 0.8)' }}
+                              onClick={() => {
+                                onRegenerate('FLASH_LITE')
+                                setShowModelDropdown(false)
+                              }}
+                              className="w-full px-3 py-2 text-left text-sm hover:bg-muted/80 transition-colors flex flex-col gap-0.5"
+                            >
+                              <span className="font-medium text-foreground">Flash Lite</span>
+                              <span className="text-xs text-muted-foreground">Fastest • Simple queries</span>
+                            </motion.button>
+
+                            {/* Gemini Flash */}
+                            <motion.button
+                              whileHover={{ backgroundColor: 'hsl(var(--muted) / 0.8)' }}
+                              onClick={() => {
+                                onRegenerate('FLASH')
+                                setShowModelDropdown(false)
+                              }}
+                              className="w-full px-3 py-2 text-left text-sm hover:bg-muted/80 transition-colors flex flex-col gap-0.5"
+                            >
+                              <span className="font-medium text-foreground">Flash</span>
+                              <span className="text-xs text-muted-foreground">Balanced • Most tasks</span>
+                            </motion.button>
+
+                            {/* Gemini Pro */}
+                            <motion.button
+                              whileHover={{ backgroundColor: 'hsl(var(--muted) / 0.8)' }}
+                              onClick={() => {
+                                onRegenerate('PRO')
+                                setShowModelDropdown(false)
+                              }}
+                              className="w-full px-3 py-2 text-left text-sm hover:bg-muted/80 transition-colors flex flex-col gap-0.5"
+                            >
+                              <span className="font-medium text-foreground">Pro</span>
+                              <span className="text-xs text-muted-foreground">Most capable • Complex analysis</span>
+                            </motion.button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  )}
+
+                  {/* Three Dots - More Options (Placeholder) */}
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="p-1.5 rounded-md hover:bg-muted/70 transition-colors border border-border/40 bg-background/80 backdrop-blur-sm shadow-sm"
+                    title="More options"
+                    onClick={() => {
+                      // Placeholder for future features (edit, delete, etc.)
+                      console.log('More options clicked - placeholder for future features')
+                    }}
+                  >
+                    <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                    </svg>
+                  </motion.button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            </div>
+          )}
 
           {/* Timestamp */}
           {showTimestamp && (

@@ -6,7 +6,8 @@ import { ChatMessages } from './chat-messages'
 import { ChatEmptyState } from './chat-empty-state'
 
 import { ChatScrollButton } from './chat-scroll-button'
-import { useChatStore, getSuggestedQuestions } from '@/lib/chat-store'
+import { useChat } from '@/lib/use-chat'
+import { getSuggestedQuestions } from '@/lib/chat-store'
 import type { GeminiModelKey } from '@/lib/ai-config'
 import type { Citation } from './types'
 
@@ -24,39 +25,19 @@ export const ChatContainer: React.FC<{
   selectedModel = 'FLASH',
   onModelChange
 }) => {
-  // Chat store integration
+  // Use the chat hook for all chat functionality
   const {
     messages,
     isLoading,
     error,
     documentContext,
-    loadConversation,
     sendMessage,
-    setDocumentContext,
-    setError,
-    setSelectedModel
-  } = useChatStore()
-
-  // Sync the selected model with the chat store
-  React.useEffect(() => {
-    setSelectedModel(selectedModel)
-  }, [selectedModel, setSelectedModel])
+    regenerateLastMessage,
+    setError
+  } = useChat(documentId, conversationId)
 
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [scrollTrigger, setScrollTrigger] = useState(0)
-
-  // Load conversation when document/conversation changes
-  React.useEffect(() => {
-    if (conversationId) {
-      loadConversation(conversationId, documentId)
-    } else if (documentId) {
-      setDocumentContext({
-        id: documentId,
-        title: 'Document',
-        sections: []
-      })
-    }
-  }, [documentId, conversationId, loadConversation, setDocumentContext])
 
   // Handle scroll state changes from ChatMessages
   const handleScrollStateChange = useCallback((userScrolled: boolean, showButton: boolean) => {
@@ -80,13 +61,13 @@ export const ChatContainer: React.FC<{
     if (!content.trim()) return
 
     try {
-      await sendMessage(content.trim(), documentId, selectedModel)
+      await sendMessage(content.trim(), selectedModel)
       setError(null)
     } catch (error) {
       console.error('Failed to send message:', error)
       setError(error instanceof Error ? error.message : 'Failed to send message')
     }
-  }, [sendMessage, documentId, selectedModel, setError])
+  }, [sendMessage, selectedModel, setError])
 
   const handleCitationClick = useCallback((citation: Citation) => {
     // Handle citation click - could navigate to document section, show popup, etc.
@@ -97,6 +78,17 @@ export const ChatContainer: React.FC<{
   const handleSuggestedQuestionClick = useCallback((question: string) => {
     handleSendMessage(question)
   }, [handleSendMessage])
+
+  // Handle copy message
+  const handleCopy = useCallback((text: string) => {
+    // Additional logic after copying if needed
+    console.log('Message copied:', text.substring(0, 50) + '...')
+  }, [])
+
+  // Handle regenerate with model override
+  const handleRegenerate = useCallback((modelOverride?: GeminiModelKey) => {
+    regenerateLastMessage(modelOverride)
+  }, [regenerateLastMessage])
 
 
 
@@ -142,6 +134,8 @@ export const ChatContainer: React.FC<{
             error={error}
             onCitationClick={handleCitationClick}
             onScrollStateChange={handleScrollStateChange}
+            onRegenerate={handleRegenerate}
+            onCopy={handleCopy}
             forceScrollToBottom={scrollTrigger}
           />
         )}

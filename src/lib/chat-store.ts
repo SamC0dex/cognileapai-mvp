@@ -52,7 +52,7 @@ interface StoreShape {
   loadConversation: (conversationId: string, documentId?: string) => Promise<void>
   sendMessage: (content: string, documentId?: string | null, model?: GeminiModelKey) => Promise<void>
 
-  regenerateLastMessage: () => Promise<void>
+  regenerateLastMessage: (modelOverride?: GeminiModelKey) => Promise<void>
   setDocumentContext: (ctx: DocumentContext | null) => void
   setStreamingMessage: (val: string) => void
   setError: (err: string | null) => void
@@ -222,13 +222,17 @@ export function useChatStore(): StoreShape {
     }
   }
 
-  const sendMessage = useCallback(async (content: string, documentId?: string | null, model?: GeminiModelKey) => {
+  const sendMessage = useCallback(async (content: string, documentId?: string | null, model?: GeminiModelKey, skipUserMessage?: boolean) => {
     const modelToUse = model || selectedModel
-    const id = `u_${Date.now()}`
-    const user: Message = { id, role: 'user', content, timestamp: new Date() }
+    let user: Message | null = null
 
-    // Instantly show user message (optimistic UI)
-    setMessages(prev => [...prev, user])
+    // Add user message unless this is a regeneration
+    if (!skipUserMessage) {
+      const id = `u_${Date.now()}`
+      user = { id, role: 'user', content, timestamp: new Date() }
+      // Instantly show user message (optimistic UI)
+      setMessages(prev => [...prev, user])
+    }
 
     // Immediately add assistant placeholder for streaming
     const assistantId = `a_${Date.now()}`
@@ -253,13 +257,36 @@ export function useChatStore(): StoreShape {
         convId = await createNewConversationInternal(documentId || documentContext?.id)
       }
 
-      const payload = {
-        messages: [...allMessagesRef.current, user].map(m => ({
+      // For regeneration, ensure we send messages up to and including the user message
+      // For new messages, use allMessagesRef which is more current
+      let messagesToSend: Array<{id: string, role: string, content: string, timestamp: string}>
+
+      if (skipUserMessage) {
+        // During regeneration: use current messages, ensuring the last one is the user message we're regenerating from
+        // allMessagesRef.current should already contain the user message we want to regenerate from
+        messagesToSend = allMessagesRef.current.map(m => ({
           id: m.id,
           role: m.role,
           content: m.content,
           timestamp: m.timestamp.toISOString()
-        })),
+        }))
+
+        // Ensure the last message is a user message (required by API)
+        if (messagesToSend.length === 0 || messagesToSend[messagesToSend.length - 1].role !== 'user') {
+          throw new Error('Cannot regenerate: no user message found to regenerate from')
+        }
+      } else {
+        // Normal message: use current messages + new user message
+        messagesToSend = [...allMessagesRef.current, ...(user ? [user] : [])].map(m => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          timestamp: m.timestamp.toISOString()
+        }))
+      }
+
+      const payload = {
+        messages: messagesToSend,
         chatType: documentId ? 'document' : 'general',
         documentId: documentId || documentContext?.id,
         conversationId: convId,
@@ -433,45 +460,17 @@ export function useChatStore(): StoreShape {
       console.error('[Chat] sendMessage failed:', errorMessage, e)
       setError(`Failed to send message: ${errorMessage}`)
 
-      // Remove both optimistically added user message and assistant placeholder on error
-      setMessages(prev => prev.slice(0, -2))
+      // Remove optimistically added messages on error
+      // For regeneration (no user message added): remove 1 message (assistant placeholder)
+      // For normal messages: remove 2 messages (user + assistant placeholder)
+      setMessages(prev => prev.slice(0, skipUserMessage ? -1 : -2))
     } finally {
       setIsLoading(false)
       setStreamingMessage('')
     }
   }, [documentContext, selectedModel])
 
-
-
-  const regenerateLastMessage = useCallback(async () => {
-    // Find last assistant and user message indices (compatible with older TypeScript)
-    let lastAssistantIndex = -1
-    let lastUserIndex = -1
-
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (lastAssistantIndex === -1 && messages[i].role === 'assistant') {
-        lastAssistantIndex = i
-      }
-      if (lastUserIndex === -1 && messages[i].role === 'user') {
-        lastUserIndex = i
-      }
-      if (lastAssistantIndex > -1 && lastUserIndex > -1) break
-    }
-
-    if (lastAssistantIndex > -1 && lastUserIndex > -1 && lastUserIndex < lastAssistantIndex) {
-      // Remove the last assistant message and regenerate
-      const newMessages = messages.slice(0, lastAssistantIndex)
-      setMessages(newMessages)
-
-      const lastUserMessage = messages[lastUserIndex]
-      await sendMessage(lastUserMessage.content, documentContext?.id, selectedModel)
-    }
-  }, [messages, sendMessage, documentContext, selectedModel])
-
-  const createNewConversation = useCallback(async (documentId?: string) => {
-    return await createNewConversationInternal(documentId)
-  }, [])
-
+  // Define createNewConversationInternal before it's used in callbacks
   const createNewConversationInternal = async (documentId?: string): Promise<string> => {
     try {
       // Generate a proper UUID v4
@@ -483,7 +482,7 @@ export function useChatStore(): StoreShape {
         .insert({
           id: conversationId,
           document_id: documentId || null,
-          title: null // Will be set when first message is sent
+          title: 'New Conversation' // Temporary title, will be updated with first message
         })
 
       if (error) {
@@ -505,12 +504,51 @@ export function useChatStore(): StoreShape {
     }
   }
 
+  const regenerateLastMessage = useCallback(async (modelOverride?: GeminiModelKey) => {
+    // Find last assistant and user message indices
+    let lastAssistantIndex = -1
+    let lastUserIndex = -1
+
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (lastAssistantIndex === -1 && messages[i].role === 'assistant') {
+        lastAssistantIndex = i
+      }
+      if (lastUserIndex === -1 && messages[i].role === 'user') {
+        lastUserIndex = i
+      }
+      if (lastAssistantIndex > -1 && lastUserIndex > -1) break
+    }
+
+    if (lastAssistantIndex > -1 && lastUserIndex > -1 && lastUserIndex < lastAssistantIndex) {
+      // Get the messages up to (and including) the user message we want to regenerate from
+      const messagesForRegeneration = messages.slice(0, lastAssistantIndex)
+      const lastUserMessage = messages[lastUserIndex]
+
+      // Remove the last assistant message from UI
+      setMessages(messagesForRegeneration)
+
+      // Update allMessagesRef to ensure sendMessage has the correct message context
+      allMessagesRef.current = messagesForRegeneration
+
+      // Use the existing sendMessage with skipUserMessage=true to reuse proven streaming logic
+      await sendMessage(lastUserMessage.content, documentContext?.id, modelOverride, true)
+    }
+  }, [messages, documentContext, sendMessage])
+
+  const createNewConversation = useCallback(async (documentId?: string) => {
+    return await createNewConversationInternal(documentId)
+  }, [])
+
   const resetState = useCallback(() => {
     setMessages([])
     setStreamingMessage('')
     setError(null)
     setCurrentConversation(null)
     conversationRef.current = null
+  }, [])
+
+  const stableSetDocumentContext = useCallback((ctx: DocumentContext | null) => {
+    setDocumentContext(ctx)
   }, [])
 
   return {
@@ -525,7 +563,7 @@ export function useChatStore(): StoreShape {
     sendMessage,
 
     regenerateLastMessage,
-    setDocumentContext,
+    setDocumentContext: stableSetDocumentContext,
     setStreamingMessage,
     setError,
     setSelectedModel,

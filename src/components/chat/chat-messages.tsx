@@ -12,6 +12,8 @@ interface ChatMessagesProps {
   streamingMessage?: string | null
   onCitationClick: (citation: Citation) => void
   onScrollStateChange: (userScrolled: boolean, showScrollButton: boolean) => void
+  onRegenerate?: (modelOverride?: import('../../lib/ai-config').GeminiModelKey) => void
+  onCopy?: (text: string) => void
   forceScrollToBottom?: number
 }
 
@@ -40,6 +42,8 @@ export const ChatMessages = React.memo<ChatMessagesProps>(({
   error,
   onCitationClick,
   onScrollStateChange,
+  onRegenerate,
+  onCopy,
   forceScrollToBottom = 0
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -131,6 +135,8 @@ export const ChatMessages = React.memo<ChatMessagesProps>(({
                 key={message.id}
                 message={message}
                 onCitationClick={onCitationClick}
+                onRegenerate={onRegenerate}
+                onCopy={onCopy}
                 showAvatar={true}
                 showTimestamp={true}
               />
