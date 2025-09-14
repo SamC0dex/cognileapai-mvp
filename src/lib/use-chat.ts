@@ -28,11 +28,11 @@ export function useChat(documentId?: string, conversationId?: string) {
   }, [documentId, conversationId, store])
 
   // Send message with simplified API
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (content: string, modelOverride?: import('./ai-config').GeminiModelKey) => {
     if (!content.trim()) return
-    
+
     try {
-      await store.sendMessage(content.trim(), documentId)
+      await store.sendMessage(content.trim(), documentId, modelOverride)
       store.setError(null)
     } catch (error) {
       console.error('Failed to send message:', error)

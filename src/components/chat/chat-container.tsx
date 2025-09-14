@@ -7,6 +7,7 @@ import { ChatEmptyState } from './chat-empty-state'
 
 import { ChatScrollButton } from './chat-scroll-button'
 import { useChatStore, getSuggestedQuestions } from '@/lib/chat-store'
+import type { GeminiModelKey } from '@/lib/ai-config'
 import type { Citation } from './types'
 
 // Check if we're in demo mode (Supabase not configured)
@@ -15,8 +16,8 @@ const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PU
 export const ChatContainer: React.FC<{
   documentId?: string
   conversationId?: string
-  selectedModel?: import('@/lib/ai-config').GeminiModelKey
-  onModelChange?: (model: import('@/lib/ai-config').GeminiModelKey) => void
+  selectedModel?: GeminiModelKey
+  onModelChange?: (model: GeminiModelKey) => void
 }> = React.memo(({
   documentId,
   conversationId,
@@ -32,8 +33,14 @@ export const ChatContainer: React.FC<{
     loadConversation,
     sendMessage,
     setDocumentContext,
-    setError
+    setError,
+    setSelectedModel
   } = useChatStore()
+
+  // Sync the selected model with the chat store
+  React.useEffect(() => {
+    setSelectedModel(selectedModel)
+  }, [selectedModel, setSelectedModel])
 
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [scrollTrigger, setScrollTrigger] = useState(0)
@@ -71,15 +78,15 @@ export const ChatContainer: React.FC<{
 
   const handleSendMessage = useCallback(async (content: string) => {
     if (!content.trim()) return
-    
+
     try {
-      await sendMessage(content.trim(), documentId)
+      await sendMessage(content.trim(), documentId, selectedModel)
       setError(null)
     } catch (error) {
       console.error('Failed to send message:', error)
       setError(error instanceof Error ? error.message : 'Failed to send message')
     }
-  }, [sendMessage, documentId, setError])
+  }, [sendMessage, documentId, selectedModel, setError])
 
   const handleCitationClick = useCallback((citation: Citation) => {
     // Handle citation click - could navigate to document section, show popup, etc.
