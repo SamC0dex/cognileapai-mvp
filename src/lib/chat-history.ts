@@ -10,6 +10,7 @@ export type ChatThread = {
   createdAt: number
   updatedAt: number
   messagesCount: number
+  isStarred?: boolean
 }
 
 const STORAGE_KEY = "cognileap:threads"
@@ -48,6 +49,7 @@ async function loadFromDatabase(): Promise<ChatThread[]> {
         id,
         title,
         document_id,
+        is_starred,
         created_at,
         updated_at
       `)
@@ -113,7 +115,8 @@ async function loadFromDatabase(): Promise<ChatThread[]> {
       preview: previewMap.get(conv.id) || '',
       createdAt: new Date(conv.created_at).getTime(),
       updatedAt: new Date(conv.updated_at).getTime(),
-      messagesCount: messageCountMap.get(conv.id) || 0
+      messagesCount: messageCountMap.get(conv.id) || 0,
+      isStarred: conv.is_starred || false
     }))
   } catch (error) {
     console.warn('[Chat History] Database error:', error)
@@ -122,14 +125,12 @@ async function loadFromDatabase(): Promise<ChatThread[]> {
 }
 
 export async function getThreads(): Promise<ChatThread[]> {
-  // Try to load from database first, fallback to localStorage
+  // Always prioritize database data to ensure consistency
   const dbThreads = await loadFromDatabase()
-  if (dbThreads.length > 0) {
-    return dbThreads
-  }
-  
-  // Fallback to localStorage
-  return loadFromLocalStorage().sort((a, b) => b.updatedAt - a.updatedAt)
+
+  // Clear localStorage and use fresh database data
+  saveToLocalStorage(dbThreads)
+  return dbThreads.sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
 export function upsertThread(thread: ChatThread) {
@@ -173,6 +174,84 @@ export async function deleteThread(id: string) {
   const threads = loadFromLocalStorage().filter(t => t.id !== id)
   saveToLocalStorage(threads)
   window.dispatchEvent(new CustomEvent("chat:threads:changed"))
+}
+
+export async function renameThread(id: string, newTitle: string) {
+  try {
+    // Update in database first
+    const { error } = await supabase
+      .from('conversations')
+      .update({
+        title: newTitle.trim(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+
+    if (error) {
+      console.warn('[Chat History] Failed to rename in database:', error.message)
+    }
+  } catch (error) {
+    console.warn('[Chat History] Database error during rename:', error)
+  }
+
+  // Update in localStorage as well
+  const threads = loadFromLocalStorage()
+  const idx = threads.findIndex(t => t.id === id)
+  if (idx >= 0) {
+    threads[idx] = {
+      ...threads[idx],
+      title: newTitle.trim(),
+      updatedAt: Date.now()
+    }
+    saveToLocalStorage(threads)
+    window.dispatchEvent(new CustomEvent("chat:threads:changed"))
+  }
+}
+
+export async function toggleStarThread(id: string) {
+  try {
+    // Get current starred state from database
+    const { data: conversation, error: fetchError } = await supabase
+      .from('conversations')
+      .select('is_starred')
+      .eq('id', id)
+      .single()
+
+    if (fetchError) {
+      console.warn('[Chat History] Failed to fetch starred state:', fetchError.message)
+      return
+    }
+
+    const newStarredState = !conversation.is_starred
+
+    // Update in database
+    const { error } = await supabase
+      .from('conversations')
+      .update({
+        is_starred: newStarredState,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+
+    if (error) {
+      console.warn('[Chat History] Failed to toggle star in database:', error.message)
+    }
+  } catch (error) {
+    console.warn('[Chat History] Database error during star toggle:', error)
+  }
+
+  // Update in localStorage as well
+  const threads = loadFromLocalStorage()
+  const idx = threads.findIndex(t => t.id === id)
+  if (idx >= 0) {
+    threads[idx] = {
+      ...threads[idx],
+      isStarred: !threads[idx].isStarred,
+      updatedAt: Date.now()
+    }
+    saveToLocalStorage(threads)
+    window.dispatchEvent(new CustomEvent("chat:threads:changed"))
+  }
 }
 
 export async function searchThreads(query: string): Promise<ChatThread[]> {
