@@ -50,7 +50,7 @@ export async function testDocumentChatEndpoint(): Promise<TestResult> {
 
     // Measure time to first token
     let timeToFirstToken: number | undefined
-    let chunks: string[] = []
+    const chunks: string[] = []
     let totalContent = ''
 
     if (response.body) {

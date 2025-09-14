@@ -385,7 +385,7 @@ export const ChatInput: React.FC<ChatInputProps & {
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
                 placeholder={placeholder}
-                disabled={disabled || isSending}
+                disabled={disabled}
                 className="w-full resize-none bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed pr-16"
                 style={{ 
                   height: textareaHeight,

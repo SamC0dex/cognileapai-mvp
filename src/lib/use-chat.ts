@@ -40,24 +40,7 @@ export function useChat(documentId?: string, conversationId?: string) {
     }
   }, [store, documentId])
 
-  // Clear chat with confirmation
-  const clearChat = useCallback(async () => {
-    if (store.messages.length === 0) return
-    
-    const confirmed = window.confirm(
-      'Are you sure you want to clear this conversation? This action cannot be undone.'
-    )
-    
-    if (confirmed) {
-      try {
-        await store.clearChat(documentId)
-        store.setError(null)
-      } catch (error) {
-        console.error('Failed to clear chat:', error)
-        store.setError(error instanceof Error ? error.message : 'Failed to clear chat')
-      }
-    }
-  }, [store, documentId])
+
 
   // Regenerate last message
   const regenerateLastMessage = useCallback(async () => {
@@ -105,7 +88,6 @@ export function useChat(documentId?: string, conversationId?: string) {
     
     // Actions
     sendMessage,
-    clearChat,
     regenerateLastMessage,
     createConversation,
     setError: store.setError,

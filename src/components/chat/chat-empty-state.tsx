@@ -20,7 +20,7 @@ export const ChatEmptyState = React.memo<ChatEmptyStateProps>(({
 
     <h3 className="text-xl font-semibold text-foreground mb-3">Hey there! How can I help you today?</h3>
     <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-      I'm powered by Gemini AI and ready to assist with your questions.
+      I&apos;m powered by Gemini AI and ready to assist with your questions.
     </p>
 
     {/* Suggested Questions */}

@@ -4,7 +4,7 @@ import React, { useState, useCallback, useMemo } from 'react'
 import { ChatInput } from './chat-input'
 import { ChatMessages } from './chat-messages'
 import { ChatEmptyState } from './chat-empty-state'
-import { ChatHeader } from './chat-header'
+
 import { ChatScrollButton } from './chat-scroll-button'
 import { useChatStore, getSuggestedQuestions } from '@/lib/chat-store'
 import type { Citation } from './types'
@@ -27,13 +27,10 @@ export const ChatContainer: React.FC<{
   const {
     messages,
     isLoading,
-    streamingMessage,
     error,
     documentContext,
     loadConversation,
     sendMessage,
-    clearChat,
-    regenerateLastMessage,
     setDocumentContext,
     setError
   } = useChatStore()
@@ -64,8 +61,7 @@ export const ChatContainer: React.FC<{
     setScrollTrigger(prev => prev + 1)
   }, [])
 
-  // Check if the last message is streaming
-  const lastMessage = messages[messages.length - 1]
+  // Check if any message is currently streaming
   const hasStreamingMessage = messages.some(msg => msg.role === 'assistant' && msg.isStreaming)
 
   // Get suggested questions based on document context
@@ -95,30 +91,9 @@ export const ChatContainer: React.FC<{
     handleSendMessage(question)
   }, [handleSendMessage])
 
-  const handleClearChat = useCallback(async () => {
-    if (messages.length === 0) return
-    
-    // Show confirmation dialog
-    if (window.confirm('Are you sure you want to clear this conversation? This action cannot be undone.')) {
-      try {
-        await clearChat(documentId)
-        setError(null)
-      } catch (error) {
-        console.error('Failed to clear chat:', error)
-        setError(error instanceof Error ? error.message : 'Failed to clear chat')
-      }
-    }
-  }, [clearChat, documentId, messages.length, setError])
 
-  const handleRetry = useCallback(async () => {
-    try {
-      await regenerateLastMessage()
-      setError(null)
-    } catch (error) {
-      console.error('Failed to regenerate message:', error)
-      setError(error instanceof Error ? error.message : 'Failed to regenerate message')
-    }
-  }, [regenerateLastMessage, setError])
+
+
 
   return (
     <div className="relative h-full flex flex-col bg-background">
@@ -143,11 +118,7 @@ export const ChatContainer: React.FC<{
           </div>
         )}
 
-        {/* Chat Header */}
-        <ChatHeader
-          messageCount={messages.length}
-          onClearChat={handleClearChat}
-        />
+
 
         {/* Messages or Empty State */}
         {messages.length === 0 && !isLoading && !error ? (

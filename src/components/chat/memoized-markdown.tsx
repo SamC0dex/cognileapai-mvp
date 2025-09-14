@@ -5,10 +5,14 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { motion } from 'framer-motion'
 
+interface MarkdownComponents {
+  [key: string]: React.ComponentType<any> // eslint-disable-line @typescript-eslint/no-explicit-any
+}
+
 interface MemoizedMarkdownProps {
   content: string
   isStreaming?: boolean
-  customComponents: any
+  customComponents: MarkdownComponents
 }
 
 // Split content into completed blocks and streaming content
@@ -33,7 +37,7 @@ const parseContent = (content: string, isStreaming: boolean) => {
 }
 
 // Memoized block component - only re-renders when content changes
-const MarkdownBlock = React.memo<{ content: string; components: any; index: number }>(
+const MarkdownBlock = React.memo<{ content: string; components: MarkdownComponents; index: number }>(
   ({ content, components, index }) => (
     <ReactMarkdown
       key={`block-${index}`}

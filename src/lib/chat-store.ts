@@ -12,7 +12,7 @@ export interface Message {
   content: string
   timestamp: Date
   isStreaming?: boolean
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
   citations?: Citation[]
 }
 
@@ -51,7 +51,7 @@ interface StoreShape {
   // actions
   loadConversation: (conversationId: string, documentId?: string) => Promise<void>
   sendMessage: (content: string, documentId?: string | null, model?: GeminiModelKey) => Promise<void>
-  clearChat: (documentId?: string | null) => Promise<void>
+
   regenerateLastMessage: () => Promise<void>
   setDocumentContext: (ctx: DocumentContext | null) => void
   setStreamingMessage: (val: string) => void
@@ -150,7 +150,7 @@ export function useChatStore(): StoreShape {
   }, [documentContext])
 
   // AI SDK v3 DataStream response parser
-  async function streamFromApi(payload: any): Promise<{text: string, metadata?: any}> {
+  async function streamFromApi(payload: unknown): Promise<{text: string, metadata?: unknown}> {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -168,7 +168,7 @@ export function useChatStore(): StoreShape {
     }
 
     let accumulatedText = ''
-    let finalMetadata: any = null
+    let finalMetadata: unknown = null
 
     try {
       const reader = res.body.getReader()
@@ -428,7 +428,7 @@ export function useChatStore(): StoreShape {
           // Don't fail the whole operation for history update errors
         }
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       const errorMessage = e instanceof Error ? e.message : 'Unknown error occurred'
       console.error('[Chat] sendMessage failed:', errorMessage, e)
       setError(`Failed to send message: ${errorMessage}`)
@@ -441,9 +441,7 @@ export function useChatStore(): StoreShape {
     }
   }, [documentContext, selectedModel])
 
-  const clearChat = useCallback(async () => {
-    setMessages([])
-  }, [])
+
 
   const regenerateLastMessage = useCallback(async () => {
     // Find last assistant and user message indices (compatible with older TypeScript)
@@ -478,7 +476,7 @@ export function useChatStore(): StoreShape {
     try {
       // Generate a proper UUID v4
       const conversationId = crypto.randomUUID()
-      
+
       // Create conversation in database
       const { error } = await supabase
         .from('conversations')
@@ -525,7 +523,7 @@ export function useChatStore(): StoreShape {
     selectedModel,
     loadConversation,
     sendMessage,
-    clearChat,
+
     regenerateLastMessage,
     setDocumentContext,
     setStreamingMessage,

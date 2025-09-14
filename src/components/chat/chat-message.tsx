@@ -2,10 +2,15 @@
 
 import React, { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { MemoizedMarkdown } from './memoized-markdown'
 import type { ChatMessageProps, Citation } from './types'
+
+// Types for markdown components
+interface MarkdownComponentProps {
+  children?: React.ReactNode
+  className?: string
+  [key: string]: unknown
+}
 
 const formatRelativeTime = (date: Date): string => {
   const now = new Date()
@@ -93,12 +98,12 @@ export const ChatMessage: React.FC<ChatMessageProps & {
   onThumbsUp,
   onThumbsDown
 }) => {
-  const { role, content, timestamp, isStreaming, citations, metadata } = message
+  const { role, content, timestamp, isStreaming, citations } = message
   const [showActions, setShowActions] = useState(false)
 
   const customComponents = {
     // Custom code block component with copy button
-    code({ children, className, ...props }: any) {
+    code({ children, className, ...props }: MarkdownComponentProps) {
       const match = /language-(\w+)/.exec(className || '')
       const isInline = !match
       
@@ -128,21 +133,21 @@ export const ChatMessage: React.FC<ChatMessageProps & {
     },
 
     // Enhanced list styling
-    ul({ children }: any) {
+    ul({ children }: MarkdownComponentProps) {
       return <ul className="list-disc pl-6 space-y-1 my-3">{children}</ul>
     },
 
-    ol({ children }: any) {
+    ol({ children }: MarkdownComponentProps) {
       return <ol className="list-decimal pl-6 space-y-1 my-3">{children}</ol>
     },
 
     // Enhanced paragraph spacing
-    p({ children }: any) {
+    p({ children }: MarkdownComponentProps) {
       return <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>
     },
 
     // Enhanced blockquote styling
-    blockquote({ children }: any) {
+    blockquote({ children }: MarkdownComponentProps) {
       return (
         <blockquote className="border-l-4 border-primary pl-4 py-2 my-4 bg-muted/30 rounded-r">
           {children}
@@ -151,20 +156,20 @@ export const ChatMessage: React.FC<ChatMessageProps & {
     },
 
     // Enhanced headers
-    h1({ children }: any) {
+    h1({ children }: MarkdownComponentProps) {
       return <h1 className="text-xl font-bold mt-6 mb-3 first:mt-0">{children}</h1>
     },
 
-    h2({ children }: any) {
+    h2({ children }: MarkdownComponentProps) {
       return <h2 className="text-lg font-semibold mt-5 mb-2">{children}</h2>
     },
 
-    h3({ children }: any) {
+    h3({ children }: MarkdownComponentProps) {
       return <h3 className="text-base font-medium mt-4 mb-2">{children}</h3>
     },
 
     // Enhanced table styling
-    table({ children }: any) {
+    table({ children }: MarkdownComponentProps) {
       return (
         <div className="overflow-x-auto my-4">
           <table className="w-full border-collapse border border-border rounded-lg">
@@ -174,7 +179,7 @@ export const ChatMessage: React.FC<ChatMessageProps & {
       )
     },
 
-    th({ children }: any) {
+    th({ children }: MarkdownComponentProps) {
       return (
         <th className="border border-border px-3 py-2 bg-muted font-semibold text-left">
           {children}
@@ -182,7 +187,7 @@ export const ChatMessage: React.FC<ChatMessageProps & {
       )
     },
 
-    td({ children }: any) {
+    td({ children }: MarkdownComponentProps) {
       return (
         <td className="border border-border px-3 py-2">
           {children}
@@ -191,12 +196,12 @@ export const ChatMessage: React.FC<ChatMessageProps & {
     },
 
     // Enhanced strong/bold
-    strong({ children }: any) {
+    strong({ children }: MarkdownComponentProps) {
       return <strong className="font-semibold text-foreground">{children}</strong>
     },
 
     // Enhanced emphasis
-    em({ children }: any) {
+    em({ children }: MarkdownComponentProps) {
       return <em className="italic text-muted-foreground">{children}</em>
     }
   }

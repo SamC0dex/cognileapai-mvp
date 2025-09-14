@@ -378,7 +378,7 @@ const ActionCard = React.forwardRef<HTMLDivElement, ActionCardProps>(
           className
         )}
         onClick={onClick}
-        {...(props as any)}
+        {...props}
       >
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10">
@@ -415,7 +415,7 @@ const FadeIn = ({ children, delay = 0, ...props }: {
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.3, delay }}
-    {...(props as any)}
+    {...props}
   >
     {children}
   </motion.div>
@@ -438,7 +438,7 @@ const SlideIn = ({ children, direction = 'left', delay = 0, ...props }: {
       initial={{ opacity: 0, ...directions[direction] }}
       animate={{ opacity: 1, x: 0, y: 0 }}
       transition={{ duration: 0.3, delay }}
-      {...(props as any)}
+      {...props}
     >
       {children}
     </motion.div>

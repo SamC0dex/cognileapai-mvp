@@ -236,7 +236,7 @@ async function saveMessageToDatabase({
   conversationId: string
   role: 'user' | 'assistant'
   content: string
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 }) {
   try {
     // Skip database saving if conversation ID is not a proper UUID
@@ -246,7 +246,7 @@ async function saveMessageToDatabase({
     }
 
     // Check if conversation exists, create if not
-    const { data: existingConv, error: convCheckError } = await supabase
+    const { error: convCheckError } = await supabase
       .from('conversations')
       .select('id')
       .eq('id', conversationId)

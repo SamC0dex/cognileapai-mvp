@@ -14,11 +14,17 @@ const supabase = createClient(
 )
 
 // In-memory cache for document context (5 minutes TTL)
-const documentCache = new Map<string, { 
-  data: any, 
-  timestamp: number,
-  content: string 
-}>()
+interface CachedDocument {
+  data: {
+    id: string
+    title: string
+    sections?: Array<{ title?: string; content?: string }>
+  }
+  timestamp: number
+  content: string
+}
+
+const documentCache = new Map<string, CachedDocument>()
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
 interface ChatDocumentRequest {
@@ -306,7 +312,7 @@ ${tableOfContents}
 Remember: Only answer based on the document content provided. Do not add external knowledge.`
 }
 
-function buildContextualMessage(message: string, documentContext: DocumentContext, messageHistory: any[]): string {
+function buildContextualMessage(message: string, documentContext: DocumentContext, _messageHistory: Array<{ role: 'user' | 'assistant', content: string }>): string {
   // Build context with token limit consideration (~4000 tokens = ~16000 characters)
   let context = `DOCUMENT: "${documentContext.title}"\n\n`
   
