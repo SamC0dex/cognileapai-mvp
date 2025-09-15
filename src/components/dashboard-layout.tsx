@@ -4,6 +4,7 @@ import * as React from 'react'
 import { useState } from 'react'
 import { Sidebar } from '@/components/sidebar'
 import { DocumentsPanel } from '@/components/documents-panel'
+import { DocumentsProvider } from '@/contexts/documents-context'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 
@@ -40,40 +41,42 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background optimized-container" data-app-content>
-      {/* Sidebar */}
-      <Sidebar
-        isCollapsed={sidebarCollapsed}
-        onCollapsedChange={handleSidebarToggle}
-        isDocumentsPanelOpen={isDocumentsPanelOpen}
-        onDocumentsPanelToggle={handleDocumentsPanelToggle}
-      />
+    <DocumentsProvider>
+      <div className="flex h-screen overflow-hidden bg-background optimized-container" data-app-content>
+        {/* Sidebar */}
+        <Sidebar
+          isCollapsed={sidebarCollapsed}
+          onCollapsedChange={handleSidebarToggle}
+          isDocumentsPanelOpen={isDocumentsPanelOpen}
+          onDocumentsPanelToggle={handleDocumentsPanelToggle}
+        />
 
-      {/* Main Content */}
-      <motion.main
-        className="flex-1 flex flex-col overflow-hidden"
-        initial={false}
-        animate={{
-          marginLeft: getMainContentOffset()
-        }}
-        transition={{
-          duration: 0.18,
-          ease: [0.4, 0, 0.2, 1],
-          type: "tween"
-        }}
-      >
-        {/* Content wrapper with proper scrolling */}
-        <div className="flex-1 overflow-auto">
-          {children}
-        </div>
-      </motion.main>
+        {/* Main Content */}
+        <motion.main
+          className="flex-1 flex flex-col overflow-hidden"
+          initial={false}
+          animate={{
+            marginLeft: getMainContentOffset()
+          }}
+          transition={{
+            duration: 0.18,
+            ease: [0.4, 0, 0.2, 1],
+            type: "tween"
+          }}
+        >
+          {/* Content wrapper with proper scrolling */}
+          <div className="flex-1 overflow-auto">
+            {children}
+          </div>
+        </motion.main>
 
-      {/* Documents Panel */}
-      <DocumentsPanel
-        isOpen={isDocumentsPanelOpen}
-        onClose={() => setIsDocumentsPanelOpen(false)}
-        sidebarCollapsed={sidebarCollapsed}
-      />
-    </div>
+        {/* Documents Panel */}
+        <DocumentsPanel
+          isOpen={isDocumentsPanelOpen}
+          onClose={() => setIsDocumentsPanelOpen(false)}
+          sidebarCollapsed={sidebarCollapsed}
+        />
+      </div>
+    </DocumentsProvider>
   )
 }

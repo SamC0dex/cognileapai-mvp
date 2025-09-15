@@ -26,6 +26,19 @@ export interface ChatInputProps {
   placeholder?: string
   maxLength?: number
   autoFocus?: boolean
+  selectedDocuments?: Array<{
+    id: string
+    title: string
+    size?: number
+    processing_status?: string
+  }>
+  urlSelectedDocument?: {
+    id: string
+    title: string
+    size?: number
+    processing_status?: string
+  } | null
+  onRemoveDocument?: (documentId: string) => void
 }
 
 export interface ChatMessageProps {

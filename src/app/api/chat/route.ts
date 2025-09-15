@@ -3,6 +3,7 @@ import { streamText, convertToCoreMessages } from 'ai'
 import { GeminiModelSelector, validateGeminiConfig, type MessageContext } from '@/lib/ai-config'
 import type { GeminiModelKey } from '@/lib/ai-config'
 import { createClient } from '@supabase/supabase-js'
+// import { retrieveRelevantContext, buildDocumentContextPrompt } from '@/lib/context-retrieval'
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -77,8 +78,62 @@ export async function POST(req: NextRequest) {
     // Convert messages to format expected by AI SDK
     const coreMessages = convertToCoreMessages(messages)
 
-    // Add system prompt based on chat type and context
-    const systemPrompt = getSystemPrompt(chatType, documentId, selectedModelKey)
+    // Get document context if documentId is provided
+    let systemPrompt = getSystemPrompt(chatType, documentId, selectedModelKey)
+    const documentCitations: any[] = []
+
+    if (documentId) {
+      console.log(`[AI] Document chat requested for: ${documentId}`)
+
+      try {
+        // Get document info and actual content
+        const { data: document, error: docError } = await supabase
+          .from('documents')
+          .select('id, title, page_count, processing_status, document_content')
+          .eq('id', documentId)
+          .single()
+
+        if (!docError && document) {
+          console.log(`[AI] Found document: ${document.title} (${document.page_count} pages)`)
+
+          if (document.document_content && document.document_content.trim()) {
+            console.log(`[AI] Using document content (${document.document_content.length} characters)`)
+
+            // For large documents, truncate to fit in context window
+            const maxContentLength = 15000 // Adjust based on model limits
+            let documentContent = document.document_content
+
+            if (documentContent.length > maxContentLength) {
+              documentContent = documentContent.substring(0, maxContentLength) + '\n\n[Content truncated due to length...]'
+              console.log(`[AI] Truncated content to ${maxContentLength} characters`)
+            }
+
+            // Enhanced system prompt with actual document content
+            systemPrompt = getSystemPrompt('document', documentId, selectedModelKey) +
+              `\n\nYou have access to the following document content from "${document.title}":\n\n` +
+              `${documentContent}\n\n` +
+              `Instructions:
+              - Answer questions directly based on this document content
+              - Quote specific sections when relevant
+              - Don't mention "reviewing" or "analyzing" the document - just answer naturally
+              - If asked about specific points, lists, or sections, find them in the content above
+              - Be conversational and helpful, not formal or repetitive`
+          } else {
+            console.log(`[AI] No document content available, using metadata only`)
+
+            // Fallback for documents without extracted content
+            systemPrompt = getSystemPrompt('document', documentId, selectedModelKey) +
+              `\n\nYou're helping with a document titled "${document.title}" (${document.page_count} pages). ` +
+              `The document content is being processed. For now, help the user by asking them to share ` +
+              `specific text or sections they'd like to discuss.`
+          }
+        } else {
+          console.error('[AI] Failed to fetch document:', docError)
+        }
+      } catch (error) {
+        console.error('[AI] Error fetching document context:', error)
+      }
+    }
 
     // Create the streaming response
     const result = await streamText({
@@ -108,14 +163,15 @@ export async function POST(req: NextRequest) {
 
             await saveMessageToDatabase({
               conversationId,
-              role: 'assistant', 
+              role: 'assistant',
               content: result.text,
               metadata: {
                 model: modelConfig.displayName,
                 tokens: result.usage?.totalTokens,
                 finishReason: result.finishReason,
                 modelKey: selectedModelKey
-              }
+              },
+              citations: documentCitations.length > 0 ? documentCitations : undefined
             })
           } catch (error) {
             console.error('[DB] Failed to save messages:', error)
@@ -227,16 +283,18 @@ Guidelines:
 - Keep responses focused and relevant to the educational context`
 }
 
-async function saveMessageToDatabase({ 
-  conversationId, 
-  role, 
-  content, 
-  metadata 
+async function saveMessageToDatabase({
+  conversationId,
+  role,
+  content,
+  metadata,
+  citations
 }: {
   conversationId: string
   role: 'user' | 'assistant'
   content: string
   metadata?: Record<string, unknown>
+  citations?: any[]
 }) {
   try {
     // Skip database saving if conversation ID is not a proper UUID
@@ -284,7 +342,8 @@ async function saveMessageToDatabase({
         role,
         content,
         sequence_number: sequenceNumber,
-        metadata
+        metadata,
+        citations: citations || null
       })
 
     if (error) {

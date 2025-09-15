@@ -9,6 +9,7 @@ import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMe
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
+import { useDocuments } from '@/contexts/documents-context'
 import type { Database } from '@/lib/supabase'
 
 type DocumentItem = Database['public']['Tables']['documents']['Row']
@@ -21,10 +22,10 @@ interface DocumentsPanelProps {
 
 export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: DocumentsPanelProps) {
   const router = useRouter()
+  const { selectedDocuments: contextSelectedDocs, addSelectedDocument, removeSelectedDocument, isDocumentSelected } = useDocuments()
   const [documents, setDocuments] = useState<DocumentItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
-  const [selectedDocuments, setSelectedDocuments] = useState<Set<string>>(new Set())
   const [selectAll, setSelectAll] = useState(false)
   const [renameDialog, setRenameDialog] = useState<{open: boolean, document: DocumentItem | null}>({open: false, document: null})
   const [removeDialog, setRemoveDialog] = useState<{open: boolean, document: DocumentItem | null}>({open: false, document: null})
@@ -133,27 +134,42 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
   }
 
   const handleDocumentSelect = (documentId: string) => {
-    setSelectedDocuments(prev => {
-      const newSelected = new Set(prev)
-      if (newSelected.has(documentId)) {
-        newSelected.delete(documentId)
-      } else {
-        newSelected.add(documentId)
-      }
+    const document = documents.find(doc => doc.id === documentId)
+    if (!document) return
 
-      // Update select all state based on selection
-      setSelectAll(newSelected.size === documents.length && documents.length > 0)
+    if (isDocumentSelected(documentId)) {
+      removeSelectedDocument(documentId)
+    } else {
+      addSelectedDocument({
+        id: document.id,
+        title: document.title,
+        size: document.bytes || undefined,
+        processing_status: document.processing_status || undefined
+      })
+    }
 
-      return newSelected
-    })
+    // Update select all state based on selection
+    const selectedCount = contextSelectedDocs.length + (isDocumentSelected(documentId) ? 0 : 1)
+    setSelectAll(selectedCount === documents.length && documents.length > 0)
   }
 
   const handleSelectAll = () => {
     if (selectAll) {
-      setSelectedDocuments(new Set())
+      // Clear all selections
+      contextSelectedDocs.forEach(doc => removeSelectedDocument(doc.id))
       setSelectAll(false)
     } else {
-      setSelectedDocuments(new Set(documents.map(doc => doc.id)))
+      // Select all documents
+      documents.forEach(doc => {
+        if (!isDocumentSelected(doc.id)) {
+          addSelectedDocument({
+            id: doc.id,
+            title: doc.title,
+            size: doc.bytes || undefined,
+            processing_status: doc.processing_status || undefined
+          })
+        }
+      })
       setSelectAll(true)
     }
   }
@@ -224,12 +240,12 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
   // Update selectAll state when documents change
   React.useEffect(() => {
     if (documents.length > 0) {
-      setSelectAll(selectedDocuments.size === documents.length)
+      const selectedCount = documents.filter(doc => isDocumentSelected(doc.id)).length
+      setSelectAll(selectedCount === documents.length)
     } else {
       setSelectAll(false)
-      setSelectedDocuments(new Set())
     }
-  }, [documents.length, selectedDocuments.size])
+  }, [documents.length, contextSelectedDocs, isDocumentSelected])
 
   return (
     <AnimatePresence>
@@ -363,12 +379,12 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
                         <button
                           onClick={() => handleDocumentSelect(document.id)}
                           className={`w-4 h-4 border rounded flex items-center justify-center shrink-0 transition-colors ${
-                            selectedDocuments.has(document.id)
+                            isDocumentSelected(document.id)
                               ? 'border-primary bg-primary'
                               : 'border-muted-foreground/30 bg-transparent hover:border-primary/50'
                           }`}
                         >
-                          {selectedDocuments.has(document.id) && (
+                          {isDocumentSelected(document.id) && (
                             <svg
                               className="w-2.5 h-2.5 text-primary-foreground"
                               fill="none"

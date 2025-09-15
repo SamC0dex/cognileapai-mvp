@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@ai-sdk/google": "^0.0.45",
+    "@ai-sdk/openai": "^2.0.30",
     "@hookform/resolvers": "^3.9.0",
     "@radix-ui/react-accordion": "^1.2.0",
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -40,7 +41,7 @@
     "next-themes": "^0.3.0",
     "pdf-parse": "^1.1.1",
     "pdf2json": "^3.2.1",
-    "pdfjs-dist": "^4.8.69",
+    "pdfjs-dist": "^4.10.38",
     "postcss": "^8.4.45",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

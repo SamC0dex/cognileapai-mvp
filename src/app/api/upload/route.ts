@@ -71,28 +71,29 @@ export async function POST(req: NextRequest) {
     
     console.log('File uploaded successfully:', uploadData.path)
     
-    // Create document record
+    // Create document record with processing status
     const { data: document, error: dbError } = await supabase
       .from('documents')
       .insert({
         title: file.name.replace('.pdf', ''),
         page_count: pageCount,
         bytes: file.size,
-        storage_path: uploadData.path
+        storage_path: uploadData.path,
+        processing_status: 'processing'
       })
       .select()
       .single()
-    
+
     if (dbError) {
       console.error('Database error:', dbError)
       // Clean up uploaded file
       await supabase.storage.from('documents').remove([uploadData.path])
       return NextResponse.json({ error: 'Failed to save document' }, { status: 500 })
     }
-    
+
     console.log('Document created successfully:', document.id)
-    
-    // Create basic sections
+
+    // Create basic sections (legacy support)
     await supabase
       .from('sections')
       .insert({
@@ -102,19 +103,131 @@ export async function POST(req: NextRequest) {
         page_start: 1,
         page_end: pageCount > 0 ? pageCount : 1
       })
-    
-    return NextResponse.json({ 
-      success: true, 
+
+    // Start background PDF processing for chat functionality
+    // This runs asynchronously so upload response is fast
+    startBackgroundProcessing(document.id, buffer).catch(error => {
+      console.error(`Background PDF processing failed for document ${document.id}:`, error)
+      // Update document with error status
+      supabase
+        .from('documents')
+        .update({
+          processing_status: 'failed',
+          error_message: error instanceof Error ? error.message : 'Processing failed'
+        })
+        .eq('id', document.id)
+        .then(() => console.log(`Updated document ${document.id} with error status`))
+    })
+
+    return NextResponse.json({
+      success: true,
       document: {
         ...document,
         hasStudyGuide: false,
         hasSummary: false,
-        hasNotes: false
+        hasNotes: false,
+        processing_status: 'processing'
       }
     })
     
   } catch (error) {
     console.error('Upload error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+// Enhanced background processing function with PDF text extraction
+async function startBackgroundProcessing(documentId: string, buffer: Buffer) {
+  try {
+    console.log(`[Background] Starting PDF processing for document ${documentId}`)
+
+    // Update status to processing
+    await supabase
+      .from('documents')
+      .update({ processing_status: 'processing' })
+      .eq('id', documentId)
+
+    // Extract text content from PDF using pdf2json
+    let extractedText = ''
+    try {
+      const PDFParser = require('pdf2json')
+
+      const extractText = () => {
+        return new Promise<string>((resolve, reject) => {
+          const pdfParser = new PDFParser()
+
+          pdfParser.on('pdfParser_dataError', (errData: any) => {
+            reject(new Error(errData.parserError))
+          })
+
+          pdfParser.on('pdfParser_dataReady', (pdfData: any) => {
+            try {
+              let text = ''
+              if (pdfData.Pages) {
+                pdfData.Pages.forEach((page: any) => {
+                  if (page.Texts) {
+                    page.Texts.forEach((textItem: any) => {
+                      if (textItem.R) {
+                        textItem.R.forEach((textRun: any) => {
+                          if (textRun.T) {
+                            // Decode the text and add spaces
+                            text += decodeURIComponent(textRun.T) + ' '
+                          }
+                        })
+                      }
+                    })
+                    text += '\n' // Add line break after each page
+                  }
+                })
+              }
+              resolve(text.trim())
+            } catch (error) {
+              reject(error)
+            }
+          })
+
+          pdfParser.parseBuffer(buffer)
+        })
+      }
+
+      extractedText = await extractText()
+      console.log(`[Background] Extracted ${extractedText.length} characters from PDF`)
+
+      // Store the extracted text in the document_content column
+      await supabase
+        .from('documents')
+        .update({
+          processing_status: 'completed',
+          chunk_count: 1, // For now, we store as one chunk
+          document_content: extractedText // Store the full text
+        })
+        .eq('id', documentId)
+
+      console.log(`[Background] PDF text extraction completed for document ${documentId}`)
+
+    } catch (textError) {
+      console.error(`[Background] Text extraction failed, but marking as completed:`, textError)
+
+      // Even if text extraction fails, mark as completed so UI shows ready
+      await supabase
+        .from('documents')
+        .update({
+          processing_status: 'completed',
+          chunk_count: 0,
+          error_message: 'Text extraction failed, but document is available'
+        })
+        .eq('id', documentId)
+    }
+
+  } catch (error) {
+    console.error(`[Background] Processing failed for document ${documentId}:`, error)
+
+    await supabase
+      .from('documents')
+      .update({
+        processing_status: 'failed',
+        error_message: error instanceof Error ? error.message : 'Processing failed'
+      })
+      .eq('id', documentId)
   }
 }

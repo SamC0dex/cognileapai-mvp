@@ -120,7 +120,8 @@ export function useChatStore(): StoreShape {
         role: msg.role as Role,
         content: msg.content,
         timestamp: new Date(msg.created_at),
-        metadata: msg.metadata
+        metadata: msg.metadata,
+        citations: msg.citations || []
       }))
 
       setMessages(loadedMessages)
@@ -482,6 +483,7 @@ export function useChatStore(): StoreShape {
         .insert({
           id: conversationId,
           document_id: documentId || null,
+          selected_document_id: documentId || null,
           title: 'New Conversation' // Temporary title, will be updated with first message
         })
 

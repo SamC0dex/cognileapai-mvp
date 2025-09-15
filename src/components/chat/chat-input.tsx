@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { GEMINI_MODELS, GeminiModelKey } from '@/lib/ai-config'
 import { useChatStore } from '@/lib/chat-store'
 import { GeminiLogo } from '@/components/icons/gemini-logo'
+import { toast } from 'sonner'
 import type { ChatInputProps } from './types'
 
 const MIN_HEIGHT = 44 // Minimum height for textarea
@@ -21,12 +22,16 @@ export const ChatInput: React.FC<ChatInputProps & {
   maxLength = 4000,
   autoFocus = false,
   selectedModel = 'FLASH',
-  onModelChange
+  onModelChange,
+  selectedDocuments = [],
+  urlSelectedDocument = null,
+  onRemoveDocument
 }) => {
   const [inputValue, setInputValue] = useState('')
   const [textareaHeight, setTextareaHeight] = useState(MIN_HEIGHT)
   const [showModelSelector, setShowModelSelector] = useState(false)
   const [showToolsSelector, setShowToolsSelector] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
   // const [lastUserMessage, setLastUserMessage] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   
@@ -231,9 +236,134 @@ export const ChatInput: React.FC<ChatInputProps & {
     })
   }, [calculateHeight])
 
+  const handleFileUpload = useCallback(async () => {
+    if (isUploading) return
+
+    // Create file input dynamically
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.pdf'
+    input.multiple = false
+    input.onchange = async (e) => {
+      const files = Array.from((e.target as HTMLInputElement).files || [])
+      if (files.length > 0) {
+        setIsUploading(true)
+        try {
+          const file = files[0]
+          const formData = new FormData()
+          formData.append('file', file)
+
+          const response = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+          })
+
+          if (response.ok) {
+            const result = await response.json()
+            toast.success(`"${file.name}" uploaded successfully! You can now chat with this document.`)
+
+            // Navigate to document chat
+            if (result.document?.id && typeof window !== 'undefined') {
+              // Navigate to document chat page
+              window.location.href = `/chat?type=document&documentId=${result.document.id}&title=${encodeURIComponent(result.document.title || file.name)}`
+            }
+
+            // Dispatch custom event for documents panel to refresh
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('document-uploaded'))
+            }
+          } else {
+            const error = await response.json()
+            toast.error(error.error || 'Upload failed')
+          }
+        } catch (error) {
+          toast.error('Upload failed')
+          console.error('Upload error:', error)
+        } finally {
+          setIsUploading(false)
+        }
+      }
+    }
+    input.click()
+  }, [isUploading])
+
   return (
     <div className="border-t border-border/50 bg-background/80 backdrop-blur-xl">
-      <div className="p-6 max-w-4xl mx-auto">
+      <div className="px-6 pb-6 pt-2 max-w-4xl mx-auto">
+        {/* Selected Documents Pills - Above the chat box */}
+        {(selectedDocuments.length > 0 || urlSelectedDocument) && (
+          <div className="mb-1.5">
+            <div className="flex flex-wrap gap-2">
+              {selectedDocuments.map(doc => (
+                <motion.div
+                  key={doc.id}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  className="group inline-flex items-center gap-1.5 px-2 py-1 bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-300 text-xs rounded-md border border-red-200 dark:border-red-800/30 max-w-48"
+                >
+                  <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                  </svg>
+                  <span className="truncate font-medium" title={doc.title}>
+                    {doc.title}
+                  </span>
+                  {doc.processing_status === 'processing' && (
+                    <div className="w-2 h-2 border border-red-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                  )}
+                  {doc.processing_status === 'completed' && (
+                    <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0" />
+                  )}
+                  {onRemoveDocument && (
+                    <button
+                      onClick={() => onRemoveDocument(doc.id)}
+                      className="ml-1 w-3 h-3 rounded-full hover:bg-red-200 dark:hover:bg-red-800/40 flex items-center justify-center flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity"
+                      title="Remove document"
+                    >
+                      <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </motion.div>
+              ))}
+
+              {urlSelectedDocument && !selectedDocuments.some(doc => doc.id === urlSelectedDocument.id) && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  className="group inline-flex items-center gap-1.5 px-2 py-1 bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-300 text-xs rounded-md border border-red-200 dark:border-red-800/30 max-w-48"
+                >
+                  <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                  </svg>
+                  <span className="truncate font-medium" title={urlSelectedDocument.title}>
+                    {urlSelectedDocument.title}
+                  </span>
+                  {urlSelectedDocument.processing_status === 'processing' && (
+                    <div className="w-2 h-2 border border-red-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                  )}
+                  {urlSelectedDocument.processing_status === 'completed' && (
+                    <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0" />
+                  )}
+                  {onRemoveDocument && (
+                    <button
+                      onClick={() => onRemoveDocument(urlSelectedDocument.id)}
+                      className="ml-1 w-3 h-3 rounded-full hover:bg-red-200 dark:hover:bg-red-800/40 flex items-center justify-center flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity"
+                      title="Remove document"
+                    >
+                      <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </motion.div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Main Input Container */}
         <div className="relative">
           {/* Let height be natural so the textarea stays inside the card */}
@@ -309,13 +439,20 @@ export const ChatInput: React.FC<ChatInputProps & {
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => console.log('attach')}
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg border border-border hover:bg-muted/50 text-foreground"
-                  title="Attach"
+                  onClick={handleFileUpload}
+                  disabled={isUploading}
+                  className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg border border-border hover:bg-muted/50 text-foreground transition-all duration-200 ${
+                    isUploading ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                  title={isUploading ? "Uploading..." : "Upload PDF"}
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21.44 11.05l-7.07 7.07a5 5 0 11-7.07-7.07l7.07-7.07a3 3 0 114.24 4.24l-7.07 7.07a1 1 0 01-1.42-1.42l6.36-6.36" />
-                  </svg>
+                  {isUploading ? (
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21.44 11.05l-7.07 7.07a5 5 0 11-7.07-7.07l7.07-7.07a3 3 0 114.24 4.24l-7.07 7.07a1 1 0 01-1.42-1.42l6.36-6.36" />
+                    </svg>
+                  )}
                 </motion.button>
 
                 {/* Tools button */}

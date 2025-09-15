@@ -1,18 +1,26 @@
 'use client'
 
-import React, { useState, useCallback, useMemo } from 'react'
+import React, { useState, useCallback, useMemo, useEffect } from 'react'
 import { ChatInput } from './chat-input'
 import { ChatMessages } from './chat-messages'
 import { ChatEmptyState } from './chat-empty-state'
-
+import { SelectedDocumentDisplay } from './selected-document-display'
 import { ChatScrollButton } from './chat-scroll-button'
 import { useChat } from '@/lib/use-chat'
 import { getSuggestedQuestions } from '@/lib/chat-store'
 import type { GeminiModelKey } from '@/lib/ai-config'
 import type { Citation } from './types'
+import { createClient } from '@supabase/supabase-js'
+import { useDocuments } from '@/contexts/documents-context'
 
 // Check if we're in demo mode (Supabase not configured)
 const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export const ChatContainer: React.FC<{
   documentId?: string
@@ -25,6 +33,11 @@ export const ChatContainer: React.FC<{
   selectedModel = 'FLASH',
   onModelChange
 }) => {
+  const { selectedDocuments, primaryDocument, removeSelectedDocument, updateDocumentStatus } = useDocuments()
+
+  // Use primary selected document if no URL document is provided
+  const effectiveDocumentId = documentId || primaryDocument?.id
+
   // Use the chat hook for all chat functionality
   const {
     messages,
@@ -34,10 +47,16 @@ export const ChatContainer: React.FC<{
     sendMessage,
     regenerateLastMessage,
     setError
-  } = useChat(documentId, conversationId)
+  } = useChat(effectiveDocumentId, conversationId)
 
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [scrollTrigger, setScrollTrigger] = useState(0)
+  const [urlSelectedDocument, setUrlSelectedDocument] = useState<{
+    id: string
+    title: string
+    size?: number
+    processing_status?: string
+  } | null>(null)
 
   // Handle scroll state changes from ChatMessages
   const handleScrollStateChange = useCallback((userScrolled: boolean, showButton: boolean) => {
@@ -48,6 +67,111 @@ export const ChatContainer: React.FC<{
   const forceScrollToBottom = useCallback(() => {
     setScrollTrigger(prev => prev + 1)
   }, [])
+
+  // Fetch document info when documentId from URL changes
+  useEffect(() => {
+    const fetchDocumentInfo = async () => {
+      if (!documentId || isDemoMode) {
+        setUrlSelectedDocument(null)
+        return
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('documents')
+          .select('id, title, bytes, processing_status')
+          .eq('id', documentId)
+          .single()
+
+        if (error) {
+          console.error('Error fetching document:', error)
+          setUrlSelectedDocument(null)
+        } else if (data) {
+          setUrlSelectedDocument({
+            id: data.id,
+            title: data.title,
+            size: data.bytes || undefined,
+            processing_status: data.processing_status || undefined
+          })
+        }
+      } catch (error) {
+        console.error('Error fetching document:', error)
+        setUrlSelectedDocument(null)
+      }
+    }
+
+    fetchDocumentInfo()
+
+    // Poll for status updates if document is processing
+    const pollInterval = setInterval(() => {
+      if (urlSelectedDocument?.processing_status === 'processing') {
+        fetchDocumentInfo()
+      }
+    }, 2000) // Poll every 2 seconds
+
+    return () => clearInterval(pollInterval)
+  }, [documentId, isDemoMode, urlSelectedDocument?.processing_status])
+
+  // Poll for status updates on selected documents
+  useEffect(() => {
+    if (isDemoMode || selectedDocuments.length === 0) return
+
+    const pollForSelectedDocuments = async () => {
+      const processingDocs = selectedDocuments.filter(doc => doc.processing_status === 'processing')
+      if (processingDocs.length === 0) return
+
+      try {
+        const { data, error } = await supabase
+          .from('documents')
+          .select('id, processing_status')
+          .in('id', processingDocs.map(doc => doc.id))
+
+        if (!error && data) {
+          data.forEach(doc => {
+            if (doc.processing_status !== 'processing') {
+              updateDocumentStatus(doc.id, doc.processing_status)
+            }
+          })
+        }
+      } catch (error) {
+        console.error('Error polling document status:', error)
+      }
+    }
+
+    const pollInterval = setInterval(pollForSelectedDocuments, 2000)
+    return () => clearInterval(pollInterval)
+  }, [selectedDocuments, updateDocumentStatus, isDemoMode])
+
+  // Listen for document uploads from chat input
+  useEffect(() => {
+    const handleDocumentUploaded = () => {
+      // Refresh selected document if needed
+      if (documentId) {
+        // Re-fetch document info to get updated status
+        window.location.reload() // Simple approach for now
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('document-uploaded', handleDocumentUploaded)
+      return () => window.removeEventListener('document-uploaded', handleDocumentUploaded)
+    }
+  }, [documentId])
+
+  // Handle document removal
+  const handleRemoveDocument = useCallback((documentId: string) => {
+    // Remove from context if it's a selected document
+    removeSelectedDocument(documentId)
+
+    // If it's the URL document, navigate away
+    if (urlSelectedDocument?.id === documentId) {
+      setUrlSelectedDocument(null)
+      if (typeof window !== 'undefined') {
+        window.history.pushState({}, '', '/chat')
+        window.location.reload()
+      }
+    }
+  }, [removeSelectedDocument, urlSelectedDocument])
 
   // Check if any message is currently streaming
   const hasStreamingMessage = messages.some(msg => msg.role === 'assistant' && msg.isStreaming)
@@ -150,11 +274,20 @@ export const ChatContainer: React.FC<{
         <ChatInput
           onSendMessage={handleSendMessage}
           disabled={hasStreamingMessage}
-          placeholder="Ask about concepts, request summaries, or get explanations..."
+          placeholder={
+            selectedDocuments.length > 0
+              ? `Ask about ${selectedDocuments.length > 1 ? 'your documents' : `"${selectedDocuments[0].title}"`}...`
+              : urlSelectedDocument
+                ? `Ask about "${urlSelectedDocument.title}"...`
+                : "Ask about concepts, request summaries, or get explanations..."
+          }
           maxLength={4000}
           autoFocus={false}
           selectedModel={selectedModel}
           onModelChange={onModelChange}
+          selectedDocuments={selectedDocuments}
+          urlSelectedDocument={urlSelectedDocument}
+          onRemoveDocument={handleRemoveDocument}
         />
     </div>
   )
