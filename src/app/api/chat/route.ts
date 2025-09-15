@@ -3,7 +3,7 @@ import { streamText, convertToCoreMessages } from 'ai'
 import { GeminiModelSelector, validateGeminiConfig, type MessageContext } from '@/lib/ai-config'
 import type { GeminiModelKey } from '@/lib/ai-config'
 import { createClient } from '@supabase/supabase-js'
-// import { retrieveRelevantContext, buildDocumentContextPrompt } from '@/lib/context-retrieval'
+import { buildContextPrompt } from '@/lib/smart-context'
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -99,25 +99,23 @@ export async function POST(req: NextRequest) {
           if (document.document_content && document.document_content.trim()) {
             console.log(`[AI] Using document content (${document.document_content.length} characters)`)
 
-            // For large documents, truncate to fit in context window
-            const maxContentLength = 15000 // Adjust based on model limits
-            let documentContent = document.document_content
+            // Use smart context system for better relevance
+            const userQuery = lastMessage.content
+            const contextPrompt = buildContextPrompt(
+              userQuery,
+              document.title,
+              document.document_content,
+              {
+                maxTokens: 4000, // Adjust based on model limits
+                chunkSize: 1000,
+                overlap: 200
+              }
+            )
 
-            if (documentContent.length > maxContentLength) {
-              documentContent = documentContent.substring(0, maxContentLength) + '\n\n[Content truncated due to length...]'
-              console.log(`[AI] Truncated content to ${maxContentLength} characters`)
-            }
+            console.log(`[AI] Smart context system selected relevant content`)
 
-            // Enhanced system prompt with actual document content
-            systemPrompt = getSystemPrompt('document', documentId, selectedModelKey) +
-              `\n\nYou have access to the following document content from "${document.title}":\n\n` +
-              `${documentContent}\n\n` +
-              `Instructions:
-              - Answer questions directly based on this document content
-              - Quote specific sections when relevant
-              - Don't mention "reviewing" or "analyzing" the document - just answer naturally
-              - If asked about specific points, lists, or sections, find them in the content above
-              - Be conversational and helpful, not formal or repetitive`
+            // Enhanced system prompt with smart context
+            systemPrompt = getSystemPrompt('document', documentId, selectedModelKey) + '\n\n' + contextPrompt
           } else {
             console.log(`[AI] No document content available, using metadata only`)
 
