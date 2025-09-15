@@ -27,7 +27,7 @@ export default function DashboardPage() {
         const result = await response.json()
         toast.success(`"${file.name}" uploaded successfully!`)
         // Navigate to chat with document context (instant, no delay)
-        router.push(`/chat?type=document&documentId=${result.documentId || 'new'}&title=${encodeURIComponent(file.name)}`)
+        router.push(`/chat?type=document&documentId=${result.document?.id || 'new'}&title=${encodeURIComponent(file.name)}`)
       } else {
         const error = await response.json()
         toast.error(error.error || 'Upload failed')

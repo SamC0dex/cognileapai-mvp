@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { useState } from 'react'
 import { Sidebar } from '@/components/sidebar'
+import { DocumentsPanel } from '@/components/documents-panel'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 
@@ -12,13 +13,16 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [isDocumentsPanelOpen, setIsDocumentsPanelOpen] = useState(false)
 
   return (
     <div className="flex h-screen overflow-hidden bg-background optimized-container" data-app-content>
       {/* Sidebar */}
-      <Sidebar 
+      <Sidebar
         isCollapsed={sidebarCollapsed}
         onCollapsedChange={setSidebarCollapsed}
+        isDocumentsPanelOpen={isDocumentsPanelOpen}
+        onDocumentsPanelToggle={() => setIsDocumentsPanelOpen(!isDocumentsPanelOpen)}
       />
       
       {/* Main Content */}
@@ -38,6 +42,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           {children}
         </div>
       </motion.main>
+
+      {/* Documents Panel */}
+      <DocumentsPanel
+        isOpen={isDocumentsPanelOpen}
+        onClose={() => setIsDocumentsPanelOpen(false)}
+      />
     </div>
   )
 }

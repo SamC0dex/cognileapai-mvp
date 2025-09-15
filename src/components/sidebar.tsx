@@ -3,13 +3,14 @@
 import * as React from 'react'
 import { useState } from 'react'
 import { usePathname } from 'next/navigation'
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Plus, 
-  LayoutDashboard, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  LayoutDashboard,
   Settings,
   Lightbulb,
+  FileText,
   ChevronDown,
   MoreHorizontal,
   User,
@@ -36,9 +37,11 @@ import { Logo } from './logo'
 interface SidebarProps {
   isCollapsed?: boolean
   onCollapsedChange?: (collapsed: boolean) => void
+  isDocumentsPanelOpen?: boolean
+  onDocumentsPanelToggle?: () => void
 }
 
-export function Sidebar({ isCollapsed = false, onCollapsedChange }: SidebarProps) {
+export function Sidebar({ isCollapsed = false, onCollapsedChange, isDocumentsPanelOpen = false, onDocumentsPanelToggle }: SidebarProps) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(isCollapsed)
   const { theme, setTheme } = useTheme()
@@ -87,6 +90,13 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange }: SidebarProps
       href: '/chat',
       icon: Lightbulb,
       current: pathname?.startsWith('/chat') || false
+    },
+    {
+      name: 'Documents',
+      href: '/documents',
+      icon: FileText,
+      current: isDocumentsPanelOpen,
+      isPanel: true
     },
     {
       name: 'Settings',
@@ -225,8 +235,12 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange }: SidebarProps
             <button
               key={item.name}
               onClick={() => {
-                console.log(`Direct navigation to ${item.href}`);
-                window.location.href = item.href;
+                if (item.isPanel) {
+                  onDocumentsPanelToggle?.();
+                } else {
+                  console.log(`Direct navigation to ${item.href}`);
+                  window.location.href = item.href;
+                }
               }}
               className={cn(
                 "penseum-nav-item group w-full",

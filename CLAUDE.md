@@ -107,7 +107,14 @@ CogniLeapAI MVP is a desktop-first web application that processes PDFs and gener
    - Check for accessibility violations
    - Monitor performance metrics
 
-3. **Functional Testing Requirements**:
+3. **Context7 MCP**:
+   - Verify any library/framework changes
+   - Ensure compliance with latest best practices
+   - Check for deprecated methods or patterns
+   - Uptodate Documentation lookup for libraries and frameworks
+   - Ensure proper usage of any new APIs or features
+
+4. **Functional Testing Requirements**:
    - Test the specific feature/improvement implemented
    - Verify all existing features still work perfectly
    - Test edge cases and error scenarios
