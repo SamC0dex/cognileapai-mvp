@@ -16,9 +16,10 @@ type DocumentItem = Database['public']['Tables']['documents']['Row']
 interface DocumentsPanelProps {
   isOpen: boolean
   onClose: () => void
+  sidebarCollapsed?: boolean
 }
 
-export function DocumentsPanel({ isOpen, onClose }: DocumentsPanelProps) {
+export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: DocumentsPanelProps) {
   const router = useRouter()
   const [documents, setDocuments] = useState<DocumentItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -245,14 +246,25 @@ export function DocumentsPanel({ isOpen, onClose }: DocumentsPanelProps) {
 
           {/* Panel */}
           <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+            initial={{ width: 0, opacity: 0 }}
+            animate={{
+              width: 320,
+              opacity: 1,
+              left: sidebarCollapsed ? 64 : 256
+            }}
+            exit={{ width: 0, opacity: 0 }}
+            transition={{
+              duration: 0.18,
+              ease: [0.4, 0, 0.2, 1],
+              type: "tween"
+            }}
             className={cn(
-              "fixed right-0 top-0 h-full w-80 bg-background border-l border-border shadow-2xl z-[400]",
+              "fixed top-0 h-full bg-background border-r border-border shadow-2xl z-[400]",
               "flex flex-col overflow-hidden"
             )}
+            style={{
+              transformOrigin: "left center"
+            }}
           >
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-border bg-card/50">

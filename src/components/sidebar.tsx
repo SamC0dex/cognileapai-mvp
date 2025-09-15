@@ -43,12 +43,10 @@ interface SidebarProps {
 
 export function Sidebar({ isCollapsed = false, onCollapsedChange, isDocumentsPanelOpen = false, onDocumentsPanelToggle }: SidebarProps) {
   const pathname = usePathname()
-  const [collapsed, setCollapsed] = useState(isCollapsed)
   const { theme, setTheme } = useTheme()
-  
+
   const handleToggle = () => {
-    const newState = !collapsed
-    setCollapsed(newState)
+    const newState = !isCollapsed
     onCollapsedChange?.(newState)
   }
   
@@ -107,18 +105,22 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange, isDocumentsPan
   ]
 
   return (
-    <motion.div 
+    <motion.div
       className={cn(
         "relative z-[200] flex flex-col h-screen penseum-sidebar pointer-events-auto",
-        collapsed ? "w-16" : "w-64"
+        isCollapsed ? "w-16" : "w-64"
       )}
       initial={false}
-      animate={{ width: collapsed ? 64 : 256 }}
-      transition={{ duration: 0.1, ease: "easeOut" }}
+      animate={{ width: isCollapsed ? 64 : 256 }}
+      transition={{
+        duration: 0.18,
+        ease: [0.4, 0, 0.2, 1],
+        type: "tween"
+      }}
     >
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
-        {!collapsed ? (
+        {!isCollapsed ? (
           <div className="flex items-center gap-2">
             <Logo width={36} height={36} />
             <span className="text-lg font-semibold text-sidebar-foreground">
@@ -132,7 +134,7 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange, isDocumentsPan
         )}
         
         {/* Show theme toggle only when not collapsed, otherwise show collapse toggle */}
-        {!collapsed ? (
+        {!isCollapsed ? (
           <div className="flex items-center gap-2">
             {/* Theme Toggle */}
             <Button
@@ -167,7 +169,7 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange, isDocumentsPan
       </div>
 
       {/* Collapse toggle for collapsed state */}
-      {collapsed && (
+      {isCollapsed && (
         <div className="flex justify-center py-2">
           <Button
             variant="ghost"
@@ -184,7 +186,7 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange, isDocumentsPan
 
       {/* Primary Action Button */}
       <div className="px-4 py-2">
-        {!collapsed ? (
+        {!isCollapsed ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button 
@@ -245,17 +247,17 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange, isDocumentsPan
               className={cn(
                 "penseum-nav-item group w-full",
                 item.current && "active",
-                collapsed && "justify-center"
+                isCollapsed && "justify-center"
               )}
               type="button"
             >
               <Icon
                 className={cn(
                   "shrink-0",
-                  collapsed ? "h-5 w-5" : "h-5 w-5"
+                  isCollapsed ? "h-5 w-5" : "h-5 w-5"
                 )}
               />
-              {!collapsed && (
+              {!isCollapsed && (
                 <div className="flex items-center justify-between w-full">
                   <span className="truncate">{item.name}</span>
                 </div>
@@ -267,7 +269,7 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange, isDocumentsPan
 
       {/* User Profile */}
       <div className="p-4 border-t border-sidebar-border">
-        {!collapsed ? (
+        {!isCollapsed ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button 

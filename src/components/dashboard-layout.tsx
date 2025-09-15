@@ -15,27 +15,53 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [isDocumentsPanelOpen, setIsDocumentsPanelOpen] = useState(false)
 
+  // Handle documents panel toggle with seamless coordination
+  const handleDocumentsPanelToggle = () => {
+    if (!isDocumentsPanelOpen) {
+      // Opening documents panel -> collapse sidebar and open panel simultaneously
+      setSidebarCollapsed(true)
+      setIsDocumentsPanelOpen(true)
+    } else {
+      // Closing documents panel -> close immediately
+      setIsDocumentsPanelOpen(false)
+    }
+  }
+
+  // Handle sidebar manual toggle - allow coexistence with documents panel
+  const handleSidebarToggle = (newCollapsedState: boolean) => {
+    // Simply toggle sidebar state, let documents panel stay open if it's open
+    setSidebarCollapsed(newCollapsedState)
+  }
+
+  // Calculate main content margin based on sidebar and documents panel state
+  const getMainContentMargin = () => {
+    const sidebarWidth = sidebarCollapsed ? 64 : 256
+    const documentsWidth = isDocumentsPanelOpen ? 320 : 0
+    return sidebarWidth + documentsWidth
+  }
+
   return (
     <div className="flex h-screen overflow-hidden bg-background optimized-container" data-app-content>
       {/* Sidebar */}
       <Sidebar
         isCollapsed={sidebarCollapsed}
-        onCollapsedChange={setSidebarCollapsed}
+        onCollapsedChange={handleSidebarToggle}
         isDocumentsPanelOpen={isDocumentsPanelOpen}
-        onDocumentsPanelToggle={() => setIsDocumentsPanelOpen(!isDocumentsPanelOpen)}
+        onDocumentsPanelToggle={handleDocumentsPanelToggle}
       />
-      
+
       {/* Main Content */}
-      <motion.main 
-        className={cn(
-          "flex-1 flex flex-col overflow-hidden",
-          sidebarCollapsed ? "ml-0" : "ml-0"
-        )}
+      <motion.main
+        className="flex-1 flex flex-col overflow-hidden"
         initial={false}
-        animate={{ 
-          marginLeft: 0 
+        animate={{
+          marginLeft: getMainContentMargin()
         }}
-        transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+        transition={{
+          duration: 0.18,
+          ease: [0.4, 0, 0.2, 1],
+          type: "tween"
+        }}
       >
         {/* Content wrapper with proper scrolling */}
         <div className="flex-1 overflow-auto">
@@ -47,6 +73,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       <DocumentsPanel
         isOpen={isDocumentsPanelOpen}
         onClose={() => setIsDocumentsPanelOpen(false)}
+        sidebarCollapsed={sidebarCollapsed}
       />
     </div>
   )
