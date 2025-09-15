@@ -33,11 +33,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     setSidebarCollapsed(newCollapsedState)
   }
 
-  // Calculate main content margin based on sidebar and documents panel state
-  const getMainContentMargin = () => {
-    const sidebarWidth = sidebarCollapsed ? 64 : 256
-    const documentsWidth = isDocumentsPanelOpen ? 320 : 0
-    return sidebarWidth + documentsWidth
+  // Shift content only when the floating documents panel is visible so the
+  // sidebar remains snug against the dashboard surface.
+  const getMainContentOffset = () => {
+    return isDocumentsPanelOpen ? 320 : 0
   }
 
   return (
@@ -55,7 +54,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         className="flex-1 flex flex-col overflow-hidden"
         initial={false}
         animate={{
-          marginLeft: getMainContentMargin()
+          marginLeft: getMainContentOffset()
         }}
         transition={{
           duration: 0.18,
