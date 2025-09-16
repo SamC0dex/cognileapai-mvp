@@ -178,10 +178,18 @@ pnpm typecheck    # Run TypeScript type checking
 ### Package Management
 Uses pnpm (version 9.10.0) - always use `pnpm` instead of `npm` or `yarn`.
 
+### Testing and Quality
+```bash
+pnpm lint         # Run ESLint to check code quality
+pnpm typecheck    # Run TypeScript type checking without compilation
+```
+Both commands should pass before considering any implementation complete.
+
 ## Architecture
 
 ### Tech Stack
 - **Frontend**: Next.js 15, TypeScript, Tailwind CSS, Radix UI, Framer Motion
+- **Package Manager**: pnpm 9.10.0 (always use `pnpm` instead of `npm` or `yarn`)
 - **Backend**: Next.js API Routes with Server-Sent Events for streaming
 - **Database**: Supabase PostgreSQL with Row Level Security
 - **Storage**: Supabase Storage for PDF files
@@ -211,6 +219,7 @@ Uses pnpm (version 9.10.0) - always use `pnpm` instead of `npm` or `yarn`.
 - `/api/extract-content` - Document content extraction and processing
 - `/api/documents/[id]/status` - Real-time document processing status
 - `/api/study-tools/generate` - AI-powered study materials generation
+- `/api/study-tools/fetch` - Retrieve existing study materials
 - All endpoints use Server-Sent Events for streaming responses
 - Database operations use server-only Supabase service role
 

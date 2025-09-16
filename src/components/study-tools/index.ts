@@ -1,3 +1,6 @@
 export { StudyToolsPanel } from './study-tools-panel'
 export { StudyToolsCanvas } from './study-tools-canvas'
+export { FlashcardCustomizationDialog } from './flashcard-customization-dialog'
+export { FlashcardViewer } from './flashcard-viewer'
 export * from '@/lib/study-tools-store'
+export * from '@/lib/flashcard-store'

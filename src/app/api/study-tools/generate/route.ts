@@ -17,6 +17,12 @@ interface StudyToolGenerateRequest {
   type: StudyToolPromptType
   documentId?: string
   conversationId?: string
+  // Flashcard-specific options
+  flashcardOptions?: {
+    numberOfCards: 'fewer' | 'standard' | 'more'
+    difficulty: 'easy' | 'medium' | 'hard'
+    customInstructions?: string
+  }
 }
 
 interface DocumentSection {
@@ -46,7 +52,7 @@ interface Message {
 
 export async function POST(req: NextRequest) {
   try {
-    const { type, documentId, conversationId }: StudyToolGenerateRequest = await req.json()
+    const { type, documentId, conversationId, flashcardOptions }: StudyToolGenerateRequest = await req.json()
 
     // Debug logging
     console.log('[StudyTools] API Request received:', { type, documentId, conversationId })
@@ -57,7 +63,7 @@ export async function POST(req: NextRequest) {
     })
 
     // Validate request
-    if (!type || !['study-guide', 'smart-summary', 'smart-notes'].includes(type)) {
+    if (!type || !['study-guide', 'smart-summary', 'smart-notes', 'flashcards'].includes(type)) {
       return NextResponse.json(
         { error: 'Invalid study tool type' },
         { status: 400 }
@@ -192,7 +198,12 @@ export async function POST(req: NextRequest) {
     const { systemPrompt, userPrompt } = getStudyToolPrompt(
       type as StudyToolPromptType,
       documentContent,
-      documentTitle
+      documentTitle,
+      flashcardOptions ? {
+        numberOfCards: flashcardOptions.numberOfCards,
+        difficulty: flashcardOptions.difficulty,
+        customInstructions: flashcardOptions.customInstructions
+      } : undefined
     )
 
     console.log(`[StudyTools] Generating ${type} for "${documentTitle}" (${documentContent.length} chars)`)
@@ -214,13 +225,48 @@ export async function POST(req: NextRequest) {
     const duration = Date.now() - startTime
     console.log(`[StudyTools] Generated ${type} in ${duration}ms (${result.text.length} chars)`)
 
+    // Special handling for flashcards - parse JSON response
+    let processedContent = result.text
+    let flashcardData = null
+
+    if (type === 'flashcards') {
+      try {
+        // Parse the JSON response from the AI
+        const cleanedText = result.text.trim().replace(/^```json\n?/, '').replace(/\n?```$/, '')
+        flashcardData = JSON.parse(cleanedText)
+
+        if (!Array.isArray(flashcardData)) {
+          throw new Error('Flashcard data is not an array')
+        }
+
+        // Validate flashcard structure
+        flashcardData.forEach((card, index) => {
+          if (!card.question || !card.answer || !card.id) {
+            throw new Error(`Invalid flashcard at index ${index}: missing required fields`)
+          }
+        })
+
+        console.log(`[StudyTools] Successfully parsed ${flashcardData.length} flashcards`)
+
+        // Keep the original JSON for content field
+        processedContent = result.text
+      } catch (error) {
+        console.error('[StudyTools] Failed to parse flashcard JSON:', error)
+        return NextResponse.json(
+          { error: 'Failed to parse generated flashcards. The AI response was not in the expected format.' },
+          { status: 500 }
+        )
+      }
+    }
+
     // Generate appropriate title
     const generatedTitle = generateStudyToolTitle(type as StudyToolPromptType, documentTitle)
 
     // Save to database - map frontend types to database types
     const dbType = type === 'smart-summary' ? 'summary' :
                    type === 'smart-notes' ? 'notes' :
-                   type === 'study-guide' ? 'study_guide' : type
+                   type === 'study-guide' ? 'study_guide' :
+                   type === 'flashcards' ? 'flashcards' : type
 
     let outputId: string | null = null
 
@@ -244,17 +290,31 @@ export async function POST(req: NextRequest) {
         type: dbType,
         payload: {
           title: generatedTitle,
-          content: result.text,
+          content: processedContent,
           type: type,
           documentId: documentId,
           conversationId: conversationId,
           createdAt: new Date().toISOString(),
-          metadata: {
-            model: 'gemini-2.5-pro',
-            duration,
-            contentLength: result.text.length,
-            sourceContentLength: documentContent.length
-          }
+          // Include flashcard-specific data
+          ...(type === 'flashcards' && flashcardData ? {
+            cards: flashcardData,
+            options: flashcardOptions,
+            metadata: {
+              model: 'gemini-2.5-pro',
+              duration,
+              contentLength: processedContent.length,
+              sourceContentLength: documentContent.length,
+              totalCards: flashcardData.length,
+              avgDifficulty: flashcardOptions?.difficulty || 'medium'
+            }
+          } : {
+            metadata: {
+              model: 'gemini-2.5-pro',
+              duration,
+              contentLength: processedContent.length,
+              sourceContentLength: documentContent.length
+            }
+          })
         }
       }
 
@@ -290,16 +350,25 @@ export async function POST(req: NextRequest) {
       success: true,
       id: outputId,
       title: generatedTitle,
-      content: result.text,
+      content: processedContent,
       type,
       documentId,
       conversationId,
+      // Include flashcard-specific data in response
+      ...(type === 'flashcards' && flashcardData ? {
+        cards: flashcardData,
+        options: flashcardOptions
+      } : {}),
       metadata: {
         generatedAt: new Date().toISOString(),
         model: 'gemini-2.5-pro',
         duration,
-        contentLength: result.text.length,
-        sourceContentLength: documentContent.length
+        contentLength: processedContent.length,
+        sourceContentLength: documentContent.length,
+        ...(type === 'flashcards' && flashcardData ? {
+          totalCards: flashcardData.length,
+          avgDifficulty: flashcardOptions?.difficulty || 'medium'
+        } : {})
       }
     })
 

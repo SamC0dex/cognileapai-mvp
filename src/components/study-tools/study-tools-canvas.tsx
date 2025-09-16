@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Button } from '@/components/ui'
 import { useStudyToolsStore, STUDY_TOOLS, type StudyToolContent } from '@/lib/study-tools-store'
+import { FlashcardViewer } from './flashcard-viewer'
 import {
   X,
   Copy,
@@ -86,7 +87,7 @@ const contentVariants = {
 
 const iconMap = {
   'study-guide': BookOpen,
-  'flashcards': FileText,
+  'flashcards': Sparkles,
   'smart-notes': PenTool,
   'smart-summary': Zap
 }
@@ -303,6 +304,92 @@ interface ContentRendererProps {
 const ContentRenderer: React.FC<ContentRendererProps> = ({ content }) => {
   const [searchTerm, setSearchTerm] = useState('')
   const [isFullscreen, setIsFullscreen] = useState(false)
+
+  // Handle flashcards specifically
+  if (content.type === 'flashcards') {
+    try {
+      console.log('[FlashcardViewer] Raw flashcard content:', content.content.substring(0, 200) + '...')
+
+      let parsedContent: any[] = []
+
+      // Try to parse as JSON directly first (for database-stored content)
+      try {
+        parsedContent = JSON.parse(content.content)
+        console.log('[FlashcardViewer] Parsed as direct JSON:', parsedContent.length, 'cards')
+      } catch (directParseError) {
+        // If direct parse fails, try cleaning markdown code block markers
+        const cleanedContent = content.content
+          .trim()
+          .replace(/^```json\n?/, '')
+          .replace(/\n?```$/, '')
+          .trim()
+
+        console.log('[FlashcardViewer] Cleaned content:', cleanedContent.substring(0, 200) + '...')
+        parsedContent = JSON.parse(cleanedContent)
+        console.log('[FlashcardViewer] Parsed after cleaning:', parsedContent.length, 'cards')
+      }
+
+      if (Array.isArray(parsedContent) && parsedContent.length > 0) {
+        return (
+          <div className={cn(
+            "flex flex-col h-full",
+            isFullscreen && "fixed inset-0 z-50 bg-background"
+          )}>
+            {/* Flashcard-specific toolbar */}
+            <motion.div
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center justify-between p-4 border-b border-border bg-muted/30 backdrop-blur-sm sticky top-0 z-10"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-sm text-muted-foreground">
+                  Interactive Flashcards • {parsedContent.length} cards
+                </span>
+              </div>
+
+              {/* Fullscreen toggle */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsFullscreen(!isFullscreen)}
+                className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
+              >
+                {isFullscreen ? (
+                  <><Minimize2 className="w-4 h-4" /> Exit Fullscreen</>
+                ) : (
+                  <><Maximize2 className="w-4 h-4" /> Fullscreen</>
+                )}
+              </Button>
+            </motion.div>
+
+            {/* Flashcard viewer */}
+            <div className="flex-1 overflow-hidden">
+              <FlashcardViewer
+                flashcards={parsedContent}
+                title={content.title}
+                className="h-full"
+              />
+            </div>
+          </div>
+        )
+      }
+    } catch (error) {
+      console.error('Failed to parse flashcard content:', error)
+      // Fall back to showing error message instead of raw JSON
+      return (
+        <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+          <div className="text-red-500 mb-4">
+            <FileText className="w-12 h-12 mx-auto mb-2" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2">Invalid Flashcard Format</h3>
+          <p className="text-muted-foreground mb-4">
+            The flashcard data appears to be corrupted. Please try generating new flashcards.
+          </p>
+        </div>
+      )
+    }
+  }
 
   const markdownComponents = {
     // Enhanced heading styles with better typography

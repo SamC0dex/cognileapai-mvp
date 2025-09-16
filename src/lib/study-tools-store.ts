@@ -38,12 +38,11 @@ export const STUDY_TOOLS: Record<StudyToolType, StudyTool> = {
   },
   'flashcards': {
     name: 'Flashcards',
-    description: 'Interactive Q&A cards for memorization (Coming Soon)',
+    description: 'Interactive Q&A cards for memorization',
     icon: '📄',
     color: 'bg-green-50 dark:bg-green-900/20',
     borderColor: 'border-green-200 dark:border-green-800',
-    textColor: 'text-green-700 dark:text-green-300',
-    disabled: true
+    textColor: 'text-green-700 dark:text-green-300'
   },
   'smart-notes': {
     name: 'Smart Notes',
@@ -81,7 +80,7 @@ interface StudyToolsStore {
   generatingType: StudyToolType | null
   generationProgress: number
   error: string | null
-  generateStudyTool: (type: StudyToolType, documentId?: string, conversationId?: string) => Promise<void>
+  generateStudyTool: (type: StudyToolType, documentId?: string, conversationId?: string, flashcardOptions?: any) => Promise<void>
 
   // Content management
   generatedContent: StudyToolContent[]
@@ -129,7 +128,8 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
   generateStudyTool: async (
     type: StudyToolType,
     documentId?: string,
-    conversationId?: string
+    conversationId?: string,
+    flashcardOptions?: any
   ) => {
     try {
       console.log('[StudyToolsStore] Starting generation:', { type, documentId, conversationId })
@@ -147,13 +147,13 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
         generationProgress: 0
       }
 
-      // Add placeholder to list immediately
+      // Add placeholder to list immediately (except for flashcards which go to flashcard store)
       set(state => ({
         isGenerating: true,
         generatingType: type,
         generationProgress: 0,
         error: null,
-        generatedContent: [placeholderContent, ...state.generatedContent]
+        generatedContent: type !== 'flashcards' ? [placeholderContent, ...state.generatedContent] : state.generatedContent
       }))
 
       // Simulate progress updates on the placeholder
@@ -180,6 +180,7 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
           type,
           documentId,
           conversationId,
+          ...(type === 'flashcards' && flashcardOptions ? { flashcardOptions } : {})
         }),
       })
 
@@ -192,28 +193,72 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
       const result = await response.json()
       console.log('[StudyToolsStore] Generation successful:', result)
 
-      const finalContent: StudyToolContent = {
-        ...placeholderContent,
-        id: result.id || placeholderContent.id, // Use database ID if available
-        title: result.title || STUDY_TOOLS[type].name,
-        content: result.content,
-        isGenerating: false,
-        generationProgress: 100
+      // Handle flashcards specially
+      if (type === 'flashcards' && result.cards) {
+        // Import flashcard store and types dynamically to avoid circular deps
+        const { useFlashcardStore } = await import('@/lib/flashcard-store')
+        const { FlashcardSet } = await import('@/types/flashcards')
+
+        // Create flashcard set
+        const flashcardSet = {
+          id: result.id || crypto.randomUUID(),
+          title: result.title,
+          cards: result.cards,
+          options: result.options || flashcardOptions,
+          createdAt: new Date(result.metadata?.generatedAt || new Date()),
+          documentId,
+          conversationId,
+          metadata: {
+            totalCards: result.cards.length,
+            avgDifficulty: result.options?.difficulty || 'medium',
+            generationTime: result.metadata?.duration || 0,
+            model: result.metadata?.model || 'gemini-2.5-pro',
+            sourceContentLength: result.metadata?.sourceContentLength || 0
+          }
+        }
+
+        // Add to flashcard store
+        useFlashcardStore.getState().addFlashcardSet(flashcardSet)
+
+        // Remove any flashcard placeholders from study tools (shouldn't be there anyway)
+        set(state => ({
+          generationProgress: 100,
+          generatedContent: state.generatedContent.filter(content =>
+            content.id !== placeholderContent.id && content.type !== 'flashcards'
+          )
+        }))
+
+        // Brief delay then open flashcard viewer
+        setTimeout(() => {
+          console.log('[StudyToolsStore] Opening flashcard viewer')
+          useFlashcardStore.getState().openViewer(flashcardSet)
+        }, 500)
+
+      } else {
+        // Regular study tools
+        const finalContent: StudyToolContent = {
+          ...placeholderContent,
+          id: result.id || placeholderContent.id, // Use database ID if available
+          title: result.title || STUDY_TOOLS[type].name,
+          content: result.content,
+          isGenerating: false,
+          generationProgress: 100
+        }
+
+        // Update placeholder with final content
+        set(state => ({
+          generationProgress: 100,
+          generatedContent: state.generatedContent.map(content =>
+            content.id === placeholderContent.id ? finalContent : content
+          )
+        }))
+
+        // Brief delay for smooth transition, then open canvas
+        setTimeout(() => {
+          console.log('[StudyToolsStore] Opening canvas with generated content')
+          get().openCanvas(finalContent)
+        }, 500)
       }
-
-      // Update placeholder with final content
-      set(state => ({
-        generationProgress: 100,
-        generatedContent: state.generatedContent.map(content =>
-          content.id === placeholderContent.id ? finalContent : content
-        )
-      }))
-
-      // Brief delay for smooth transition, then open canvas
-      setTimeout(() => {
-        console.log('[StudyToolsStore] Opening canvas with generated content')
-        get().openCanvas(finalContent)
-      }, 500)
 
     } catch (error) {
       console.error('[StudyToolsStore] Generation failed:', error)
@@ -289,16 +334,91 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
       console.log('[StudyToolsStore] Loaded study tools from database:', result)
 
       if (result.success && result.studyTools && result.studyTools.length > 0) {
-        // Merge database content with existing content, avoiding duplicates
-        set(state => {
-          const existingIds = new Set(state.generatedContent.map(content => content.id))
-          const newContent = result.studyTools.filter((tool: StudyToolContent) => !existingIds.has(tool.id))
+        // Separate flashcards from regular study tools
+        const flashcards: StudyToolContent[] = []
+        const regularStudyTools: StudyToolContent[] = []
 
-          return {
-            generatedContent: [...newContent, ...state.generatedContent]
+        result.studyTools.forEach((tool: StudyToolContent) => {
+          if (tool.type === 'flashcards') {
+            flashcards.push(tool)
+          } else {
+            regularStudyTools.push(tool)
           }
         })
-        console.log('[StudyToolsStore] Successfully merged', result.studyTools.length, 'study tools from database')
+
+        // Handle flashcards - route to flashcard store
+        if (flashcards.length > 0) {
+          try {
+            // Import flashcard store dynamically to avoid circular deps
+            const { useFlashcardStore } = await import('@/lib/flashcard-store')
+
+            // First, clean up any existing duplicates
+            useFlashcardStore.getState().deduplicateFlashcardSets()
+
+            for (const flashcardTool of flashcards) {
+              try {
+                // Parse the flashcard content
+                let cleanedContent = flashcardTool.content
+                  .trim()
+                  .replace(/^```json\n?/, '')
+                  .replace(/\n?```$/, '')
+                  .trim()
+
+                const parsedCards = JSON.parse(cleanedContent)
+
+                if (Array.isArray(parsedCards)) {
+                  // Create flashcard set and add to flashcard store
+                  const flashcardSet = {
+                    id: flashcardTool.id,
+                    title: flashcardTool.title,
+                    cards: parsedCards,
+                    options: flashcardTool.metadata?.options || { numberOfCards: 'standard', difficulty: 'medium' },
+                    createdAt: new Date(flashcardTool.createdAt),
+                    documentId: flashcardTool.documentId,
+                    conversationId: flashcardTool.conversationId,
+                    metadata: {
+                      totalCards: parsedCards.length,
+                      avgDifficulty: flashcardTool.metadata?.options?.difficulty || 'medium',
+                      generationTime: flashcardTool.metadata?.generationTime || 0,
+                      model: flashcardTool.metadata?.model || 'gemini-2.5-pro',
+                      sourceContentLength: flashcardTool.metadata?.sourceContentLength || 0
+                    }
+                  }
+
+                  // Add to flashcard store (will show up in flashcard list)
+                  useFlashcardStore.getState().addFlashcardSet(flashcardSet)
+                  console.log('[StudyToolsStore] Added flashcard set to flashcard store:', flashcardTool.title)
+                } else {
+                  console.warn('[StudyToolsStore] Invalid flashcard format for:', flashcardTool.title)
+                }
+              } catch (parseError) {
+                console.error('[StudyToolsStore] Failed to parse flashcard content:', parseError)
+              }
+            }
+          } catch (importError) {
+            console.error('[StudyToolsStore] Failed to import flashcard store:', importError)
+          }
+        }
+
+        // Handle regular study tools - add to generatedContent
+        if (regularStudyTools.length > 0) {
+          set(state => {
+            const existingIds = new Set(state.generatedContent.map(content => content.id))
+            const newContent = regularStudyTools.filter((tool: StudyToolContent) => !existingIds.has(tool.id))
+
+            return {
+              generatedContent: [...newContent, ...state.generatedContent]
+            }
+          })
+          console.log('[StudyToolsStore] Successfully merged', regularStudyTools.length, 'regular study tools from database')
+        }
+
+        // Ensure flashcards are not in generatedContent (they should only be in flashcard store)
+        set(state => ({
+          generatedContent: state.generatedContent.filter(content => content.type !== 'flashcards')
+        }))
+
+        console.log('[StudyToolsStore] Processed', flashcards.length, 'flashcards and', regularStudyTools.length, 'regular study tools')
       } else {
         console.log('[StudyToolsStore] No study tools found in database')
       }

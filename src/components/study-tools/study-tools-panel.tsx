@@ -7,6 +7,10 @@ import remarkGfm from 'remark-gfm'
 import { Button } from '@/components/ui'
 import { useStudyToolsStore, STUDY_TOOLS, type StudyToolType } from '@/lib/study-tools-store'
 import { StudyToolsConfirmationDialog } from './study-tools-confirmation-dialog'
+import { FlashcardCustomizationDialog } from './flashcard-customization-dialog'
+import { FlashcardViewer } from './flashcard-viewer'
+import { useFlashcardStore } from '@/lib/flashcard-store'
+import { FlashcardOptions } from '@/types/flashcards'
 import {
   ChevronLeft,
   ChevronRight,
@@ -1205,6 +1209,9 @@ const ExpandedPanel: React.FC<{
             {/* Generated Documents Section */}
             <GeneratedDocumentsSection />
 
+            {/* Flashcard Sets Section */}
+            <FlashcardSetsSection />
+
             {/* Context tip */}
             {!hasContext && (
               <motion.div
@@ -1225,6 +1232,247 @@ const ExpandedPanel: React.FC<{
           </motion.div>
         )}
       </AnimatePresence>
+    </motion.div>
+  )
+}
+
+// Flashcard Sets Section Component
+const FlashcardSetsSection: React.FC = () => {
+  const { flashcardSets, openViewer, removeFlashcardSet, renameFlashcardSet } = useFlashcardStore()
+  const prefersReducedMotion = useReducedMotion()
+  const [editingTitle, setEditingTitle] = React.useState<string | null>(null)
+  const [editingValue, setEditingValue] = React.useState('')
+
+  const handleStartRename = (flashcardSet: any) => {
+    setEditingTitle(flashcardSet.id)
+    setEditingValue(flashcardSet.title)
+  }
+
+  const handleSaveRename = (flashcardSetId: string) => {
+    if (editingValue.trim() && editingValue !== flashcardSets.find(f => f.id === flashcardSetId)?.title) {
+      renameFlashcardSet(flashcardSetId, editingValue.trim())
+    }
+    setEditingTitle(null)
+    setEditingValue('')
+  }
+
+  const handleCopyFlashcards = async (flashcardSet: any) => {
+    try {
+      // Convert flashcards to a readable text format
+      const flashcardsText = flashcardSet.cards.map((card: any, index: number) =>
+        `${index + 1}. Q: ${card.question}\n   A: ${card.answer}\n`
+      ).join('\n')
+
+      const fullText = `${flashcardSet.title}\n${'='.repeat(flashcardSet.title.length)}\n\n${flashcardsText}`
+      await navigator.clipboard.writeText(fullText)
+    } catch (error) {
+      console.error('Failed to copy flashcards:', error)
+    }
+  }
+
+  const handleDelete = (flashcardSetId: string) => {
+    removeFlashcardSet(flashcardSetId)
+  }
+
+  // Flashcard Dropdown Menu Component
+  const FlashcardDropdownMenu: React.FC<{ flashcardSet: any }> = ({ flashcardSet }) => {
+    const [isOpen, setIsOpen] = React.useState(false)
+
+    return (
+      <div className="relative">
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={(e) => {
+            e.stopPropagation()
+            setIsOpen(!isOpen)
+          }}
+          className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-accent transition-colors"
+        >
+          <MoreVertical className="w-3 h-3 text-muted-foreground" />
+        </motion.button>
+
+        <AnimatePresence>
+          {isOpen && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: -5 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -5 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              className="absolute right-0 top-full mt-1 w-36 bg-popover border border-border rounded-lg shadow-xl z-20 overflow-hidden"
+              onMouseLeave={() => setIsOpen(false)}
+            >
+              <div className="p-1">
+                <motion.button
+                  whileHover={{ backgroundColor: 'hsl(var(--accent))' }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    handleStartRename(flashcardSet)
+                    setIsOpen(false)
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left hover:bg-accent"
+                >
+                  <Edit3 className="w-4 h-4" />
+                  Rename
+                </motion.button>
+                <motion.button
+                  whileHover={{ backgroundColor: 'hsl(var(--accent))' }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    handleCopyFlashcards(flashcardSet)
+                    setIsOpen(false)
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left hover:bg-accent"
+                >
+                  <Copy className="w-4 h-4" />
+                  Copy
+                </motion.button>
+                <div className="h-px bg-border my-1" />
+                <motion.button
+                  whileHover={{ backgroundColor: 'hsl(var(--destructive) / 0.1)' }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    handleDelete(flashcardSet.id)
+                    setIsOpen(false)
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left text-destructive hover:text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </motion.button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    )
+  }
+
+  if (flashcardSets.length === 0) {
+    return null
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.25, ...smoothTransition }}
+      className="space-y-2 mt-6"
+    >
+      <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+        <Sparkles className="w-4 h-4" />
+        Flashcard Sets ({flashcardSets.length})
+      </h3>
+
+      <motion.div
+        className="space-y-2"
+        variants={{
+          hidden: {},
+          visible: {
+            transition: {
+              staggerChildren: 0.05
+            }
+          }
+        }}
+        initial="hidden"
+        animate="visible"
+      >
+        {flashcardSets.map((flashcardSet, index) => {
+          return (
+            <motion.div
+              key={flashcardSet.id}
+              variants={{
+                hidden: { opacity: 0, x: -10, scale: 0.95 },
+                visible: {
+                  opacity: 1,
+                  x: 0,
+                  scale: 1,
+                  transition: {
+                    type: 'spring',
+                    stiffness: 400,
+                    damping: 25,
+                    delay: index * 0.05
+                  }
+                }
+              }}
+              whileHover={!prefersReducedMotion ? {
+                y: -1,
+                scale: 1.01,
+                transition: { duration: 0.15 }
+              } : undefined}
+              whileTap={!prefersReducedMotion ? {
+                scale: 0.98,
+                transition: { duration: 0.08 }
+              } : undefined}
+              className="group p-3 rounded-lg border transition-all duration-200 cursor-pointer hover:shadow-md hover:shadow-black/5 bg-background/50 hover:bg-background/80 border-green-200 dark:border-green-800"
+              onClick={() => openViewer(flashcardSet)}
+            >
+              <div className="flex items-start gap-3">
+                {/* Flashcard icon */}
+                <motion.div
+                  className="p-1.5 rounded-lg flex-shrink-0 bg-green-50 dark:bg-green-900/20"
+                  whileHover={!prefersReducedMotion ? { scale: 1.05, rotate: 1 } : undefined}
+                  transition={{ duration: 0.2 }}
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-green-700 dark:text-green-300" />
+                </motion.div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-1">
+                    {editingTitle === flashcardSet.id ? (
+                      <div className="flex items-center gap-2 flex-1">
+                        <input
+                          type="text"
+                          value={editingValue}
+                          onChange={(e) => setEditingValue(e.target.value)}
+                          onBlur={() => handleSaveRename(flashcardSet.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveRename(flashcardSet.id)
+                            if (e.key === 'Escape') {
+                              setEditingTitle(null)
+                              setEditingValue('')
+                            }
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          autoFocus
+                          className="flex-1 text-sm font-medium bg-background border border-border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-teal-500/50"
+                        />
+                      </div>
+                    ) : (
+                      <h4 className="font-medium text-sm truncate flex-1">
+                        {flashcardSet.title}
+                      </h4>
+                    )}
+
+                    <div className="flex items-center gap-1">
+                      <motion.div
+                        className="opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                        whileHover={{ scale: 1.1 }}
+                      >
+                        <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                      </motion.div>
+                      <FlashcardDropdownMenu flashcardSet={flashcardSet} />
+                    </div>
+                  </div>
+
+                  {/* Flashcard info */}
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {new Date(flashcardSet.createdAt).toLocaleDateString()}
+                    </span>
+                    <span>{flashcardSet.cards.length} cards</span>
+                    <span className="capitalize">{flashcardSet.options.difficulty || 'medium'}</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )
+        })}
+      </motion.div>
     </motion.div>
   )
 }
@@ -1265,6 +1513,14 @@ export const StudyToolsPanel: React.FC<{
     studyToolType: null
   })
 
+  // Flashcard customization dialog state
+  const [flashcardDialog, setFlashcardDialog] = React.useState({
+    isOpen: false
+  })
+
+  // Flashcard store
+  const { isViewerOpen, currentFlashcardSet, isFullscreen, closeViewer, toggleFullscreen } = useFlashcardStore()
+
   // Load study tools from database on mount and when context changes
   React.useEffect(() => {
     if (hasContext) {
@@ -1275,6 +1531,23 @@ export const StudyToolsPanel: React.FC<{
   const handleGenerateStudyTool = React.useCallback((type: StudyToolType) => {
     if (isGenerating) return
 
+    // Special handling for flashcards - always show customization dialog
+    if (type === 'flashcards') {
+      // Check if we have context first
+      if (!hasContext) {
+        setConfirmationDialog({
+          isOpen: true,
+          studyToolType: type
+        })
+        return
+      }
+
+      // Open flashcard customization dialog
+      setFlashcardDialog({ isOpen: true })
+      return
+    }
+
+    // Regular study tools handling
     // Priority 1: If we have a document selected, generate from document
     if (hasDocumentSelected) {
       generateStudyTool(type, documentId, conversationId)
@@ -1295,7 +1568,7 @@ export const StudyToolsPanel: React.FC<{
       isOpen: true,
       studyToolType: type
     })
-  }, [isGenerating, generateStudyTool, documentId, conversationId, hasDocumentSelected, hasMessages])
+  }, [isGenerating, generateStudyTool, documentId, conversationId, hasDocumentSelected, hasMessages, hasContext])
 
   const handleConfirmConversationGeneration = React.useCallback(() => {
     if (confirmationDialog.studyToolType) {
@@ -1317,6 +1590,15 @@ export const StudyToolsPanel: React.FC<{
 
   const handleCloseConfirmationDialog = React.useCallback(() => {
     setConfirmationDialog({ isOpen: false, studyToolType: null })
+  }, [])
+
+  const handleFlashcardGenerate = React.useCallback((options: FlashcardOptions) => {
+    setFlashcardDialog({ isOpen: false })
+    generateStudyTool('flashcards', documentId, conversationId, options)
+  }, [generateStudyTool, documentId, conversationId])
+
+  const handleCloseFlashcardDialog = React.useCallback(() => {
+    setFlashcardDialog({ isOpen: false })
   }, [])
 
   return (
@@ -1349,6 +1631,30 @@ export const StudyToolsPanel: React.FC<{
           studyToolType={confirmationDialog.studyToolType}
           hasMessages={hasMessages}
         />
+      )}
+
+      {/* Flashcard Customization Dialog */}
+      <FlashcardCustomizationDialog
+        isOpen={flashcardDialog.isOpen}
+        onClose={handleCloseFlashcardDialog}
+        onGenerate={handleFlashcardGenerate}
+        isGenerating={isGenerating && generatingType === 'flashcards'}
+      />
+
+      {/* Flashcard Viewer */}
+      {isViewerOpen && currentFlashcardSet && (
+        <div className={cn(
+          "fixed inset-0 z-40 bg-background",
+          isFullscreen ? "z-50" : ""
+        )}>
+          <FlashcardViewer
+            flashcards={currentFlashcardSet.cards}
+            title={currentFlashcardSet.title}
+            onClose={closeViewer}
+            isFullscreen={isFullscreen}
+            onToggleFullscreen={toggleFullscreen}
+          />
+        </div>
       )}
     </>
   )
