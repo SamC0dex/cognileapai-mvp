@@ -719,6 +719,7 @@ const ExpandedPanel: React.FC<{
 }> = ({ onCollapse, onGenerateStudyTool, isGenerating, generatingType, hasContext }) => {
   const prefersReducedMotion = useReducedMotion()
   const { isCanvasOpen, canvasContent, closeCanvas, copyToClipboard, downloadAsPDF, downloadAsDOCX } = useStudyToolsStore()
+  const { isViewerOpen, currentFlashcardSet, isFullscreen, closeViewer, toggleFullscreen } = useFlashcardStore()
   const [isCopied, setIsCopied] = React.useState(false)
   const [searchTerm, setSearchTerm] = React.useState('')
   const [showExportMenu, setShowExportMenu] = React.useState(false)
@@ -1152,6 +1153,24 @@ const ExpandedPanel: React.FC<{
                 </motion.div>
               </div>
             </div>
+          </motion.div>
+        ) : isViewerOpen && currentFlashcardSet && !isFullscreen ? (
+          <motion.div
+            key="flashcards"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 40 }}
+            className="flex-1 flex flex-col min-h-0"
+          >
+            <FlashcardViewer
+              flashcards={currentFlashcardSet.cards}
+              title={currentFlashcardSet.title}
+              onClose={closeViewer}
+              isFullscreen={false}
+              onToggleFullscreen={toggleFullscreen}
+              className="h-full"
+            />
           </motion.div>
         ) : (
           <motion.div
@@ -1641,21 +1660,19 @@ export const StudyToolsPanel: React.FC<{
         isGenerating={isGenerating && generatingType === 'flashcards'}
       />
 
-      {/* Flashcard Viewer */}
-      {isViewerOpen && currentFlashcardSet && (
-        <div className={cn(
-          "fixed inset-0 z-40 bg-background",
-          isFullscreen ? "z-50" : ""
-        )}>
+      {/* Fullscreen Flashcard Viewer */}
+      {isViewerOpen && currentFlashcardSet && isFullscreen && (
+        <div className="fixed inset-0 z-50 bg-background">
           <FlashcardViewer
             flashcards={currentFlashcardSet.cards}
             title={currentFlashcardSet.title}
             onClose={closeViewer}
-            isFullscreen={isFullscreen}
+            isFullscreen={true}
             onToggleFullscreen={toggleFullscreen}
           />
         </div>
       )}
+
     </>
   )
 })

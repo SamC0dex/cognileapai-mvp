@@ -57,10 +57,22 @@ export const useFlashcardStore = create<FlashcardStore>()(
       // Viewer actions
       openViewer: (flashcardSet: FlashcardSet) => {
         console.log('[FlashcardStore] Opening viewer with flashcard set:', flashcardSet.id)
+
+        // Close canvas when opening flashcards (mutual exclusion)
+        try {
+          const { useStudyToolsStore } = require('@/lib/study-tools-store')
+          const studyToolsStore = useStudyToolsStore.getState()
+          if (studyToolsStore.isCanvasOpen) {
+            studyToolsStore.closeCanvas()
+          }
+        } catch (error) {
+          console.warn('[FlashcardStore] Could not close canvas:', error)
+        }
+
         set({
           isViewerOpen: true,
           currentFlashcardSet: flashcardSet,
-          isFullscreen: false
+          isFullscreen: false // Always start in study tools section, not fullscreen
         })
 
         // Start a new study session

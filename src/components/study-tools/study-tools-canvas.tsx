@@ -368,6 +368,8 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ content }) => {
               <FlashcardViewer
                 flashcards={parsedContent}
                 title={content.title}
+                isFullscreen={isFullscreen}
+                onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
                 className="h-full"
               />
             </div>

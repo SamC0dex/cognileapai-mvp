@@ -112,6 +112,18 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
   canvasContent: null,
   openCanvas: (content: StudyToolContent) => {
     console.log('[StudyToolsStore] Opening canvas with content:', content)
+
+    // Close flashcard viewer when opening canvas (mutual exclusion)
+    try {
+      const { useFlashcardStore } = require('@/lib/flashcard-store')
+      const flashcardStore = useFlashcardStore.getState()
+      if (flashcardStore.isViewerOpen) {
+        flashcardStore.closeViewer()
+      }
+    } catch (error) {
+      console.warn('[StudyToolsStore] Could not close flashcard viewer:', error)
+    }
+
     set({ canvasContent: content, isCanvasOpen: true })
   },
   closeCanvas: () => {
@@ -228,10 +240,23 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
           )
         }))
 
-        // Brief delay then open flashcard viewer
+        // Brief delay then open in study tools canvas (not separate flashcard viewer)
         setTimeout(() => {
-          console.log('[StudyToolsStore] Opening flashcard viewer')
-          useFlashcardStore.getState().openViewer(flashcardSet)
+          console.log('[StudyToolsStore] Opening flashcard in study tools canvas')
+
+          // Create content for study tools canvas
+          const flashcardContent: StudyToolContent = {
+            id: flashcardSet.id,
+            type: 'flashcards',
+            title: flashcardSet.title,
+            content: JSON.stringify(flashcardSet.cards),
+            createdAt: flashcardSet.createdAt,
+            documentId: flashcardSet.documentId,
+            conversationId: flashcardSet.conversationId
+          }
+
+          // Open in study tools canvas instead of separate viewer
+          get().openCanvas(flashcardContent)
         }, 500)
 
       } else {
@@ -346,7 +371,7 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
           }
         })
 
-        // Handle flashcards - route to flashcard store
+        // Handle flashcards - route to flashcard store (keep existing behavior)
         if (flashcards.length > 0) {
           try {
             // Import flashcard store dynamically to avoid circular deps
