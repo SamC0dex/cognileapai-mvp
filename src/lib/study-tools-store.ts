@@ -321,32 +321,109 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
 
   downloadAsPDF: async (content: StudyToolContent): Promise<void> => {
     try {
-      // Simple print-based PDF generation
-      const printWindow = window.open('', '_blank')
-      if (!printWindow) throw new Error('Could not open print window')
+      // Import html2pdf dynamically to avoid SSR issues
+      const html2pdf = (await import('html2pdf.js')).default
 
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>${content.title}</title>
-            <style>
-              body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; }
-              h1 { color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-              pre { white-space: pre-wrap; word-wrap: break-word; }
-            </style>
-          </head>
-          <body>
-            <h1>${content.title}</h1>
-            <pre>${content.content}</pre>
-          </body>
-        </html>
-      `)
+      // Clean AI introduction text from content
+      let cleanedContent = content.content
+      // Remove common AI introduction patterns
+      const patterns = [
+        /^Of course[.,]?\s*/i,
+        /^Here\s+(?:is|are)\s+(?:a|an|the|some)?\s*(?:comprehensive|detailed|smart)?\s*[^.]*?\s*on\s+the\s*["'""']?[^"'""']*?["'""']?[^.]*?[.,*]\s*/i,
+        /^Here\s+are\s+comprehensive\s+smart\s+notes\s+on\s+the\s+["'""'][^"'""']*["'""']\s+syllabus[.,*\s]*/i,
+        /^Here\s+(?:is|are)\s+[^.]*?(?:notes|summary|guide|analysis)[^.]*?[.,*]\s*/i,
+        /^I'll\s+(?:create|provide|generate)\s+[^.]*?[.,]\s*/i,
+        /^(?:Certainly|Absolutely|Sure)[.,]?\s*/i,
+        /created\s+using\s+the\s+[^.]*?methodology[.,]?\s*/i,
+        /^(?:Let me|I'd be happy to)\s+[^.]*?[.,]\s*/i
+      ]
 
-      printWindow.document.close()
-      printWindow.focus()
-      printWindow.print()
-      printWindow.close()
+      for (const pattern of patterns) {
+        cleanedContent = cleanedContent.replace(pattern, '')
+      }
+
+      cleanedContent = cleanedContent.replace(/^[\s*]+/, '').trim()
+
+      // Create a hidden div with properly styled markdown content
+      const tempDiv = document.createElement('div')
+      tempDiv.style.position = 'absolute'
+      tempDiv.style.left = '-9999px'
+      tempDiv.style.top = '-9999px'
+      tempDiv.style.width = '800px'
+      tempDiv.style.fontFamily = 'Arial, sans-serif'
+      tempDiv.style.fontSize = '12px'
+      tempDiv.style.lineHeight = '1.6'
+      tempDiv.style.color = '#000000'
+      tempDiv.style.backgroundColor = '#ffffff'
+      tempDiv.style.padding = '20px'
+
+      // Convert markdown to HTML using a simple approach
+      // Since we already have ReactMarkdown rendering, let's use basic HTML conversion
+      let htmlContent = cleanedContent
+        // Headers
+        .replace(/^# (.*$)/gm, '<h1 style="font-size: 18px; font-weight: bold; margin: 16px 0 8px 0; color: #333; border-bottom: 2px solid #eee; padding-bottom: 8px;">$1</h1>')
+        .replace(/^## (.*$)/gm, '<h2 style="font-size: 16px; font-weight: bold; margin: 14px 0 6px 0; color: #333;">$1</h2>')
+        .replace(/^### (.*$)/gm, '<h3 style="font-size: 14px; font-weight: bold; margin: 12px 0 4px 0; color: #333;">$1</h3>')
+        // Bold and italic
+        .replace(/\*\*(.*?)\*\*/g, '<strong style="font-weight: bold;">$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em style="font-style: italic;">$1</em>')
+        // Code inline
+        .replace(/`([^`]+)`/g, '<code style="background-color: #f4f4f4; padding: 2px 4px; border-radius: 3px; font-family: monospace;">$1</code>')
+        // Lists - basic conversion
+        .replace(/^[-*] (.*$)/gm, '<li style="margin: 4px 0;">$1</li>')
+        .replace(/^(\d+)\. (.*$)/gm, '<li style="margin: 4px 0; list-style-type: decimal;">$2</li>')
+        // Line breaks
+        .replace(/\n\n/g, '</p><p style="margin: 8px 0; line-height: 1.6;">')
+        .replace(/\n/g, '<br>')
+
+      // Wrap in paragraph tags
+      htmlContent = '<p style="margin: 8px 0; line-height: 1.6;">' + htmlContent + '</p>'
+
+      // Wrap lists properly
+      htmlContent = htmlContent.replace(/(<li[^>]*>.*?<\/li>)/gs, (match) => {
+        if (!match.includes('<ul') && !match.includes('<ol')) {
+          return '<ul style="margin: 8px 0; padding-left: 20px;">' + match + '</ul>'
+        }
+        return match
+      })
+
+      tempDiv.innerHTML = `
+        <div style="max-width: 800px;">
+          <h1 style="font-size: 20px; font-weight: bold; margin-bottom: 16px; color: #333; text-align: center;">${content.title}</h1>
+          <div style="margin-bottom: 12px; text-align: center; color: #666; font-size: 10px;">
+            Generated on ${new Date(content.createdAt).toLocaleDateString()} at ${new Date(content.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </div>
+          <div>${htmlContent}</div>
+        </div>
+      `
+
+      document.body.appendChild(tempDiv)
+
+      // Configure PDF options
+      const options = {
+        margin: [0.5, 0.5, 0.5, 0.5],
+        filename: `${content.title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          backgroundColor: '#ffffff',
+          useCORS: true
+        },
+        jsPDF: {
+          unit: 'in',
+          format: 'letter',
+          orientation: 'portrait',
+          compressPDF: true
+        },
+        pagebreak: { mode: 'avoid-all' }
+      }
+
+      // Generate and save PDF
+      await html2pdf().set(options).from(tempDiv).save()
+
+      // Clean up
+      document.body.removeChild(tempDiv)
+
     } catch (error) {
       console.error('Failed to download PDF:', error)
       throw error
@@ -355,19 +432,121 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
 
   downloadAsDOCX: async (content: StudyToolContent): Promise<void> => {
     try {
-      // Simple text file download
-      const blob = new Blob([content.content], { type: 'text/plain' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${content.title}.txt`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      // Import md-to-docx dynamically to avoid SSR issues
+      const { convertMarkdownToDocx, downloadDocx } = await import('@mohtasham/md-to-docx')
+
+      // Clean AI introduction text from content
+      let cleanedContent = content.content
+      // Remove common AI introduction patterns (same as PDF cleaning)
+      const patterns = [
+        /^Of course[.,]?\s*/i,
+        /^Here\s+(?:is|are)\s+(?:a|an|the|some)?\s*(?:comprehensive|detailed|smart)?\s*[^.]*?\s*on\s+the\s*["'""']?[^"'""']*?["'""']?[^.]*?[.,*]\s*/i,
+        /^Here\s+are\s+comprehensive\s+smart\s+notes\s+on\s+the\s+["'""'][^"'""']*["'""']\s+syllabus[.,*\s]*/i,
+        /^Here\s+(?:is|are)\s+[^.]*?(?:notes|summary|guide|analysis)[^.]*?[.,*]\s*/i,
+        /^I'll\s+(?:create|provide|generate)\s+[^.]*?[.,]\s*/i,
+        /^(?:Certainly|Absolutely|Sure)[.,]?\s*/i,
+        /created\s+using\s+the\s+[^.]*?methodology[.,]?\s*/i,
+        /^(?:Let me|I'd be happy to)\s+[^.]*?[.,]\s*/i
+      ]
+
+      for (const pattern of patterns) {
+        cleanedContent = cleanedContent.replace(pattern, '')
+      }
+
+      cleanedContent = cleanedContent.replace(/^[\s*]+/, '').trim()
+
+      // Add document header with title and generation info
+      const documentHeader = `# ${content.title}
+
+*Generated on ${new Date(content.createdAt).toLocaleDateString()} at ${new Date(content.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}*
+
+---
+
+`
+
+      const fullMarkdown = documentHeader + cleanedContent
+
+      // Configure DOCX options for professional document
+      const options = {
+        documentType: 'document' as const,
+        style: {
+          // Font sizes
+          titleSize: 24,
+          heading1Size: 20,
+          heading2Size: 18,
+          heading3Size: 16,
+          heading4Size: 14,
+          heading5Size: 12,
+          paragraphSize: 11,
+          listItemSize: 11,
+          codeBlockSize: 10,
+          blockquoteSize: 11,
+
+          // Spacing
+          headingSpacing: 240, // 12pt before/after
+          paragraphSpacing: 120, // 6pt before/after
+          lineSpacing: 1.15,
+
+          // Alignment
+          paragraphAlignment: 'JUSTIFIED' as const,
+          heading1Alignment: 'CENTER' as const,
+          heading2Alignment: 'LEFT' as const,
+          heading3Alignment: 'LEFT' as const,
+
+          // Document direction
+          direction: 'LTR' as const
+        }
+      }
+
+      // Convert markdown to DOCX blob
+      const docxBlob = await convertMarkdownToDocx(fullMarkdown, options)
+
+      // Generate safe filename
+      const safeFileName = `${content.title.replace(/[^a-zA-Z0-9\s]/g, '_').replace(/\s+/g, '_')}.docx`
+
+      // Download the DOCX file
+      downloadDocx(docxBlob, safeFileName)
+
     } catch (error) {
-      console.error('Failed to download text file:', error)
-      throw error
+      console.error('Failed to download DOCX:', error)
+
+      // Fallback: download as formatted text file
+      try {
+        console.log('Falling back to text file download...')
+
+        let cleanedContent = content.content
+        // Apply same cleaning
+        const patterns = [
+          /^Of course[.,]?\s*/i,
+          /^Here\s+(?:is|are)\s+(?:a|an|the|some)?\s*(?:comprehensive|detailed|smart)?\s*[^.]*?\s*on\s+the\s*["'""']?[^"'""']*?["'""']?[^.]*?[.,*]\s*/i,
+          /^Here\s+are\s+comprehensive\s+smart\s+notes\s+on\s+the\s+["'""'][^"'""']*["'""']\s+syllabus[.,*\s]*/i,
+          /^Here\s+(?:is|are)\s+[^.]*?(?:notes|summary|guide|analysis)[^.]*?[.,*]\s*/i,
+          /^I'll\s+(?:create|provide|generate)\s+[^.]*?[.,]\s*/i,
+          /^(?:Certainly|Absolutely|Sure)[.,]?\s*/i,
+          /created\s+using\s+the\s+[^.]*?methodology[.,]?\s*/i,
+          /^(?:Let me|I'd be happy to)\s+[^.]*?[.,]\s*/i
+        ]
+
+        for (const pattern of patterns) {
+          cleanedContent = cleanedContent.replace(pattern, '')
+        }
+        cleanedContent = cleanedContent.replace(/^[\s*]+/, '').trim()
+
+        const textContent = `${content.title}\n\nGenerated on ${new Date(content.createdAt).toLocaleDateString()} at ${new Date(content.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}\n\n${'='.repeat(50)}\n\n${cleanedContent}`
+
+        const blob = new Blob([textContent], { type: 'text/plain' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${content.title.replace(/[^a-zA-Z0-9\s]/g, '_').replace(/\s+/g, '_')}.txt`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      } catch (fallbackError) {
+        console.error('Fallback text download also failed:', fallbackError)
+        throw new Error('Failed to download document in any format')
+      }
     }
   }
 }),
@@ -377,7 +556,7 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
       partialize: (state) => ({
         generatedContent: state.generatedContent.map(content => ({
           ...content,
-          createdAt: content.createdAt.toISOString() // Serialize Date to string
+          createdAt: typeof content.createdAt === 'string' ? content.createdAt : content.createdAt.toISOString() // Handle both Date and string
         })),
       }),
       onRehydrateStorage: () => (state) => {
@@ -385,7 +564,7 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
         if (state?.generatedContent) {
           state.generatedContent = state.generatedContent.map(content => ({
             ...content,
-            createdAt: new Date(content.createdAt as unknown as string)
+            createdAt: typeof content.createdAt === 'string' ? new Date(content.createdAt) : content.createdAt
           }))
         }
       }

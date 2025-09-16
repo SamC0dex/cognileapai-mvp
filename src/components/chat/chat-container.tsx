@@ -12,7 +12,7 @@ import type { GeminiModelKey } from '@/lib/ai-config'
 import type { Citation } from './types'
 import { createClient } from '@supabase/supabase-js'
 import { useDocuments } from '@/contexts/documents-context'
-import { StudyToolsPanel, StudyToolsCanvas, useStudyToolsStore } from '@/components/study-tools'
+import { StudyToolsPanel, useStudyToolsStore } from '@/components/study-tools'
 import { motion, useReducedMotion } from 'framer-motion'
 
 // Enhanced chat area width variants for coordinated layout
@@ -28,9 +28,9 @@ const layoutVariants = {
       duration: 0.3
     }
   },
-  // Panel expanded, no canvas
+  // Panel expanded, no canvas (40% panel, 60% chat)
   panelExpanded: {
-    width: '50%',
+    width: '60%',
     transition: {
       type: 'spring',
       stiffness: 400,
@@ -39,20 +39,9 @@ const layoutVariants = {
       duration: 0.3
     }
   },
-  // Panel collapsed, with canvas
-  panelCollapsedCanvas: {
-    width: 'calc(100% - 48px - 40%)',
-    transition: {
-      type: 'spring',
-      stiffness: 400,
-      damping: 40,
-      mass: 0.5,
-      duration: 0.3
-    }
-  },
-  // Panel expanded, with canvas
+  // Panel expanded with canvas (50% panel, 50% chat)
   panelExpandedCanvas: {
-    width: '30%',
+    width: '50%',
     transition: {
       type: 'spring',
       stiffness: 400,
@@ -92,9 +81,9 @@ export const ChatContainer: React.FC<{
 
   // Memoize the current layout state for performance
   const layoutState = useMemo(() => {
-    if (isCanvasOpen) return 'withCanvas'
-    if (isPanelExpanded) return 'withPanel'
-    return 'full'
+    if (isPanelExpanded && isCanvasOpen) return 'panelExpandedCanvas'
+    if (isPanelExpanded) return 'panelExpanded'
+    return 'panelCollapsed'
   }, [isCanvasOpen, isPanelExpanded])
 
   // Use the chat hook for all chat functionality
@@ -294,12 +283,10 @@ export const ChatContainer: React.FC<{
         variants={layoutVariants}
         animate={prefersReducedMotion ? undefined : layoutState}
         style={prefersReducedMotion ? {
-          width: isCanvasOpen && isPanelExpanded
-            ? '30%'
-            : isCanvasOpen && !isPanelExpanded
-            ? 'calc(100% - 48px - 40%)'
+          width: isPanelExpanded && isCanvasOpen
+            ? '50%'
             : isPanelExpanded
-            ? 'calc(100% - 25%)'
+            ? '60%'
             : 'calc(100% - 48px)'
         } : undefined}
       >
@@ -371,9 +358,6 @@ export const ChatContainer: React.FC<{
           onRemoveDocument={handleRemoveDocument}
         />
       </motion.div>
-
-      {/* Study Tools Canvas - Appears on right when opened */}
-      <StudyToolsCanvas />
     </div>
   )
 })

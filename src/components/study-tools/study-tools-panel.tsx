@@ -2,6 +2,8 @@
 
 import React from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Button } from '@/components/ui'
 import { useStudyToolsStore, STUDY_TOOLS, type StudyToolType } from '@/lib/study-tools-store'
 import { StudyToolsConfirmationDialog } from './study-tools-confirmation-dialog'
@@ -21,7 +23,12 @@ import {
   Edit3,
   Trash2,
   Download,
-  Copy
+  Copy,
+  X,
+  Check,
+  Search,
+  Maximize2,
+  Minimize2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -72,7 +79,18 @@ const panelVariants = {
     }
   },
   expanded: {
-    width: '25%',
+    width: '40%',
+    opacity: 1,
+    transition: {
+      type: 'spring',
+      stiffness: 400,
+      damping: 40,
+      mass: 0.5,
+      duration: 0.3
+    }
+  },
+  expandedWithCanvas: {
+    width: '50%',
     opacity: 1,
     transition: {
       type: 'spring',
@@ -207,8 +225,47 @@ const StudyToolCard: React.FC<StudyToolCardProps> = React.memo(({
 
 StudyToolCard.displayName = 'StudyToolCard'
 
+// Helper function to clean AI introduction text from content
+const cleanAIIntroduction = (content: string): string => {
+  // Remove common AI introduction patterns with comprehensive matching
+  const patterns = [
+    // "Of course" variations
+    /^Of course[.,]?\s*/i,
+    // "Here is/are" patterns - more comprehensive
+    /^Here\s+(?:is|are)\s+(?:a|an|the|some)?\s*(?:comprehensive|detailed|smart)?\s*[^.]*?\s*on\s+the\s*["'""']?[^"'""']*?["'""']?[^.]*?[.,*]\s*/i,
+    // Specific pattern for the current issue
+    /^Here\s+are\s+comprehensive\s+smart\s+notes\s+on\s+the\s+["'""'][^"'""']*["'""']\s+syllabus[.,*\s]*/i,
+    // General "Here are" followed by content description
+    /^Here\s+(?:is|are)\s+[^.]*?(?:notes|summary|guide|analysis)[^.]*?[.,*]\s*/i,
+    // "I'll create" patterns
+    /^I'll\s+(?:create|provide|generate)\s+[^.]*?[.,]\s*/i,
+    // Certainty expressions
+    /^(?:Certainly|Absolutely|Sure)[.,]?\s*/i,
+    // Methodology references
+    /created\s+using\s+the\s+[^.]*?methodology[.,]?\s*/i,
+    // Common AI politeness patterns
+    /^(?:Let me|I'd be happy to)\s+[^.]*?[.,]\s*/i
+  ]
+
+  let cleaned = content
+  for (const pattern of patterns) {
+    const before = cleaned
+    cleaned = cleaned.replace(pattern, '')
+    // Debug log to see what patterns are matching
+    if (before !== cleaned && process.env.NODE_ENV === 'development') {
+      console.log('[AI Text Cleaning] Removed pattern:', before.substring(0, 100) + '...')
+    }
+  }
+
+  // Remove any remaining leading whitespace, newlines, or asterisks
+  cleaned = cleaned.replace(/^[\s*]+/, '').trim()
+
+  return cleaned
+}
+
 const GeneratedDocumentsSection: React.FC = React.memo(() => {
   const { generatedContent, openCanvas, removeGeneratedContent, renameGeneratedContent, copyToClipboard } = useStudyToolsStore()
+  const { downloadAsPDF, downloadAsDOCX } = useStudyToolsStore()
   const prefersReducedMotion = useReducedMotion()
   const [activeDropdown, setActiveDropdown] = React.useState<string | null>(null)
   const [editingTitle, setEditingTitle] = React.useState<string | null>(null)
@@ -217,7 +274,8 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
   // Close dropdown when clicking outside
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (activeDropdown) {
+      const target = event.target as Element
+      if (activeDropdown && !target.closest('[data-dropdown="true"]')) {
         setActiveDropdown(null)
       }
     }
@@ -244,16 +302,44 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
     setActiveDropdown(null)
   }
 
-  const handleCopy = async (content: string) => {
-    await copyToClipboard(content)
-    setActiveDropdown(null)
+  const handleCopyContent = async (content: string) => {
+    try {
+      const success = await copyToClipboard(content)
+      if (success) {
+        console.log('Content copied successfully')
+      }
+      setActiveDropdown(null)
+    } catch (error) {
+      console.error('Failed to copy content:', error)
+      setActiveDropdown(null)
+    }
+  }
+
+  const handleDownloadContent = async (content: any) => {
+    try {
+      await downloadAsDOCX(content)
+      setActiveDropdown(null)
+    } catch (error) {
+      console.error('Failed to download content:', error)
+      // Fallback to simple text download
+      const blob = new Blob([content.content], { type: 'text/plain' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${content.title}.txt`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      setActiveDropdown(null)
+    }
   }
 
   const DocumentDropdownMenu = ({ content }: { content: any }) => {
     const isActive = activeDropdown === content.id
 
     return (
-      <div className="relative">
+      <div className="relative" data-dropdown="true">
         <motion.button
           className={cn(
             "p-1.5 rounded-md transition-colors duration-200",
@@ -278,16 +364,17 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: -5 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              className="absolute right-0 top-full mt-1 w-48 bg-popover border border-border rounded-lg shadow-xl z-20 overflow-hidden"
+              className="absolute right-0 top-full mt-1 w-48 bg-popover border border-border rounded-lg shadow-xl z-[60] overflow-hidden" data-dropdown="true"
             >
               <div className="p-1">
                 <motion.button
                   whileHover={{ backgroundColor: 'hsl(var(--accent))' }}
                   onClick={(e) => {
                     e.stopPropagation()
+                    e.preventDefault()
                     handleRename(content)
                   }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left hover:bg-accent"
                 >
                   <Edit3 className="w-4 h-4" />
                   Rename
@@ -296,9 +383,10 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
                   whileHover={{ backgroundColor: 'hsl(var(--accent))' }}
                   onClick={(e) => {
                     e.stopPropagation()
-                    handleCopy(content.content)
+                    e.preventDefault()
+                    handleCopyContent(content.content)
                   }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left hover:bg-accent"
                 >
                   <Copy className="w-4 h-4" />
                   Copy Content
@@ -307,10 +395,10 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
                   whileHover={{ backgroundColor: 'hsl(var(--accent))' }}
                   onClick={(e) => {
                     e.stopPropagation()
-                    // TODO: Add download functionality
-                    setActiveDropdown(null)
+                    e.preventDefault()
+                    handleDownloadContent(content)
                   }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left hover:bg-accent"
                 >
                   <Download className="w-4 h-4" />
                   Download
@@ -320,9 +408,10 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
                   whileHover={{ backgroundColor: 'hsl(var(--destructive) / 0.1)' }}
                   onClick={(e) => {
                     e.stopPropagation()
+                    e.preventDefault()
                     handleDelete(content.id)
                   }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left text-destructive hover:text-destructive"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left text-destructive hover:text-destructive hover:bg-destructive/10"
                 >
                   <Trash2 className="w-4 h-4" />
                   Delete
@@ -525,15 +614,12 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Clock className="w-3 h-3" />
                         <span>
-                          {new Date(content.createdAt).toLocaleString()}
+                          {new Date(content.createdAt).toLocaleDateString()} at {new Date(content.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                         <span className="text-xs bg-muted/50 px-1.5 py-0.5 rounded">
                           {Math.round(content.content.length / 1000)}k chars
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {content.content.substring(0, 120)}...
-                      </p>
                     </>
                   )}
                 </div>
@@ -628,12 +714,75 @@ const ExpandedPanel: React.FC<{
   hasContext: boolean
 }> = ({ onCollapse, onGenerateStudyTool, isGenerating, generatingType, hasContext }) => {
   const prefersReducedMotion = useReducedMotion()
+  const { isCanvasOpen, canvasContent, closeCanvas, copyToClipboard, downloadAsPDF, downloadAsDOCX } = useStudyToolsStore()
+  const [isCopied, setIsCopied] = React.useState(false)
+  const [searchTerm, setSearchTerm] = React.useState('')
+  const [showExportMenu, setShowExportMenu] = React.useState(false)
+
+  // Close export menu when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element
+      if (showExportMenu && !target.closest('[data-dropdown="true"]')) {
+        setShowExportMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showExportMenu])
+
+  const handleCopy = React.useCallback(async () => {
+    if (!canvasContent) return
+
+    try {
+      const success = await copyToClipboard(canvasContent.content)
+      if (success) {
+        setIsCopied(true)
+        setTimeout(() => setIsCopied(false), 2000)
+      } else {
+        // Fallback using navigator.clipboard
+        await navigator.clipboard.writeText(cleanedContent)
+        setIsCopied(true)
+        setTimeout(() => setIsCopied(false), 2000)
+      }
+    } catch (error) {
+      console.error('Copy failed:', error)
+      // Try fallback method
+      try {
+        await navigator.clipboard.writeText(cleanedContent)
+        setIsCopied(true)
+        setTimeout(() => setIsCopied(false), 2000)
+      } catch (fallbackError) {
+        console.error('Fallback copy also failed:', fallbackError)
+      }
+    }
+  }, [canvasContent, copyToClipboard])
+
+  const handleDownloadPDF = React.useCallback(async () => {
+    if (!canvasContent) return
+
+    try {
+      await downloadAsPDF(canvasContent)
+    } catch (error) {
+      console.error('PDF download failed:', error)
+    }
+  }, [canvasContent, downloadAsPDF])
+
+  const handleDownloadDOCX = React.useCallback(async () => {
+    if (!canvasContent) return
+
+    try {
+      await downloadAsDOCX(canvasContent)
+    } catch (error) {
+      console.error('DOCX download failed:', error)
+    }
+  }, [canvasContent, downloadAsDOCX])
 
   return (
     <motion.div
       variants={panelVariants}
       initial="collapsed"
-      animate="expanded"
+      animate={isCanvasOpen ? "expandedWithCanvas" : "expanded"}
       exit="collapsed"
       className="h-full bg-background/95 backdrop-blur-sm border-r border-border flex flex-col shadow-lg"
     >
@@ -676,73 +825,406 @@ const ExpandedPanel: React.FC<{
         </motion.div>
       </motion.div>
 
-      {/* Tools grid */}
-      <div className="flex-1 p-4 space-y-3 overflow-y-auto">
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1 }}
-          className="text-sm text-muted-foreground mb-4"
-        >
-          Generate AI-powered study materials from your documents and conversations.
-        </motion.p>
-
-        <motion.div
-          className="grid grid-cols-2 gap-3"
-          initial="hidden"
-          animate="visible"
-          variants={{
-            hidden: {},
-            visible: {
-              transition: {
-                staggerChildren: 0.05
-              }
-            }
-          }}
-        >
-          {Object.entries(STUDY_TOOLS).map(([type, tool]) => (
-            <StudyToolCard
-              key={type}
-              type={type as StudyToolType}
-              onClick={() => onGenerateStudyTool(type as StudyToolType)}
-              isGenerating={isGenerating}
-              isCurrentlyGenerating={generatingType === type}
-              hasContext={hasContext}
-            />
-          ))}
-        </motion.div>
-
-        {/* Divider */}
-        <motion.div
-          initial={{ opacity: 0, scaleX: 0 }}
-          animate={{ opacity: 1, scaleX: 1 }}
-          transition={{ delay: 0.2, ...smoothTransition }}
-          className="mt-6 mb-4"
-        >
-          <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-        </motion.div>
-
-        {/* Generated Documents Section */}
-        <GeneratedDocumentsSection />
-
-        {/* Context tip */}
-        {!hasContext && (
+      {/* Canvas Content or Tools Grid */}
+      <AnimatePresence mode="wait">
+        {isCanvasOpen && canvasContent ? (
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, ...smoothTransition }}
-            className="mt-4 p-3 rounded-lg border bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800"
+            key="canvas"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 40 }}
+            className="flex-1 flex flex-col min-h-0"
           >
-            <div className="flex items-start gap-2">
-              <span className="text-amber-600 dark:text-amber-400">💡</span>
-              <p className="text-xs text-muted-foreground">
-                <strong>Tip:</strong>{' '}
-                Upload a document or start a conversation to unlock study tools.
-              </p>
+            {/* Canvas Header */}
+            <div className="flex items-center justify-between p-4 border-b border-border bg-gradient-to-r from-background/95 to-background/90 backdrop-blur-md relative z-10">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <motion.div
+                  className={cn(
+                    "p-2 rounded-xl shadow-sm",
+                    STUDY_TOOLS[canvasContent.type].color,
+                    STUDY_TOOLS[canvasContent.type].borderColor,
+                    "border-2"
+                  )}
+                  whileHover={!prefersReducedMotion ? { scale: 1.05, rotate: 1 } : undefined}
+                  transition={{ duration: 0.2 }}
+                >
+                  {React.createElement(iconMap[canvasContent.type], {
+                    className: cn("w-5 h-5", STUDY_TOOLS[canvasContent.type].textColor)
+                  })}
+                </motion.div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-base truncate bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
+                    {canvasContent.title}
+                  </h3>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {new Date(canvasContent.createdAt).toLocaleDateString()} at {new Date(canvasContent.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {/* Copy button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopy}
+                  className={cn(
+                    "flex items-center gap-2 transition-all duration-200",
+                    isCopied && "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400"
+                  )}
+                >
+                  <AnimatePresence mode="wait">
+                    {isCopied ? (
+                      <motion.div
+                        key="copied"
+                        initial={{ scale: 0, rotate: -180 }}
+                        animate={{ scale: 1, rotate: 0 }}
+                        exit={{ scale: 0, rotate: 180 }}
+                        className="flex items-center gap-1"
+                      >
+                        <Check className="w-3 h-3" />
+                        <span className="text-xs">Copied</span>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="copy"
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="flex items-center gap-1"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span className="text-xs">Copy</span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </Button>
+
+                {/* Export menu */}
+                <div className="relative" data-dropdown="true">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowExportMenu(!showExportMenu)}
+                    className="flex items-center gap-1"
+                  >
+                    <Download className="w-3 h-3" />
+                    <span className="text-xs">Export</span>
+                  </Button>
+
+                  <AnimatePresence>
+                    {showExportMenu && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: -5 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: -5 }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                        className="absolute right-0 top-full mt-2 w-48 bg-popover border border-border rounded-lg shadow-xl z-[100] overflow-hidden" data-dropdown="true"
+                      >
+                        <div className="p-1">
+                          <motion.button
+                            whileHover={{ backgroundColor: 'hsl(var(--accent))' }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              e.preventDefault()
+                              handleDownloadPDF()
+                              setShowExportMenu(false)
+                            }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-xs rounded-md transition-colors hover:bg-accent"
+                          >
+                            <FileText className="w-3 h-3 text-red-500" />
+                            Download as PDF
+                          </motion.button>
+                          <motion.button
+                            whileHover={{ backgroundColor: 'hsl(var(--accent))' }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              e.preventDefault()
+                              handleDownloadDOCX()
+                              setShowExportMenu(false)
+                            }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-xs rounded-md transition-colors hover:bg-accent"
+                          >
+                            <FileText className="w-3 h-3 text-blue-500" />
+                            Download as Text
+                          </motion.button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                {/* Close button */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={closeCanvas}
+                  className="w-7 h-7 rounded-lg hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Search toolbar */}
+            <div className="flex items-center gap-2 p-3 border-b border-border bg-muted/20 relative z-0">
+              <div className="relative flex-1">
+                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Search in document..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-7 pr-3 py-1.5 text-xs border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary/50"
+                />
+              </div>
+              <span className="text-xs text-muted-foreground">
+                {Math.round(canvasContent.content.length / 1000)}k chars
+              </span>
+            </div>
+
+            {/* Canvas Content */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="max-w-none p-4 pb-8">
+                {/* Type-specific header */}
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={cn(
+                    "p-3 rounded-lg border mb-4 backdrop-blur-sm text-center",
+                    STUDY_TOOLS[canvasContent.type].color,
+                    STUDY_TOOLS[canvasContent.type].borderColor
+                  )}
+                >
+                  <p className={cn("text-xs font-medium m-0", STUDY_TOOLS[canvasContent.type].textColor)}>
+                    {canvasContent.type === 'smart-notes' && '📝 Organized notes with highlights and key insights'}
+                    {canvasContent.type === 'smart-summary' && '⚡ Concise overview with essential takeaways'}
+                    {canvasContent.type === 'study-guide' && '📖 Comprehensive study guide with structured learning path'}
+                    {canvasContent.type === 'flashcards' && '📚 Interactive flashcards - Click to reveal answers'}
+                  </p>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.1 }}
+                  className="prose prose-sm max-w-none dark:prose-invert"
+                >
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      // Custom text renderer to handle search highlighting
+                      text: ({ children, ...props }) => {
+                        if (!searchTerm || typeof children !== 'string' || !children.trim()) {
+                          return <span {...props}>{children}</span>
+                        }
+
+                        try {
+                          // Escape special regex characters
+                          const escapedTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                          const regex = new RegExp(`(${escapedTerm})`, 'gi')
+                          const parts = children.split(regex)
+
+                          return (
+                            <span {...props}>
+                              {parts.map((part, index) => {
+                                if (part && regex.test(part)) {
+                                  return (
+                                    <mark key={index} className="bg-yellow-200 dark:bg-yellow-800 px-0.5 rounded text-black dark:text-white">
+                                      {part}
+                                    </mark>
+                                  )
+                                }
+                                return part || ''
+                              })}
+                            </span>
+                          )
+                        } catch (error) {
+                          console.error('Search highlighting error:', error)
+                          return <span {...props}>{children}</span>
+                        }
+                      },
+                      h1: ({ children }) => (
+                        <h1 className="text-xl font-bold text-foreground border-b-2 border-primary/20 pb-3 mb-4 mt-8 first:mt-0 bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
+                          {children}
+                        </h1>
+                      ),
+                      h2: ({ children }) => (
+                        <h2 className="text-lg font-semibold text-foreground mb-3 mt-6 first:mt-0 flex items-center gap-2">
+                          <span className="w-1 h-6 bg-primary rounded-full"></span>
+                          {children}
+                        </h2>
+                      ),
+                      h3: ({ children }) => (
+                        <h3 className="text-base font-semibold text-foreground mb-2 mt-4 pl-3 border-l-2 border-primary/30">
+                          {children}
+                        </h3>
+                      ),
+                      h4: ({ children }) => (
+                        <h4 className="text-sm font-medium text-foreground mb-2 mt-3 text-primary">
+                          {children}
+                        </h4>
+                      ),
+                      ul: ({ children }) => (
+                        <ul className="space-y-2 mb-4 pl-4">
+                          {children}
+                        </ul>
+                      ),
+                      ol: ({ children }) => (
+                        <ol className="space-y-2 mb-4 pl-4 list-decimal">
+                          {children}
+                        </ol>
+                      ),
+                      li: ({ children }) => (
+                        <li className="text-sm text-foreground leading-relaxed flex items-start gap-2">
+                          <span className="w-1.5 h-1.5 bg-primary rounded-full mt-2 flex-shrink-0"></span>
+                          <span>{children}</span>
+                        </li>
+                      ),
+                      p: ({ children }) => (
+                        <p className="mb-4 text-sm text-foreground leading-relaxed last:mb-0">
+                          {children}
+                        </p>
+                      ),
+                      blockquote: ({ children }) => (
+                        <blockquote className="border-l-4 border-primary pl-4 italic bg-primary/5 py-3 my-4 rounded-r-lg">
+                          <div className="text-sm text-muted-foreground">
+                            {children}
+                          </div>
+                        </blockquote>
+                      ),
+                      code: ({ children, inline }: any) => {
+                        if (inline) {
+                          return (
+                            <code className="bg-primary/10 text-primary px-1.5 py-0.5 rounded text-xs font-mono border border-primary/20">
+                              {children}
+                            </code>
+                          )
+                        }
+                        return <code className="font-mono text-xs">{children}</code>
+                      },
+                      pre: ({ children }) => (
+                        <pre className="bg-muted/50 p-4 rounded-lg overflow-x-auto mb-4 text-xs border border-border shadow-inner">
+                          {children}
+                        </pre>
+                      ),
+                      strong: ({ children }) => (
+                        <strong className="font-semibold text-primary">
+                          {children}
+                        </strong>
+                      ),
+                      em: ({ children }) => (
+                        <em className="italic text-primary/80 font-medium">
+                          {children}
+                        </em>
+                      ),
+                      hr: () => (
+                        <hr className="my-6 border-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+                      ),
+                      table: ({ children }) => (
+                        <div className="overflow-x-auto my-4">
+                          <table className="min-w-full border-collapse border border-border rounded-lg overflow-hidden">
+                            {children}
+                          </table>
+                        </div>
+                      ),
+                      th: ({ children }) => (
+                        <th className="border border-border bg-muted/50 px-3 py-2 text-left font-semibold text-xs">
+                          {children}
+                        </th>
+                      ),
+                      td: ({ children }) => (
+                        <td className="border border-border px-3 py-2 text-xs">
+                          {children}
+                        </td>
+                      )
+                    }}
+                  >
+                    {cleanAIIntroduction(canvasContent.content)}
+                  </ReactMarkdown>
+                </motion.div>
+              </div>
             </div>
           </motion.div>
+        ) : (
+          <motion.div
+            key="tools"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 40 }}
+            className="flex-1 p-4 space-y-3 overflow-y-auto"
+          >
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className="text-sm text-muted-foreground mb-4"
+            >
+              Generate AI-powered study materials from your documents and conversations.
+            </motion.p>
+
+            <motion.div
+              className="grid grid-cols-2 gap-3"
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: {},
+                visible: {
+                  transition: {
+                    staggerChildren: 0.05
+                  }
+                }
+              }}
+            >
+              {Object.entries(STUDY_TOOLS).map(([type, tool]) => (
+                <StudyToolCard
+                  key={type}
+                  type={type as StudyToolType}
+                  onClick={() => onGenerateStudyTool(type as StudyToolType)}
+                  isGenerating={isGenerating}
+                  isCurrentlyGenerating={generatingType === type}
+                  hasContext={hasContext}
+                />
+              ))}
+            </motion.div>
+
+            {/* Divider */}
+            <motion.div
+              initial={{ opacity: 0, scaleX: 0 }}
+              animate={{ opacity: 1, scaleX: 1 }}
+              transition={{ delay: 0.2, ...smoothTransition }}
+              className="mt-6 mb-4"
+            >
+              <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+            </motion.div>
+
+            {/* Generated Documents Section */}
+            <GeneratedDocumentsSection />
+
+            {/* Context tip */}
+            {!hasContext && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, ...smoothTransition }}
+                className="mt-4 p-3 rounded-lg border bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800"
+              >
+                <div className="flex items-start gap-2">
+                  <span className="text-amber-600 dark:text-amber-400">💡</span>
+                  <p className="text-xs text-muted-foreground">
+                    <strong>Tip:</strong>{' '}
+                    Upload a document or start a conversation to unlock study tools.
+                  </p>
+                </div>
+              </motion.div>
+            )}
+          </motion.div>
         )}
-      </div>
+      </AnimatePresence>
     </motion.div>
   )
 }

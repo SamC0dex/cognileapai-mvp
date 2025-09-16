@@ -69,6 +69,30 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // If no specific outputs found and no documentId/conversationId provided,
+    // or if specific search returned no results, fetch recent study tools as fallback
+    if (outputs.length === 0) {
+      console.log('[StudyTools] No context-specific study tools found, fetching recent ones as fallback')
+
+      const { data, error } = await supabase
+        .from('outputs')
+        .select('*')
+        .eq('overall', true)
+        .order('created_at', { ascending: false })
+        .limit(10) // Limit to 10 most recent study tools
+
+      if (error) {
+        console.error('[StudyTools] Database fallback fetch error:', error)
+        return NextResponse.json(
+          { error: 'Failed to fetch study tools from database' },
+          { status: 500 }
+        )
+      }
+
+      outputs = data || []
+      console.log('[StudyTools] Using fallback - loaded', outputs.length, 'recent study tools')
+    }
+
     // Transform database outputs to frontend format
     const studyTools = outputs.map(output => {
       const payload = output.payload || {}
@@ -83,7 +107,7 @@ export async function POST(req: NextRequest) {
         type: frontendType,
         title: payload.title || 'Untitled',
         content: payload.content || '',
-        createdAt: new Date(output.created_at),
+        createdAt: output.created_at, // Keep as ISO string from database
         documentId: payload.documentId || null,
         conversationId: payload.conversationId || null,
         isGenerating: false,

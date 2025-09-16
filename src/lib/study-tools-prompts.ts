@@ -69,7 +69,9 @@ export const STUDY_TOOL_PROMPTS = {
 - Connect to broader context and implications
 
 ## Output Format:
-Generate a comprehensive study guide that learners can use to achieve mastery of the topic. Include clear section headers, bullet points, numbered lists, and visual indicators. The guide should be substantial and thorough - there are no length restrictions.`,
+Generate a comprehensive study guide that learners can use to achieve mastery of the topic. Include clear section headers, bullet points, numbered lists, and visual indicators. The guide should be substantial and thorough - there are no length restrictions.
+
+**IMPORTANT: Start directly with the content. Do NOT include any conversational introduction like 'Here is...', 'Of course...', or 'I'll create...'. Begin immediately with the study guide content.**`,
 
     userPrompt: `Create a comprehensive study guide based on the following content. Focus on creating a learning resource that enables deep understanding and long-term retention.
 
@@ -81,7 +83,7 @@ Additional Context:
 - Type: Study Guide Generation
 - Focus: Comprehensive understanding and mastery
 
-Please generate a detailed study guide following the systematic approach outlined. Make it engaging, thorough, and uniquely valuable for serious learners.`
+Generate a detailed study guide following the systematic approach outlined. Make it engaging, thorough, and uniquely valuable for serious learners. Start directly with the study guide content - no introductory text.`
   },
 
   'smart-summary': {
@@ -147,7 +149,9 @@ Please generate a detailed study guide following the systematic approach outline
 - Maintain the original's tone and perspective while adding analytical value
 
 ## Output Format:
-Create a smart summary that serves as both a quick reference and a deep understanding tool. Use clear hierarchical structure, emphasize key insights, and provide both overview and detailed breakdowns as needed.`,
+Create a smart summary that serves as both a quick reference and a deep understanding tool. Use clear hierarchical structure, emphasize key insights, and provide both overview and detailed breakdowns as needed.
+
+**IMPORTANT: Start directly with the content. Do NOT include any conversational introduction like 'Here is...', 'Of course...', or 'I'll create...'. Begin immediately with the smart summary content.**`,
 
     userPrompt: `Create an intelligent summary of the following content. Focus on extracting maximum value and insight while maintaining clarity and comprehensiveness.
 
@@ -159,7 +163,7 @@ Additional Context:
 - Type: Smart Summary Generation
 - Focus: Maximum insight extraction and synthesis
 
-Please generate a smart summary that captures both the content and its significance, following the structured approach outlined. Make it valuable for both quick reference and deep understanding.`
+Generate a smart summary that captures both the content and its significance, following the structured approach outlined. Make it valuable for both quick reference and deep understanding. Start directly with the summary content - no introductory text.`
   },
 
   'smart-notes': {
@@ -232,7 +236,9 @@ Please generate a smart summary that captures both the content and its significa
 - Maintain high information density without clutter
 
 ## Output Format:
-Generate comprehensive smart notes that serve as a complete learning resource. Use clear headings, bullet points, indentation, and visual indicators. Include both detailed information and quick reference elements. The notes should be substantial and thorough - optimize for learning and retention over brevity.`,
+Generate comprehensive smart notes that serve as a complete learning resource. Use clear headings, bullet points, indentation, and visual indicators. Include both detailed information and quick reference elements. The notes should be substantial and thorough - optimize for learning and retention over brevity.
+
+**IMPORTANT: Start directly with the content. Do NOT include any conversational introduction like 'Here is...', 'Of course...', or 'I'll create...'. Begin immediately with the smart notes content.**`,
 
     userPrompt: `Create comprehensive smart notes from the following content. Focus on creating a powerful learning resource that captures both information and insights.
 
@@ -244,7 +250,7 @@ Additional Context:
 - Type: Smart Notes Generation
 - Focus: Active learning and knowledge organization
 
-Please generate detailed smart notes following the systematic approach outlined. Make them valuable for both learning and long-term reference, with clear organization and rich analytical content.`
+Generate detailed smart notes following the systematic approach outlined. Make them valuable for both learning and long-term reference, with clear organization and rich analytical content. Start directly with the notes content - no introductory text.`
   }
 } as const
 
