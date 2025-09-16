@@ -208,6 +208,9 @@ Uses pnpm (version 9.10.0) - always use `pnpm` instead of `npm` or `yarn`.
 - `/api/chat` - General AI chat with conversation persistence
 - `/api/chat/document` - Document-specific chat with section context
 - `/api/upload` - PDF upload and processing pipeline
+- `/api/extract-content` - Document content extraction and processing
+- `/api/documents/[id]/status` - Real-time document processing status
+- `/api/study-tools/generate` - AI-powered study materials generation
 - All endpoints use Server-Sent Events for streaming responses
 - Database operations use server-only Supabase service role
 
@@ -217,7 +220,10 @@ src/
 ├── app/                    # Next.js App Router
 │   ├── api/               # Implemented API routes
 │   │   ├── chat/         # Chat endpoints with streaming
-│   │   └── upload/       # PDF upload processing
+│   │   ├── upload/       # PDF upload processing
+│   │   ├── extract-content/ # Document content extraction
+│   │   ├── documents/[id]/status/ # Document processing status
+│   │   └── study-tools/generate/ # Study tools generation API
 │   ├── chat/[id]/        # Individual chat conversations
 │   ├── dashboard/        # Main dashboard page
 │   └── test-document-chat/ # Chat testing page
@@ -228,14 +234,26 @@ src/
 │   │   ├── chat-messages.tsx      # Message list with scrolling
 │   │   ├── chat-message.tsx       # Individual message display
 │   │   ├── memoized-markdown.tsx  # Optimized markdown rendering
+│   │   ├── selected-document-display.tsx # Document context display
 │   │   └── types.ts              # Chat type definitions
+│   ├── study-tools/      # AI-powered study tools system
+│   │   ├── study-tools-panel.tsx  # Expandable tools panel
+│   │   ├── study-tools-canvas.tsx # Content viewer/editor
+│   │   └── index.ts              # Study tools exports
+│   ├── documents-panel.tsx # Document management interface
 │   └── ui.tsx           # Comprehensive UI component library
 ├── lib/
 │   ├── chat-store.ts    # Zustand chat state management
 │   ├── use-chat.ts      # Custom hook for chat operations
 │   ├── ai-config.ts     # AI model configuration and selection
 │   ├── chat-history.ts  # Local storage for chat persistence
+│   ├── smart-context.ts # Intelligent context retrieval for large documents
+│   ├── study-tools-store.ts # Study tools state management
+│   ├── study-tools-prompts.ts # AI prompts for study materials
+│   ├── export-utils.ts  # PDF and document export utilities
 │   └── supabase.ts      # Supabase client configuration
+├── contexts/
+│   └── documents-context.tsx # Document state management
 └── hooks/               # Custom React hooks
 ```
 
@@ -271,8 +289,69 @@ const { messages, sendMessage, isStreaming } = useChat(documentId)
 - **Model Selection**: Automatic based on context (see `ai-config.ts`)
 - **Streaming Responses**: Server-Sent Events with smooth UI updates
 - **Document Context**: Relevant sections passed to AI for accurate responses
+- **Smart Context Retrieval**: Intelligent chunking for large documents (see `smart-context.ts`)
 - **Citation Support**: AI responses include document references
 - **Error Recovery**: Graceful handling of API failures with retry mechanisms
+
+### Study Tools System
+Comprehensive AI-powered study materials generation with professional UI/UX:
+
+#### Features
+- **Study Guide**: Multi-layered learning paths with Foundation → Connections → Applications → Mastery
+- **Smart Summary**: Significance hierarchy with strategic overview and practical implications
+- **Smart Notes**: Active learning methodology with interconnected knowledge networks
+- **Flashcards**: Interactive Q&A cards (coming soon)
+
+#### Architecture
+- **StudyToolsPanel** (`study-tools-panel.tsx`) - Collapsible panel with tool selection
+- **StudyToolsCanvas** (`study-tools-canvas.tsx`) - Full-screen content viewer with export options
+- **StudyToolsStore** (`study-tools-store.ts`) - Zustand state management with persistence
+- **Advanced Prompts** (`study-tools-prompts.ts`) - Specialized prompts for each tool type
+- **Export System** (`export-utils.ts`) - PDF and document export with styled formatting
+
+#### Usage Pattern
+```tsx
+// Integrate study tools panel
+<StudyToolsPanel documentId="doc_123" conversationId="conv_456" />
+
+// Canvas opens automatically after generation
+<StudyToolsCanvas />
+
+// Access store for custom integrations
+const { generateStudyTool, isGenerating } = useStudyToolsStore()
+```
+
+#### Context Integration
+- **Document-based**: Uses full document content for comprehensive analysis
+- **Conversation-based**: Leverages chat history for contextual study materials
+- **Smart Context**: Automatically chunks large documents for optimal AI processing
+
+### Smart Context Management
+Advanced document processing for large PDFs and efficient AI interactions:
+
+#### Features
+- **Intelligent Chunking**: Splits documents with configurable overlap and size
+- **Relevance Scoring**: Keyword-based ranking with phrase matching and numbered item detection
+- **Context Selection**: Automatically selects most relevant chunks within token limits
+- **Fallback Handling**: Ensures context availability even with low relevance scores
+
+#### Core Functions
+```typescript
+// Chunk large documents intelligently
+const chunks = chunkDocument(content, { chunkSize: 1000, overlap: 200 })
+
+// Get relevant context for queries
+const { context, chunks, totalRelevance } = getSmartContext(query, documentContent)
+
+// Build optimized prompts with context
+const prompt = buildContextPrompt(query, title, content)
+```
+
+#### Configuration Options
+- `maxTokens`: Maximum context size (default: 4000)
+- `chunkSize`: Words per chunk (default: 1000)
+- `overlap`: Overlap between chunks (default: 200)
+- `minRelevanceScore`: Minimum relevance threshold (default: 0.1)
 
 ### Design System
 - **Custom Tailwind Configuration** with design tokens
@@ -305,6 +384,20 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 - **Test streaming behavior** - ensure UI handles partial responses correctly
 - **Document context is crucial** - most chat functionality expects a documentId
 
+### Working with Study Tools
+- **Use StudyToolsStore** for all study tools operations - avoid direct API calls
+- **Handle generation states** - tools can take 30-60 seconds to generate
+- **Context requirements** - most tools require either documentId or conversationId
+- **Canvas management** - canvas opens automatically after successful generation
+- **Export functionality** - PDF and text exports are handled by the store
+- **Persistence** - generated content is automatically saved to localStorage
+
+### Working with Smart Context
+- **Automatic chunking** - use `getSmartContext()` for queries on large documents
+- **Relevance tuning** - adjust `minRelevanceScore` based on document type
+- **Token management** - monitor context size to stay within model limits
+- **Fallback strategy** - always provide context even with low relevance scores
+
 ### Code Quality Standards  
 - **TypeScript strict mode** - no `any` types, proper interface definitions
 - **ESLint configuration** - follows Next.js recommended rules
@@ -319,7 +412,14 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 ## Key Files
 - `src/lib/chat-store.ts` - Central chat state management
+- `src/lib/study-tools-store.ts` - Study tools state management and generation
+- `src/lib/smart-context.ts` - Intelligent document chunking and context retrieval
+- `src/lib/study-tools-prompts.ts` - Advanced AI prompts for study materials
+- `src/lib/export-utils.ts` - PDF and document export functionality
+- `src/components/study-tools/study-tools-panel.tsx` - Study tools UI panel
+- `src/components/study-tools/study-tools-canvas.tsx` - Content viewer and editor
 - `src/components/chat/README.md` - Comprehensive chat system documentation
+- `src/contexts/documents-context.tsx` - Document state management
 - `package.json` - Dependencies and development scripts
-- `tailwind.config.ts` - Design system configuration  
+- `tailwind.config.ts` - Design system configuration
 - `docs/` - Detailed project documentation

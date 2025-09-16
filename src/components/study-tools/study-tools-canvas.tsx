@@ -1,0 +1,609 @@
+'use client'
+
+import React, { useState, useCallback } from 'react'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { Button } from '@/components/ui'
+import { useStudyToolsStore, STUDY_TOOLS, type StudyToolContent } from '@/lib/study-tools-store'
+import {
+  X,
+  Copy,
+  Download,
+  FileText,
+  Check,
+  MoreHorizontal,
+  Calendar,
+  Sparkles,
+  BookOpen,
+  PenTool,
+  Zap,
+  ExternalLink,
+  Share2,
+  Maximize2,
+  Search,
+  Minimize2
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+
+// Enhanced canvas animation variants with proper width
+const canvasVariants = {
+  hidden: {
+    width: 0,
+    opacity: 0,
+    x: 20
+  },
+  visible: {
+    width: '40%',
+    opacity: 1,
+    x: 0,
+    transition: {
+      type: 'spring',
+      stiffness: 400,
+      damping: 40,
+      mass: 0.5,
+      duration: 0.3
+    }
+  },
+  exit: {
+    width: 0,
+    opacity: 0,
+    x: 20,
+    transition: {
+      type: 'spring',
+      stiffness: 500,
+      damping: 45,
+      mass: 0.4,
+      duration: 0.25
+    }
+  }
+}
+
+const headerVariants = {
+  hidden: { opacity: 0, y: -10 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      delay: 0.05,
+      duration: 0.2,
+      ease: 'easeOut'
+    }
+  }
+}
+
+const contentVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      delay: 0.1,
+      duration: 0.2,
+      ease: 'easeOut'
+    }
+  }
+}
+
+const iconMap = {
+  'study-guide': BookOpen,
+  'flashcards': FileText,
+  'smart-notes': PenTool,
+  'smart-summary': Zap
+}
+
+interface CanvasHeaderProps {
+  content: StudyToolContent
+  onClose: () => void
+  onCopy: () => void
+  onDownloadPDF: () => void
+  onDownloadDOCX: () => void
+  isCopied: boolean
+}
+
+const CanvasHeader: React.FC<CanvasHeaderProps> = ({
+  content,
+  onClose,
+  onCopy,
+  onDownloadPDF,
+  onDownloadDOCX,
+  isCopied
+}) => {
+  const tool = STUDY_TOOLS[content.type]
+  const IconComponent = iconMap[content.type]
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const prefersReducedMotion = useReducedMotion()
+
+  return (
+    <motion.div
+      variants={headerVariants}
+      initial="hidden"
+      animate="visible"
+      className="flex items-center justify-between p-4 border-b border-border bg-gradient-to-r from-background/95 to-background/90 backdrop-blur-md sticky top-0 z-10 shadow-sm"
+    >
+      {/* Title and metadata */}
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <motion.div
+          className={cn(
+            "p-2 rounded-xl shadow-sm",
+            tool.color,
+            tool.borderColor,
+            "border-2"
+          )}
+          whileHover={!prefersReducedMotion ? { scale: 1.05, rotate: 1 } : undefined}
+          transition={{ duration: 0.2 }}
+        >
+          <IconComponent className={cn("w-6 h-6", tool.textColor)} />
+        </motion.div>
+        <div className="flex-1 min-w-0">
+          <motion.h1
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.1 }}
+            className="font-semibold text-lg truncate bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent"
+          >
+            {content.title}
+          </motion.h1>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="flex items-center gap-4 text-sm text-muted-foreground"
+          >
+            <span className="flex items-center gap-1">
+              <Calendar className="w-3 h-3" />
+              {content.createdAt.toLocaleDateString()}
+            </span>
+            <span className="flex items-center gap-1">
+              <motion.div
+                animate={{ rotate: [0, 10, -10, 0] }}
+                transition={{ duration: 3, repeat: Infinity }}
+              >
+                <Sparkles className="w-3 h-3" />
+              </motion.div>
+              {tool.name}
+            </span>
+          </motion.div>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <motion.div
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.3 }}
+        className="flex items-center gap-2"
+      >
+        {/* Copy button */}
+        <motion.div
+          whileHover={!prefersReducedMotion ? { scale: 1.02 } : undefined}
+          whileTap={!prefersReducedMotion ? { scale: 0.98 } : undefined}
+        >
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onCopy}
+            className={cn(
+              "flex items-center gap-2 transition-all duration-200",
+              isCopied && "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400"
+            )}
+          >
+            <AnimatePresence mode="wait">
+              {isCopied ? (
+                <motion.div
+                  key="copied"
+                  initial={{ scale: 0, rotate: -180 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  exit={{ scale: 0, rotate: 180 }}
+                  className="flex items-center gap-2"
+                >
+                  <Check className="w-4 h-4" />
+                  Copied
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="copy"
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="flex items-center gap-2"
+                >
+                  <Copy className="w-4 h-4" />
+                  Copy
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </Button>
+        </motion.div>
+
+        {/* Export menu */}
+        <div className="relative">
+          <motion.div
+            whileHover={!prefersReducedMotion ? { scale: 1.02 } : undefined}
+            whileTap={!prefersReducedMotion ? { scale: 0.98 } : undefined}
+          >
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Export
+              <motion.div
+                animate={{ rotate: showExportMenu ? 180 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <MoreHorizontal className="w-3 h-3" />
+              </motion.div>
+            </Button>
+          </motion.div>
+
+          <AnimatePresence>
+            {showExportMenu && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: -5 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: -5 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                className="absolute right-0 top-full mt-2 w-48 bg-popover border border-border rounded-xl shadow-xl z-20 overflow-hidden"
+              >
+                <div className="p-1">
+                  <motion.button
+                    whileHover={{ backgroundColor: 'hsl(var(--accent))' }}
+                    onClick={() => {
+                      onDownloadPDF()
+                      setShowExportMenu(false)
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors"
+                  >
+                    <FileText className="w-4 h-4 text-red-500" />
+                    Download as PDF
+                    <ExternalLink className="w-3 h-3 ml-auto opacity-50" />
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ backgroundColor: 'hsl(var(--accent))' }}
+                    onClick={() => {
+                      onDownloadDOCX()
+                      setShowExportMenu(false)
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors"
+                  >
+                    <FileText className="w-4 h-4 text-blue-500" />
+                    Download as Text
+                    <ExternalLink className="w-3 h-3 ml-auto opacity-50" />
+                  </motion.button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Close button */}
+        <motion.div
+          whileHover={!prefersReducedMotion ? { scale: 1.05, rotate: 90 } : undefined}
+          whileTap={!prefersReducedMotion ? { scale: 0.95 } : undefined}
+        >
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </motion.div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+interface ContentRendererProps {
+  content: StudyToolContent
+}
+
+const ContentRenderer: React.FC<ContentRendererProps> = ({ content }) => {
+  const [searchTerm, setSearchTerm] = useState('')
+  const [isFullscreen, setIsFullscreen] = useState(false)
+
+  const markdownComponents = {
+    // Enhanced heading styles with better typography
+    h1: ({ children }: any) => (
+      <h1 className="text-2xl font-bold text-foreground border-b border-border pb-2 mb-4 mt-8 first:mt-0">
+        {children}
+      </h1>
+    ),
+    h2: ({ children }: any) => (
+      <h2 className="text-xl font-semibold text-foreground mb-3 mt-6 first:mt-0">
+        {children}
+      </h2>
+    ),
+    h3: ({ children }: any) => (
+      <h3 className="text-lg font-semibold text-foreground mb-2 mt-4">
+        {children}
+      </h3>
+    ),
+    h4: ({ children }: any) => (
+      <h4 className="text-base font-semibold text-foreground mb-2 mt-3">
+        {children}
+      </h4>
+    ),
+    // Enhanced list styles
+    ul: ({ children }: any) => (
+      <ul className="list-disc list-inside space-y-1 mb-4 text-foreground">
+        {children}
+      </ul>
+    ),
+    ol: ({ children }: any) => (
+      <ol className="list-decimal list-inside space-y-1 mb-4 text-foreground">
+        {children}
+      </ol>
+    ),
+    // Enhanced paragraph spacing
+    p: ({ children }: any) => (
+      <p className="mb-4 text-foreground leading-relaxed last:mb-0">
+        {children}
+      </p>
+    ),
+    // Enhanced blockquote styling
+    blockquote: ({ children }: any) => (
+      <blockquote className="border-l-4 border-blue-500 pl-4 italic bg-muted/30 py-2 mb-4 text-muted-foreground">
+        {children}
+      </blockquote>
+    ),
+    // Code block styling
+    pre: ({ children }: any) => (
+      <pre className="bg-muted p-4 rounded-lg overflow-x-auto mb-4 text-sm border">
+        {children}
+      </pre>
+    ),
+    // Inline code styling
+    code: ({ children, inline }: any) => {
+      if (inline) {
+        return (
+          <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono text-foreground">
+            {children}
+          </code>
+        )
+      }
+      return <code className="font-mono text-sm">{children}</code>
+    },
+    // Enhanced table styling
+    table: ({ children }: any) => (
+      <div className="overflow-x-auto mb-4">
+        <table className="min-w-full border-collapse border border-border">
+          {children}
+        </table>
+      </div>
+    ),
+    th: ({ children }: any) => (
+      <th className="border border-border bg-muted/50 px-4 py-2 text-left font-semibold">
+        {children}
+      </th>
+    ),
+    td: ({ children }: any) => (
+      <td className="border border-border px-4 py-2">
+        {children}
+      </td>
+    ),
+    // Strong and emphasis
+    strong: ({ children }: any) => (
+      <strong className="font-semibold text-foreground">
+        {children}
+      </strong>
+    ),
+    em: ({ children }: any) => (
+      <em className="italic text-muted-foreground">
+        {children}
+      </em>
+    )
+  }
+
+  const renderTypeSpecificHeader = () => {
+    const tool = STUDY_TOOLS[content.type]
+    const headers = {
+      'flashcards': {
+        text: '📚 Interactive flashcards - Click to reveal answers',
+        bg: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800',
+        text_color: 'text-blue-700 dark:text-blue-300'
+      },
+      'smart-notes': {
+        text: '📝 Organized notes with highlights and key insights',
+        bg: 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800',
+        text_color: 'text-purple-700 dark:text-purple-300'
+      },
+      'smart-summary': {
+        text: '⚡ Concise overview with essential takeaways',
+        bg: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800',
+        text_color: 'text-amber-700 dark:text-amber-300'
+      },
+      'study-guide': {
+        text: '📖 Comprehensive study guide with structured learning path',
+        bg: 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800',
+        text_color: 'text-green-700 dark:text-green-300'
+      }
+    }
+
+    const header = headers[content.type as keyof typeof headers]
+    if (!header) return null
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={cn(
+          "p-4 rounded-lg border mb-6 backdrop-blur-sm",
+          header.bg
+        )}
+      >
+        <p className={cn("text-sm font-medium m-0", header.text_color)}>
+          {header.text}
+        </p>
+      </motion.div>
+    )
+  }
+
+  const highlightSearchTerm = (text: string) => {
+    if (!searchTerm) return text
+    const regex = new RegExp(`(${searchTerm})`, 'gi')
+    return text.replace(regex, '<mark class="bg-yellow-200 dark:bg-yellow-800">$1</mark>')
+  }
+
+  return (
+    <div className={cn(
+      "flex flex-col h-full",
+      isFullscreen && "fixed inset-0 z-50 bg-background"
+    )}>
+      {/* Enhanced toolbar */}
+      <motion.div
+        initial={{ opacity: 0, y: -5 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center gap-3 p-4 border-b border-border bg-muted/30 backdrop-blur-sm sticky top-0 z-10"
+      >
+        {/* Search */}
+        <div className="flex items-center gap-2 flex-1 max-w-md">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search in document..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 text-sm border border-border rounded-lg bg-background/50 focus:outline-none focus:ring-2 focus:ring-brand-teal-500/50"
+            />
+          </div>
+        </div>
+
+        {/* Fullscreen toggle */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setIsFullscreen(!isFullscreen)}
+          className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
+        >
+          {isFullscreen ? (
+            <><Minimize2 className="w-4 h-4" /> Exit Fullscreen</>
+          ) : (
+            <><Maximize2 className="w-4 h-4" /> Fullscreen</>
+          )}
+        </Button>
+      </motion.div>
+
+      {/* Content area with enhanced scrolling */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-none p-6 pb-12">
+          {renderTypeSpecificHeader()}
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.1 }}
+            className="prose prose-base max-w-none dark:prose-invert prose-headings:scroll-m-4"
+            style={{
+              '--tw-prose-body': 'hsl(var(--foreground))',
+              '--tw-prose-headings': 'hsl(var(--foreground))',
+              '--tw-prose-lead': 'hsl(var(--muted-foreground))',
+              '--tw-prose-links': 'hsl(var(--primary))',
+              '--tw-prose-bold': 'hsl(var(--foreground))',
+              '--tw-prose-counters': 'hsl(var(--muted-foreground))',
+              '--tw-prose-bullets': 'hsl(var(--muted-foreground))',
+              '--tw-prose-hr': 'hsl(var(--border))',
+              '--tw-prose-quotes': 'hsl(var(--muted-foreground))',
+              '--tw-prose-quote-borders': 'hsl(var(--border))',
+              '--tw-prose-captions': 'hsl(var(--muted-foreground))',
+              '--tw-prose-code': 'hsl(var(--foreground))',
+              '--tw-prose-pre-code': 'hsl(var(--foreground))',
+              '--tw-prose-pre-bg': 'hsl(var(--muted))',
+              '--tw-prose-th-borders': 'hsl(var(--border))',
+              '--tw-prose-td-borders': 'hsl(var(--border))'
+            } as React.CSSProperties}
+          >
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={markdownComponents}
+            >
+              {content.content}
+            </ReactMarkdown>
+          </motion.div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export const StudyToolsCanvas: React.FC = React.memo(() => {
+  const {
+    isCanvasOpen,
+    canvasContent,
+    closeCanvas,
+    copyToClipboard,
+    downloadAsPDF,
+    downloadAsDOCX,
+  } = useStudyToolsStore()
+
+  const [isCopied, setIsCopied] = useState(false)
+
+  const handleCopy = useCallback(async () => {
+    if (!canvasContent) return
+
+    const success = await copyToClipboard(canvasContent.content)
+    if (success) {
+      setIsCopied(true)
+      setTimeout(() => setIsCopied(false), 2000)
+    }
+  }, [canvasContent, copyToClipboard])
+
+  const handleDownloadPDF = useCallback(async () => {
+    if (!canvasContent) return
+
+    try {
+      await downloadAsPDF(canvasContent)
+    } catch (error) {
+      console.error('PDF download failed:', error)
+      // TODO: Show error toast
+    }
+  }, [canvasContent, downloadAsPDF])
+
+  const handleDownloadDOCX = useCallback(async () => {
+    if (!canvasContent) return
+
+    try {
+      await downloadAsDOCX(canvasContent)
+    } catch (error) {
+      console.error('DOCX download failed:', error)
+      // TODO: Show error toast
+    }
+  }, [canvasContent, downloadAsDOCX])
+
+  return (
+    <AnimatePresence mode="wait">
+      {isCanvasOpen && canvasContent && (
+        <motion.div
+          key="canvas"
+          variants={canvasVariants}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          className="h-full bg-background/95 backdrop-blur-sm border-l border-border flex flex-col shadow-xl"
+        >
+          <CanvasHeader
+            content={canvasContent}
+            onClose={closeCanvas}
+            onCopy={handleCopy}
+            onDownloadPDF={handleDownloadPDF}
+            onDownloadDOCX={handleDownloadDOCX}
+            isCopied={isCopied}
+          />
+          <motion.div
+            variants={contentVariants}
+            initial="hidden"
+            animate="visible"
+            className="flex-1 overflow-hidden"
+          >
+            <ContentRenderer content={canvasContent} />
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+})
+
+StudyToolsCanvas.displayName = 'StudyToolsCanvas'

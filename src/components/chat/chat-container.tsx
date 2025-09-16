@@ -12,6 +12,56 @@ import type { GeminiModelKey } from '@/lib/ai-config'
 import type { Citation } from './types'
 import { createClient } from '@supabase/supabase-js'
 import { useDocuments } from '@/contexts/documents-context'
+import { StudyToolsPanel, StudyToolsCanvas, useStudyToolsStore } from '@/components/study-tools'
+import { motion, useReducedMotion } from 'framer-motion'
+
+// Enhanced chat area width variants for coordinated layout
+const layoutVariants = {
+  // Panel collapsed, no canvas
+  panelCollapsed: {
+    width: 'calc(100% - 48px)',
+    transition: {
+      type: 'spring',
+      stiffness: 400,
+      damping: 40,
+      mass: 0.5,
+      duration: 0.3
+    }
+  },
+  // Panel expanded, no canvas
+  panelExpanded: {
+    width: '50%',
+    transition: {
+      type: 'spring',
+      stiffness: 400,
+      damping: 40,
+      mass: 0.5,
+      duration: 0.3
+    }
+  },
+  // Panel collapsed, with canvas
+  panelCollapsedCanvas: {
+    width: 'calc(100% - 48px - 40%)',
+    transition: {
+      type: 'spring',
+      stiffness: 400,
+      damping: 40,
+      mass: 0.5,
+      duration: 0.3
+    }
+  },
+  // Panel expanded, with canvas
+  panelExpandedCanvas: {
+    width: '30%',
+    transition: {
+      type: 'spring',
+      stiffness: 400,
+      damping: 40,
+      mass: 0.5,
+      duration: 0.3
+    }
+  }
+}
 
 // Check if we're in demo mode (Supabase not configured)
 const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -34,9 +84,18 @@ export const ChatContainer: React.FC<{
   onModelChange
 }) => {
   const { selectedDocuments, primaryDocument, removeSelectedDocument, updateDocumentStatus } = useDocuments()
+  const { isPanelExpanded, isCanvasOpen } = useStudyToolsStore()
+  const prefersReducedMotion = useReducedMotion()
 
   // Use primary selected document if no URL document is provided
   const effectiveDocumentId = documentId || primaryDocument?.id
+
+  // Memoize the current layout state for performance
+  const layoutState = useMemo(() => {
+    if (isCanvasOpen) return 'withCanvas'
+    if (isPanelExpanded) return 'withPanel'
+    return 'full'
+  }, [isCanvasOpen, isPanelExpanded])
 
   // Use the chat hook for all chat functionality
   const {
@@ -219,7 +278,31 @@ export const ChatContainer: React.FC<{
 
 
   return (
-    <div className="relative h-full flex flex-col bg-background">
+    <div className="relative h-full flex bg-background">
+      {/* Study Tools Panel - Fixed width sidebar */}
+      <StudyToolsPanel
+        documentId={effectiveDocumentId}
+        conversationId={conversationId}
+        selectedDocuments={selectedDocuments}
+        primaryDocument={primaryDocument}
+        hasMessages={messages.length > 0}
+      />
+
+      {/* Main Chat Area - Flexible width */}
+      <motion.div
+        className="flex flex-col h-full min-w-0 flex-1"
+        variants={layoutVariants}
+        animate={prefersReducedMotion ? undefined : layoutState}
+        style={prefersReducedMotion ? {
+          width: isCanvasOpen && isPanelExpanded
+            ? '30%'
+            : isCanvasOpen && !isPanelExpanded
+            ? 'calc(100% - 48px - 40%)'
+            : isPanelExpanded
+            ? 'calc(100% - 25%)'
+            : 'calc(100% - 48px)'
+        } : undefined}
+      >
         {/* Demo Mode Banner */}
         {isDemoMode && (
           <div className="flex-shrink-0 px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
@@ -240,8 +323,6 @@ export const ChatContainer: React.FC<{
             </div>
           </div>
         )}
-
-
 
         {/* Messages or Empty State */}
         {messages.length === 0 && !isLoading && !error ? (
@@ -289,6 +370,10 @@ export const ChatContainer: React.FC<{
           urlSelectedDocument={urlSelectedDocument}
           onRemoveDocument={handleRemoveDocument}
         />
+      </motion.div>
+
+      {/* Study Tools Canvas - Appears on right when opened */}
+      <StudyToolsCanvas />
     </div>
   )
 })
