@@ -275,11 +275,12 @@ export const FlashcardViewer: React.FC<FlashcardViewerProps> = ({
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1 }}
-                        className="flex-1 flex items-center justify-center"
+                        className="flex-1 flex items-center justify-center cursor-pointer"
+                        onClick={toggleAnswer}
                       >
                         <h2 className={cn(
                           "font-medium text-foreground leading-relaxed max-w-full break-words text-center",
-                          isFullscreen ? "text-xl" : "text-lg" // Reasonable text size
+                          isFullscreen ? "text-2xl" : "text-xl" // Increased by 2 from text-xl/text-lg
                         )}>
                           {currentCard.question}
                         </h2>
@@ -289,17 +290,16 @@ export const FlashcardViewer: React.FC<FlashcardViewerProps> = ({
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.2 }}
-                        className="mt-auto"
+                        className="mt-auto cursor-pointer"
+                        onClick={toggleAnswer}
                       >
-                        <Button
-                          onClick={toggleAnswer}
-                          className={cn(
-                            "bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-medium transition-all duration-200 shadow-md hover:shadow-lg",
-                            isFullscreen ? "px-8 py-4 text-lg" : "px-4 py-2 text-sm" // Larger button in fullscreen
-                          )}
-                        >
+                        <div className={cn(
+                          "text-center py-3 px-6 text-muted-foreground font-medium transition-all duration-200",
+                          "drop-shadow-md hover:drop-shadow-lg",
+                          isFullscreen ? "text-lg" : "text-base" // Increased by 2 from text-lg/text-sm
+                        )}>
                           See answer
-                        </Button>
+                        </div>
                       </motion.div>
                     </>
                   ) : (
@@ -309,21 +309,14 @@ export const FlashcardViewer: React.FC<FlashcardViewerProps> = ({
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1 }}
-                        className="flex-1 flex flex-col justify-center space-y-6"
+                        className="flex-1 flex items-center justify-center cursor-pointer"
+                        onClick={toggleAnswer}
                       >
-                        <div className="text-center">
-                          <h3 className={cn(
-                            "font-medium text-foreground mb-4 text-center",
-                            isFullscreen ? "text-xl" : "text-base" // Larger text in fullscreen
-                          )}>
-                            {currentCard.question}
-                          </h3>
-                          <div className={cn(
-                            "text-muted-foreground leading-relaxed",
-                            isFullscreen ? "text-sm" : "text-xs" // Smaller text in study tools section
-                          )}>
-                            {currentCard.answer}
-                          </div>
+                        <div className={cn(
+                          "text-foreground leading-relaxed text-center max-w-full break-words",
+                          isFullscreen ? "text-2xl" : "text-xl" // Same size as question, increased by 2
+                        )}>
+                          {currentCard.answer}
                         </div>
                       </motion.div>
 
@@ -331,19 +324,17 @@ export const FlashcardViewer: React.FC<FlashcardViewerProps> = ({
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.2 }}
-                        className="mt-auto"
+                        className="mt-auto cursor-pointer"
+                        onClick={toggleAnswer}
                       >
-                        <Button
-                          onClick={toggleAnswer}
-                          variant="outline"
-                          className={cn(
-                            "rounded-xl font-medium border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/20",
-                            isFullscreen ? "px-8 py-4 text-lg" : "px-4 py-2 text-sm" // Larger button in fullscreen
-                          )}
-                        >
-                          <MessageSquare className={cn("mr-2", isFullscreen ? "w-5 h-5" : "w-3 h-3")} />
-                          Explain
-                        </Button>
+                        <div className={cn(
+                          "text-center py-3 px-6 text-green-600 dark:text-green-400 font-medium transition-all duration-200",
+                          "drop-shadow-md hover:drop-shadow-lg flex items-center justify-center gap-2",
+                          isFullscreen ? "text-lg" : "text-base" // Increased by 2 from text-lg/text-sm
+                        )}>
+                          <MessageSquare className={cn(isFullscreen ? "w-5 h-5" : "w-4 h-4")} />
+                          See question
+                        </div>
                       </motion.div>
                     </>
                   )}

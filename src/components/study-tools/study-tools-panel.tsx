@@ -710,6 +710,7 @@ const CollapsedPanel: React.FC<{ onExpand: () => void }> = ({ onExpand }) => {
   )
 }
 
+
 const ExpandedPanel: React.FC<{
   onCollapse: () => void
   onGenerateStudyTool: (type: StudyToolType) => void
@@ -795,6 +796,7 @@ const ExpandedPanel: React.FC<{
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -10, transition: { delay: 0.2, duration: 0.15 } }}
         transition={{ delay: 0.05, ...smoothTransition }}
         className="flex items-center justify-between p-4 border-b border-border bg-gradient-to-r from-brand-teal-50 to-transparent dark:from-brand-teal-900/20"
       >
@@ -837,7 +839,7 @@ const ExpandedPanel: React.FC<{
             key="canvas"
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
+            exit={{ opacity: 0, x: -20, transition: { delay: 0.2, duration: 0.15 } }}
             transition={{ type: 'spring', stiffness: 400, damping: 40 }}
             className="flex-1 flex flex-col min-h-0"
           >
@@ -1159,7 +1161,7 @@ const ExpandedPanel: React.FC<{
             key="flashcards"
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
+            exit={{ opacity: 0, x: -20, transition: { delay: 0.2, duration: 0.15 } }}
             transition={{ type: 'spring', stiffness: 400, damping: 40 }}
             className="flex-1 flex flex-col min-h-0"
           >
@@ -1177,32 +1179,15 @@ const ExpandedPanel: React.FC<{
             key="tools"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
+            exit={{ opacity: 0, x: 20, transition: { delay: 0.2, duration: 0.15 } }}
             transition={{ type: 'spring', stiffness: 400, damping: 40 }}
             className="flex-1 p-4 space-y-3 overflow-y-auto"
           >
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.1 }}
-              className="text-sm text-muted-foreground mb-4"
-            >
+            <p className="text-sm text-muted-foreground mb-4">
               Generate AI-powered study materials from your documents and conversations.
-            </motion.p>
+            </p>
 
-            <motion.div
-              className="grid grid-cols-2 gap-3"
-              initial="hidden"
-              animate="visible"
-              variants={{
-                hidden: {},
-                visible: {
-                  transition: {
-                    staggerChildren: 0.05
-                  }
-                }
-              }}
-            >
+            <div className="grid grid-cols-2 gap-3">
               {Object.entries(STUDY_TOOLS).map(([type, tool]) => (
                 <StudyToolCard
                   key={type}
@@ -1213,7 +1198,7 @@ const ExpandedPanel: React.FC<{
                   hasContext={hasContext}
                 />
               ))}
-            </motion.div>
+            </div>
 
             {/* Divider */}
             <motion.div
@@ -1381,6 +1366,9 @@ Generated flashcards ({flashcardSets.length})
         animate="visible"
       >
         {flashcardSets.map((flashcardSet, index) => {
+          const isGenerating = flashcardSet.metadata?.isGenerating || false
+          const generationProgress = flashcardSet.metadata?.generationProgress || 0
+
           return (
             <motion.div
               key={flashcardSet.id}
@@ -1398,26 +1386,42 @@ Generated flashcards ({flashcardSets.length})
                   }
                 }
               }}
-              whileHover={!prefersReducedMotion ? {
+              whileHover={!prefersReducedMotion && !isGenerating ? {
                 y: -1,
                 scale: 1.01,
                 transition: { duration: 0.15 }
               } : undefined}
-              whileTap={!prefersReducedMotion ? {
+              whileTap={!prefersReducedMotion && !isGenerating ? {
                 scale: 0.98,
                 transition: { duration: 0.08 }
               } : undefined}
-              className="group p-3 rounded-lg border transition-all duration-200 cursor-pointer hover:shadow-md hover:shadow-black/5 bg-background/50 hover:bg-background/80 border-green-200 dark:border-green-800"
-              onClick={() => openViewer(flashcardSet)}
+              className={cn(
+                "group p-3 rounded-lg border transition-all duration-200",
+                isGenerating
+                  ? "bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800"
+                  : "cursor-pointer hover:shadow-md hover:shadow-black/5 bg-background/50 hover:bg-background/80 border-green-200 dark:border-green-800"
+              )}
+              onClick={() => !isGenerating && openViewer(flashcardSet)}
             >
               <div className="flex items-start gap-3">
                 {/* Flashcard icon */}
                 <motion.div
-                  className="p-1.5 rounded-lg flex-shrink-0 bg-green-50 dark:bg-green-900/20"
-                  whileHover={!prefersReducedMotion ? { scale: 1.05, rotate: 1 } : undefined}
+                  className={cn(
+                    "p-1.5 rounded-lg flex-shrink-0",
+                    isGenerating
+                      ? "bg-blue-50 dark:bg-blue-900/20"
+                      : "bg-green-50 dark:bg-green-900/20"
+                  )}
+                  whileHover={!prefersReducedMotion && !isGenerating ? { scale: 1.05, rotate: 1 } : undefined}
                   transition={{ duration: 0.2 }}
+                  animate={isGenerating ? { rotate: [0, 360] } : undefined}
+                  transition={isGenerating ? { duration: 2, repeat: Infinity, ease: "linear" } : { duration: 0.2 }}
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-green-700 dark:text-green-300" />
+                  {isGenerating ? (
+                    <Loader2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                  ) : (
+                    <Sparkles className="w-3.5 h-3.5 text-green-700 dark:text-green-300" />
+                  )}
                 </motion.div>
 
                 <div className="flex-1 min-w-0">
@@ -1460,12 +1464,29 @@ Generated flashcards ({flashcardSets.length})
 
                   {/* Flashcard info */}
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {new Date(flashcardSet.createdAt).toLocaleDateString()}
-                    </span>
-                    <span>{flashcardSet.cards.length} cards</span>
-                    <span className="capitalize">{flashcardSet.options.difficulty || 'medium'}</span>
+                    {isGenerating ? (
+                      <>
+                        <span className="text-blue-600 dark:text-blue-400 font-medium">Generating...</span>
+                        <span className="flex items-center gap-1">
+                          <div className="w-16 h-1 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-blue-600 dark:bg-blue-400 transition-all duration-300 rounded-full"
+                              style={{ width: `${generationProgress}%` }}
+                            />
+                          </div>
+                          <span className="text-xs">{Math.round(generationProgress)}%</span>
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {new Date(flashcardSet.createdAt).toLocaleDateString()}
+                        </span>
+                        <span>{flashcardSet.cards.length} cards</span>
+                        <span className="capitalize">{flashcardSet.options.difficulty || 'medium'}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

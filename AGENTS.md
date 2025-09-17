@@ -1,36 +1,42 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
-- `src/app` contains App Router routes and API handlers (`src/app/api/**`); keep segments kebab-case with colocated loading/error UI.
-- `src/components` supplies reusable UI, while `src/lib`, `src/hooks`, and `src/types` hold chat logic, Supabase utilities, and shared types; styles live in `src/styles`, assets in `public`, docs in `docs/`.
+## Project Structure & Key Files
+- `src/app` holds App Router routes plus `src/app/api/**`; keep segments kebab-case with colocated loading/error UI.
+- Reusable UI in `src/components` (PascalCase); chat and study logic in `src/lib/chat-store.ts`, `src/lib/smart-context.ts`, and `src/lib/study-tools-store.ts`.
+- Shared hooks, types, and styles in `src/hooks`, `src/types`, and `src/styles`; assets in `public`; long-form docs in `docs/`.
+
+## Tech Stack & Architecture
+- Frontend: Next.js 15, TypeScript, Tailwind CSS, Radix UI, Framer Motion.
+- Backend: Next.js API routes stream via Server-Sent Events through the Vercel AI SDK to Gemini models.
+- Data: Supabase Postgres with Row Level Security, Supabase Storage, and Zustand plus Dexie for persistence.
+- AI: Gemini Flash, Lite, and Pro with smart chunking and model selection defined in `src/lib`.
+
+## UI/UX Guardrails
+- Protect the desktop-first layout, teal and amber system, streaming chat feel, and shortcuts (Enter, Shift+Enter, Cmd/Ctrl+K).
+- Stick to Tailwind utility patterns and Radix primitives; never regress accessibility, responsiveness, or loading states.
+- Coordinate UI changes with design references and avoid bespoke CSS or heavy motion unless approved.
 
 ## Build, Test, and Development Commands
-- `pnpm dev` serves `http://localhost:3000`; `pnpm dev:turbo` switches to Turbopack.
-- `pnpm build` + `pnpm start` mimic production; `pnpm build:analyze` adds bundle metrics.
-- `pnpm lint` enforces the Next.js + ESLint config, and `pnpm typecheck` runs strict TypeScript with no emit.
+- `pnpm dev` or `pnpm dev:turbo` serves http://localhost:3000.
+- `pnpm build && pnpm start` mimic production; `pnpm build:analyze` inspects bundles.
+- `pnpm lint` plus `pnpm typecheck` enforce formatting and strict types.
 
-## Coding Style & Naming Conventions
-- TypeScript strict mode, functional React components, and PascalCase filenames in `src/components` (e.g., `DocumentPanel.tsx`).
-- CamelCase utilities/hooks (`useChatStore.ts`); rely on Tailwind classes rather than nested CSS and keep class lists readable.
-- Run `pnpm lint` before pushing; formatting is handled there, so no extra Prettier step.
+## Coding Style & Naming
+- Build functional React with strict TypeScript; memoize only when profiling proves value.
+- Components stay PascalCase (`DocumentPanel.tsx`); utilities and hooks are camelCase (`useChatStore.ts`).
+- Prefer Tailwind utilities and tidy class lists; linting controls formatting without a separate Prettier run.
 
-## Testing Guidelines
-- Use `pnpm lint && pnpm typecheck` as the minimum pre-review gate.
-- When touching `/api/chat/**`, execute `testDocumentChatEndpoint()` from `src/app/api/chat/document/test.ts` in a browser console or Node REPL to confirm streaming paths.
-- Manually exercise affected UI, ensuring clean console/network output plus intact keyboard shortcuts and loading states.
+## Testing & Validation
+- Baseline: `pnpm lint && pnpm typecheck` with zero warnings.
+- For `/api/chat/**` changes run `testDocumentChatEndpoint()` from `src/app/api/chat/document/test.ts`.
+- Manually retest chat streaming, study tools, exports, and shortcuts; keep console and network clean.
 
-## Workflow Expectations
-- Start with deep analysis, list impacted files, and capture a TodoWrite plan before editing.
-- Prior to any feature or UI/UX change, consult Context7 MCP for the latest Next.js, Tailwind, Gemini, Supabase, or library docs and align the approach accordingly.
-- Apply the CLAUDE risk checklist (UI, chat, database, API, workflows, dependencies) and iterate the plan until every item is satisfied.
-- Implement in small increments; after coding, rerun lint/typecheck and replay impacted flows with Playwright MCP.
+## Workflow & Risk Controls
+- Begin with deep analysis, list impacted files, and capture a TodoWrite plan.
+- Apply the CLAUDE checklist across UI, chat, database, API, workflows, and dependencies.
+- Deliver in tight increments, validating each step so no stale UI or UX ships.
 
-## MCP Tooling
-- `Context7 MCP`: Required for documentation research, UI/UX validation, and verifying API usage before implementation.
-- `Playwright MCP`: Run targeted journeys, accessibility shortcuts, and responsive checks after changes; capture evidence for reviewers when useful.
-- `Supabase MCP`: Inspect schemas, validate policies, and confirm storage behaviour whenever persistence is involved.
-
-## Commit & Pull Request Guidelines
-- Mirror the local history with concise, imperative commits (`feat: add documents panel`, `Fix documents slider`) and keep changes atomic.
-- PRs must summarize the work, list executed commands and manual scenarios, link issues/specs, and include screenshots or GIFs for UI updates.
-- Confirm lint, typecheck, required MCP runs, and any targeted tests before requesting review.
+## Commit & Pull Request Guidelines (Only When user asks)
+- Use concise imperative commits (`feat: enhance study guide flow`, `fix: stabilize chat streaming guard`).
+- PRs summarize scope, commands run, manual checks, linked specs or issues, and UI evidence.
+- Confirm lint, typecheck, and relevant manual flows before requesting review.

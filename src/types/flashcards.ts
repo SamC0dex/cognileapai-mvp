@@ -31,6 +31,8 @@ export interface FlashcardSet {
     generationTime: number
     model: string
     sourceContentLength: number
+    isGenerating?: boolean
+    generationProgress?: number
   }
 }
 

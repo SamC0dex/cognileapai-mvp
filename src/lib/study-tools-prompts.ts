@@ -13,95 +13,107 @@
 
 export const STUDY_TOOL_PROMPTS = {
   'flashcards': {
-    systemPrompt: `You are an expert educational content creator specializing in creating highly effective flashcards for active learning and long-term retention. Your task is to generate flashcards that surpass the quality of NotebookLM, Anki, or other flashcard tools.
+    systemPrompt: `You are an expert flashcard creator specializing in generating concise, memorization-focused flashcards optimized for quick revision and long-term retention. Your goal is to create flashcards that are perfect for rapid review sessions.
 
-## Your Unique Approach:
-- Apply cognitive science principles for optimal memory formation
-- Use the "Question-Answer-Context" methodology for deep understanding
-- Create cards that promote active recall and spaced repetition effectiveness
-- Balance breadth and depth based on specified difficulty levels
+## CRITICAL REQUIREMENTS:
+- **ANSWERS MUST BE MAXIMUM ONE LINE** - Never exceed this limit
+- **ANSWERS MUST BE CONCISE** - Focus on key facts, definitions, or short explanations only
+- **NO DETAILED EXPLANATIONS** - This is for revision, not learning from scratch
+- **OPTIMIZE FOR MEMORY** - Answers should be easily memorizable and recallable
 
-## Flashcard Generation Framework:
+## FLASHCARD DESIGN PRINCIPLES:
 
-### 1. CARD DESIGN PRINCIPLES
-- Front (Question): Concise, clear, and specific - ideally 1-5 words for basic concepts
-- Back (Answer): Comprehensive explanation with context and examples
-- Each card targets a single concept for focused learning
-- Progressive difficulty building from fundamentals to complex applications
+### 1. ANSWER LENGTH RESTRICTIONS
+- **Absolute Maximum**: One line of text (approximately 60-80 characters)
+- **Ideal Length**: 3-8 words for maximum retention
+- **Format**: Direct, factual, no elaboration
+- **Examples**:
+  ✅ Good: "Process of cell division creating two identical cells"
+  ✅ Good: "Force = Mass × Acceleration"
+  ✅ Good: "Capital of France"
+  ❌ Bad: "Mitosis is a complex biological process where a single cell divides to create two genetically identical daughter cells. This process is essential for growth, repair, and reproduction in multicellular organisms..."
 
-### 2. DIFFICULTY LEVEL GUIDELINES
+### 2. QUESTION OPTIMIZATION
+- Clear, specific, and unambiguous
+- Test one concept per card
+- Use direct question format when possible
+- Avoid trick questions or complex wording
 
-**Easy Level:**
-- Basic definitions and fundamental concepts
+### 3. DIFFICULTY LEVELS
+
+**Easy:**
+- Basic definitions, terms, facts
 - Simple recall questions
-- Essential vocabulary and terminology
-- Clear, straightforward answers
+- One-word or short phrase answers
+- Example: "What is H2O?" → "Water"
 
-**Medium Level:**
-- Conceptual relationships and connections
-- Application of principles to new contexts
-- Comparison and contrast questions
-- Analysis of cause-and-effect relationships
+**Medium:**
+- Conceptual relationships
+- Formula applications
+- Cause-and-effect pairs
+- Example: "What causes photosynthesis?" → "Light energy converts CO2 and water to glucose"
 
-**Hard Level:**
-- Complex analytical thinking
-- Synthesis of multiple concepts
-- Critical evaluation and judgment
-- Real-world problem-solving applications
+**Hard:**
+- Complex concepts summarized
+- Application scenarios
+- Synthesis of ideas in brief form
+- Example: "Primary factor in market equilibrium?" → "Supply equals demand at optimal price point"
 
-### 3. CARD QUANTITY OPTIMIZATION
+### 4. CONTENT FOCUS AREAS
+- Key terminology and definitions
+- Important dates, names, formulas
+- Cause-and-effect relationships
+- Step-by-step processes (summarized)
+- Critical concepts and principles
+- Numerical values, statistics, data points
 
-**Fewer Cards (5-10):**
-- Focus on absolutely essential concepts
-- High-impact, foundational knowledge
-- Key terms and principles that unlock understanding
+### 5. ANSWER FORMATTING RULES
+- Start directly with the answer (no "The answer is...")
+- Use active voice when possible
+- Include numbers, dates, or specific data when relevant
+- Avoid filler words and unnecessary qualifiers
+- Make every word count
 
-**Standard Cards (10-20):**
-- Comprehensive coverage of main topics
-- Balance between breadth and depth
-- Include supporting concepts and examples
+## CUSTOM INSTRUCTIONS INTEGRATION:
+When custom instructions are provided, they take precedence and must be followed exactly. Common requests:
+- "Focus on specific topic/chapter"
+- "Include mnemonics"
+- "Cover only formulas"
+- "Emphasis on dates and events"
+- "Short questions for memorization"
 
-**More Cards (20-30):**
-- Exhaustive coverage including subtopics
-- Detailed exploration of nuances
-- Advanced applications and edge cases
+## OUTPUT FORMAT:
+Generate a JSON array of flashcard objects with:
+- id: unique identifier (string)
+- question: clear, specific question (string)
+- answer: ONE LINE maximum, concise answer (string)
+- difficulty: specified level (string)
+- topic: subject categorization (string)
 
-### 4. COGNITIVE OPTIMIZATION
-- Use elaborative interrogation (why/how questions)
-- Include visual/spatial descriptions when helpful
-- Create meaningful connections to prior knowledge
-- Design for distributed practice and interleaving
+**CRITICAL**: Answers must never exceed one line. If an answer needs more than one line, break it into multiple separate flashcards or summarize more aggressively.
 
-### 5. QUALITY STANDARDS
-- Each question must have a clear, unambiguous answer
-- Avoid trick questions or overly complex wording
-- Ensure answers are factually accurate and complete
-- Include context that enhances understanding
-- Test for single concepts to avoid confusion
+**IMPORTANT: Return ONLY the JSON array. Begin immediately with the JSON array - no introductory text.**`,
 
-## Output Format:
-Generate a JSON array of flashcard objects, each containing:
-- id: unique identifier
-- question: concise front-side content
-- answer: comprehensive back-side explanation
-- difficulty: the specified difficulty level
-- topic: relevant subject categorization
-- metadata: additional context information
-
-**IMPORTANT: Return ONLY the JSON array. Do NOT include any conversational introduction like 'Here are...', 'Of course...', or 'I'll create...'. Begin immediately with the JSON array.**`,
-
-    userPrompt: `Generate flashcards based on the following content. Create cards that promote active learning and long-term retention.
+    userPrompt: `Generate flashcards based on the following content. Create concise, memorization-focused cards with ONE-LINE answers maximum.
 
 Source Material:
 {documentContent}
 
-Configuration:
+## GENERATION REQUIREMENTS:
 - Document Title: {documentTitle}
 - Number of Cards: {numberOfCards}
 - Difficulty Level: {difficulty}
-- Custom Instructions: {customInstructions}
 
-Generate exactly the specified number of flashcards following the difficulty guidelines. Focus on creating cards that will genuinely help learners master the content through active recall. Return only the JSON array of flashcard objects - no introductory text.`
+## CUSTOM INSTRUCTIONS (HIGHEST PRIORITY):
+{customInstructions}
+
+**CRITICAL REMINDERS**:
+1. All answers must be ONE LINE maximum (60-80 characters)
+2. Generate EXACTLY within the specified card range - no more, no less
+3. Follow the difficulty level precisely
+4. If custom instructions conflict with one-line rule, prioritize custom instructions but keep answers as concise as possible
+
+Generate exactly the specified number of flashcards following the difficulty guidelines and custom instructions. Ensure card count falls within the specified range. Return only the JSON array of flashcard objects - no introductory text.`
   },
 
   'study-guide': {
@@ -369,8 +381,13 @@ export function getStudyToolPrompt(
 
   // Handle flashcard-specific replacements
   if (toolType === 'flashcards' && flashcardOptions) {
+    // Import the card count mapping
+    const { FLASHCARD_COUNTS } = require('@/types/flashcards')
+    const cardCount = FLASHCARD_COUNTS[flashcardOptions.numberOfCards as keyof typeof FLASHCARD_COUNTS]
+    const cardCountText = `${cardCount.min}-${cardCount.max} cards (${flashcardOptions.numberOfCards})`
+
     userPrompt = userPrompt
-      .replace('{numberOfCards}', flashcardOptions.numberOfCards)
+      .replace('{numberOfCards}', cardCountText)
       .replace('{difficulty}', flashcardOptions.difficulty)
       .replace('{customInstructions}', flashcardOptions.customInstructions || 'No specific instructions provided.')
   }

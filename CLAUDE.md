@@ -185,6 +185,8 @@ pnpm typecheck    # Run TypeScript type checking without compilation
 ```
 Both commands should pass before considering any implementation complete.
 
+**Note**: This project currently uses manual testing via MCP tools (Playwright, Browser Tools) rather than automated test suites. All testing is performed through the mandatory Quality Assurance workflow outlined above.
+
 ## Architecture
 
 ### Tech Stack
@@ -248,6 +250,9 @@ src/
 │   ├── study-tools/      # AI-powered study tools system
 │   │   ├── study-tools-panel.tsx  # Expandable tools panel
 │   │   ├── study-tools-canvas.tsx # Content viewer/editor
+│   │   ├── flashcard-viewer.tsx   # Interactive flashcard viewer
+│   │   ├── flashcard-customization-dialog.tsx # Flashcard settings
+│   │   ├── study-tools-confirmation-dialog.tsx # Generation confirmation
 │   │   └── index.ts              # Study tools exports
 │   ├── documents-panel.tsx # Document management interface
 │   └── ui.tsx           # Comprehensive UI component library
@@ -309,7 +314,7 @@ Comprehensive AI-powered study materials generation with professional UI/UX:
 - **Study Guide**: Multi-layered learning paths with Foundation → Connections → Applications → Mastery
 - **Smart Summary**: Significance hierarchy with strategic overview and practical implications
 - **Smart Notes**: Active learning methodology with interconnected knowledge networks
-- **Flashcards**: Interactive Q&A cards with flip animations and card count tracking
+- **Flashcards**: Interactive Q&A cards with flip animations, customizable settings, and card count tracking
 
 #### Architecture
 - **StudyToolsPanel** (`study-tools-panel.tsx`) - Collapsible panel with tool selection

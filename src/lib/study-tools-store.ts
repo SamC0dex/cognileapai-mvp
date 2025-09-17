@@ -168,6 +168,30 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
         generatedContent: type !== 'flashcards' ? [placeholderContent, ...state.generatedContent] : state.generatedContent
       }))
 
+      // For flashcards, add placeholder to flashcard store instead
+      if (type === 'flashcards') {
+        const { useFlashcardStore } = require('@/lib/flashcard-store')
+        const placeholderFlashcardSet = {
+          id: placeholderContent.id,
+          title: placeholderContent.title,
+          cards: [],
+          options: flashcardOptions || { numberOfCards: 'standard', difficulty: 'medium' },
+          createdAt: placeholderContent.createdAt,
+          documentId: placeholderContent.documentId,
+          conversationId: placeholderContent.conversationId,
+          metadata: {
+            totalCards: 0,
+            avgDifficulty: 'generating',
+            generationTime: 0,
+            model: 'gemini-2.5-pro',
+            sourceContentLength: 0,
+            isGenerating: true,
+            generationProgress: 0
+          }
+        }
+        useFlashcardStore.getState().addFlashcardSet(placeholderFlashcardSet)
+      }
+
       // Simulate progress updates on the placeholder
       const progressInterval = setInterval(() => {
         set(state => {
@@ -181,6 +205,24 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
             generationProgress: Math.min(state.generationProgress + Math.random() * 15, 90)
           }
         })
+
+        // Also update flashcard placeholder if it's a flashcard generation
+        if (type === 'flashcards') {
+          const { useFlashcardStore } = require('@/lib/flashcard-store')
+          const flashcardStore = useFlashcardStore.getState()
+          const updatedSets = flashcardStore.flashcardSets.map(set =>
+            set.id === placeholderContent.id
+              ? {
+                  ...set,
+                  metadata: {
+                    ...set.metadata,
+                    generationProgress: Math.min((set.metadata.generationProgress || 0) + Math.random() * 15, 90)
+                  }
+                }
+              : set
+          )
+          useFlashcardStore.setState({ flashcardSets: updatedSets })
+        }
       }, 300)
 
       const response = await fetch('/api/study-tools/generate', {
@@ -207,9 +249,8 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
 
       // Handle flashcards specially
       if (type === 'flashcards' && result.cards) {
-        // Import flashcard store and types dynamically to avoid circular deps
+        // Import flashcard store dynamically to avoid circular deps
         const { useFlashcardStore } = await import('@/lib/flashcard-store')
-        const { FlashcardSet } = await import('@/types/flashcards')
 
         // Create flashcard set
         const flashcardSet = {
@@ -229,34 +270,24 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
           }
         }
 
-        // Add to flashcard store
-        useFlashcardStore.getState().addFlashcardSet(flashcardSet)
+        // Replace placeholder with final flashcard set in flashcard store
+        const flashcardStore = useFlashcardStore.getState()
+        const updatedSets = flashcardStore.flashcardSets.map(set =>
+          set.id === placeholderContent.id ? flashcardSet : set
+        )
+        useFlashcardStore.setState({ flashcardSets: updatedSets })
 
-        // Remove any flashcard placeholders from study tools (shouldn't be there anyway)
+        // Mark generation as completed
         set(state => ({
-          generationProgress: 100,
-          generatedContent: state.generatedContent.filter(content =>
-            content.id !== placeholderContent.id && content.type !== 'flashcards'
-          )
+          generationProgress: 100
         }))
 
-        // Brief delay then open in study tools canvas (not separate flashcard viewer)
+        // Brief delay then open flashcard viewer (not canvas)
         setTimeout(() => {
-          console.log('[StudyToolsStore] Opening flashcard in study tools canvas')
+          console.log('[StudyToolsStore] Opening flashcard viewer')
 
-          // Create content for study tools canvas
-          const flashcardContent: StudyToolContent = {
-            id: flashcardSet.id,
-            type: 'flashcards',
-            title: flashcardSet.title,
-            content: JSON.stringify(flashcardSet.cards),
-            createdAt: flashcardSet.createdAt,
-            documentId: flashcardSet.documentId,
-            conversationId: flashcardSet.conversationId
-          }
-
-          // Open in study tools canvas instead of separate viewer
-          get().openCanvas(flashcardContent)
+          // Open in proper flashcard viewer instead of canvas
+          useFlashcardStore.getState().openViewer(flashcardSet)
         }, 500)
 
       } else {
@@ -397,16 +428,16 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
                     id: flashcardTool.id,
                     title: flashcardTool.title,
                     cards: parsedCards,
-                    options: flashcardTool.metadata?.options || { numberOfCards: 'standard', difficulty: 'medium' },
+                    options: { numberOfCards: 'standard', difficulty: 'medium' },
                     createdAt: new Date(flashcardTool.createdAt),
                     documentId: flashcardTool.documentId,
                     conversationId: flashcardTool.conversationId,
                     metadata: {
                       totalCards: parsedCards.length,
-                      avgDifficulty: flashcardTool.metadata?.options?.difficulty || 'medium',
-                      generationTime: flashcardTool.metadata?.generationTime || 0,
-                      model: flashcardTool.metadata?.model || 'gemini-2.5-pro',
-                      sourceContentLength: flashcardTool.metadata?.sourceContentLength || 0
+                      avgDifficulty: 'medium',
+                      generationTime: 0,
+                      model: 'gemini-2.5-pro',
+                      sourceContentLength: 0
                     }
                   }
 
