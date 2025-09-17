@@ -386,7 +386,7 @@ export function getStudyToolPrompt(
  */
 export function generateStudyToolTitle(toolType: StudyToolPromptType, documentTitle: string): string {
   const toolNames = {
-    'flashcards': 'Flashcards',
+    'flashcards': 'Generated flashcards',
     'study-guide': 'Study Guide',
     'smart-summary': 'Smart Summary',
     'smart-notes': 'Smart Notes'

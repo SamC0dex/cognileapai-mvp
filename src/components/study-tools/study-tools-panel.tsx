@@ -1267,27 +1267,20 @@ const FlashcardSetsSection: React.FC = () => {
     setEditingValue(flashcardSet.title)
   }
 
-  const handleSaveRename = (flashcardSetId: string) => {
+  const handleSaveRename = async (flashcardSetId: string) => {
     if (editingValue.trim() && editingValue !== flashcardSets.find(f => f.id === flashcardSetId)?.title) {
-      renameFlashcardSet(flashcardSetId, editingValue.trim())
+      try {
+        await renameFlashcardSet(flashcardSetId, editingValue.trim())
+      } catch (error) {
+        console.error('Failed to rename flashcard set:', error)
+        // The UI feedback was already applied, so we don't need to do anything here
+      }
     }
     setEditingTitle(null)
     setEditingValue('')
   }
 
-  const handleCopyFlashcards = async (flashcardSet: any) => {
-    try {
-      // Convert flashcards to a readable text format
-      const flashcardsText = flashcardSet.cards.map((card: any, index: number) =>
-        `${index + 1}. Q: ${card.question}\n   A: ${card.answer}\n`
-      ).join('\n')
-
-      const fullText = `${flashcardSet.title}\n${'='.repeat(flashcardSet.title.length)}\n\n${flashcardsText}`
-      await navigator.clipboard.writeText(fullText)
-    } catch (error) {
-      console.error('Failed to copy flashcards:', error)
-    }
-  }
+  // handleCopyFlashcards function removed as per user request
 
   const handleDelete = (flashcardSetId: string) => {
     removeFlashcardSet(flashcardSetId)
@@ -1335,19 +1328,7 @@ const FlashcardSetsSection: React.FC = () => {
                   <Edit3 className="w-4 h-4" />
                   Rename
                 </motion.button>
-                <motion.button
-                  whileHover={{ backgroundColor: 'hsl(var(--accent))' }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    e.preventDefault()
-                    handleCopyFlashcards(flashcardSet)
-                    setIsOpen(false)
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left hover:bg-accent"
-                >
-                  <Copy className="w-4 h-4" />
-                  Copy
-                </motion.button>
+                {/* Copy button removed as per user request */}
                 <div className="h-px bg-border my-1" />
                 <motion.button
                   whileHover={{ backgroundColor: 'hsl(var(--destructive) / 0.1)' }}
@@ -1383,7 +1364,7 @@ const FlashcardSetsSection: React.FC = () => {
     >
       <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
         <Sparkles className="w-4 h-4" />
-        Flashcard Sets ({flashcardSets.length})
+Generated flashcards ({flashcardSets.length})
       </h3>
 
       <motion.div
@@ -1448,8 +1429,8 @@ const FlashcardSetsSection: React.FC = () => {
                           value={editingValue}
                           onChange={(e) => setEditingValue(e.target.value)}
                           onBlur={() => handleSaveRename(flashcardSet.id)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleSaveRename(flashcardSet.id)
+                          onKeyDown={async (e) => {
+                            if (e.key === 'Enter') await handleSaveRename(flashcardSet.id)
                             if (e.key === 'Escape') {
                               setEditingTitle(null)
                               setEditingValue('')
@@ -1660,18 +1641,8 @@ export const StudyToolsPanel: React.FC<{
         isGenerating={isGenerating && generatingType === 'flashcards'}
       />
 
-      {/* Fullscreen Flashcard Viewer */}
-      {isViewerOpen && currentFlashcardSet && isFullscreen && (
-        <div className="fixed inset-0 z-50 bg-background">
-          <FlashcardViewer
-            flashcards={currentFlashcardSet.cards}
-            title={currentFlashcardSet.title}
-            onClose={closeViewer}
-            isFullscreen={true}
-            onToggleFullscreen={toggleFullscreen}
-          />
-        </div>
-      )}
+      {/* Fullscreen Flashcard Viewer - This should be rendered at app level, not here */}
+      {/* Removed fullscreen flashcard viewer - it should be handled at a higher level to respect sidebar layout */}
 
     </>
   )

@@ -158,7 +158,7 @@ export const FlashcardViewer: React.FC<FlashcardViewerProps> = ({
   return (
     <div className={cn(
       "flex flex-col bg-background",
-      isFullscreen ? "fixed inset-0 z-50" : "h-full",
+      isFullscreen ? "h-full" : "h-full", // Remove fixed positioning for fullscreen
       className
     )}>
       {/* Header */}
@@ -172,7 +172,7 @@ export const FlashcardViewer: React.FC<FlashcardViewerProps> = ({
               {title}
             </h1>
             <p className="text-xs text-muted-foreground">
-              Based on {flashcards.length} sources
+              {flashcards.length} flashcards
             </p>
           </div>
         </div>
@@ -208,7 +208,7 @@ export const FlashcardViewer: React.FC<FlashcardViewerProps> = ({
       {/* Card Area */}
       <div className={cn(
         "flex-1 flex items-center justify-center relative overflow-hidden",
-        isFullscreen ? "p-12 bg-gradient-to-br from-background via-background to-muted/20" : "p-4"
+        isFullscreen ? "py-4 px-8" : "p-4" // Reduced vertical padding for fullscreen
       )}>
         {/* Background Cards (for depth effect) */}
         <div className="absolute inset-0 flex items-center justify-center">
@@ -217,7 +217,7 @@ export const FlashcardViewer: React.FC<FlashcardViewerProps> = ({
             <motion.div
               className={cn(
                 "absolute bg-card border border-border rounded-2xl shadow-lg opacity-20 scale-95 rotate-2",
-                isFullscreen ? "w-[28rem] h-[36rem]" : "w-72 h-[24.96rem]"
+                isFullscreen ? "w-80 h-[32rem]" : "w-72 h-[24.96rem]"
               )}
               style={{ zIndex: 1 }}
             />
@@ -228,7 +228,7 @@ export const FlashcardViewer: React.FC<FlashcardViewerProps> = ({
         <motion.div
           className={cn(
             "relative",
-            isFullscreen ? "w-[28rem] h-[36rem]" : "w-72 h-[24.96rem]"
+            isFullscreen ? "w-96 h-[36rem]" : "w-72 h-[24.96rem]" // Better proportions for fullscreen
           )}
           style={{ zIndex: 10 }}
           animate={{
@@ -262,11 +262,11 @@ export const FlashcardViewer: React.FC<FlashcardViewerProps> = ({
                 style={{ transformStyle: 'preserve-3d' }}
               >
                 <div className={cn(
-                  "w-full h-full rounded-2xl border-2 flex flex-col justify-center items-center text-center shadow-2xl",
-                  "bg-gradient-to-br from-background to-background/95 backdrop-blur-sm",
+                  "w-full h-full rounded-2xl border-2 flex flex-col justify-center items-center text-center shadow-xl",
+                  "bg-gradient-to-br from-background to-background/95",
                   "border-border hover:border-primary/30 transition-all duration-300",
                   showAnswer && "border-green-200 dark:border-green-800 bg-gradient-to-br from-green-50/50 to-background dark:from-green-900/20",
-                  isFullscreen ? "p-12" : "p-8" // More padding in fullscreen
+                  isFullscreen ? "p-8" : "p-6" // Balanced padding
                 )}>
                   {!showAnswer ? (
                     /* Question Side */
@@ -279,7 +279,7 @@ export const FlashcardViewer: React.FC<FlashcardViewerProps> = ({
                       >
                         <h2 className={cn(
                           "font-medium text-foreground leading-relaxed max-w-full break-words text-center",
-                          isFullscreen ? "text-2xl" : "text-lg" // Larger text in fullscreen
+                          isFullscreen ? "text-xl" : "text-lg" // Reasonable text size
                         )}>
                           {currentCard.question}
                         </h2>
@@ -398,75 +398,51 @@ export const FlashcardViewer: React.FC<FlashcardViewerProps> = ({
       {/* Bottom Controls */}
       <div className={cn(
         "border-t border-border bg-background/95 backdrop-blur-sm",
-        isFullscreen ? "p-6" : "p-3" // More padding in fullscreen
+        isFullscreen ? "px-8 py-3" : "p-3" // Reduced vertical padding for fullscreen
       )}>
-        {/* Content Feedback Buttons - Only in fullscreen */}
-        {isFullscreen && (
-          <div className="flex items-center justify-center gap-6 mb-6">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="flex items-center gap-2 px-6 py-3 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors"
-            >
-              <motion.div
-                animate={{ rotate: [0, 10, -10, 0] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
-                👍
-              </motion.div>
-              <span className="font-medium">Good content</span>
-            </motion.button>
 
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="flex items-center gap-2 px-6 py-3 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
-            >
-              <motion.div
-                animate={{ rotate: [0, -10, 10, 0] }}
-                transition={{ duration: 2, repeat: Infinity, delay: 1 }}
-              >
-                👎
-              </motion.div>
-              <span className="font-medium">Bad content</span>
-            </motion.button>
-          </div>
-        )}
+        {/* Content Feedback Buttons - REMOVED as per user request */}
 
+        {/* Card Counter */}
         <div className={cn(
-          "flex items-center justify-between",
-          isFullscreen ? "mb-6" : "mb-3"
+          "flex items-center justify-center",
+          isFullscreen ? "mb-2" : "mb-1.5" // Reduced by 50%
         )}>
+          <span className={cn(
+            "font-medium text-foreground",
+            isFullscreen ? "text-base" : "text-xs"
+          )}>
+            {currentIndex + 1} / {flashcards.length} cards
+          </span>
+        </div>
+
+        {/* Progress Bar with Restart Button on the left */}
+        <div className={cn(
+          "flex items-center gap-3",
+          isFullscreen ? "justify-center" : "justify-start"
+        )}>
+          {/* Restart button to the left of progress bar */}
           <Button
             variant="outline"
             size="sm"
             onClick={restart}
-            className="flex items-center gap-2 hover:bg-accent"
+            className="flex items-center gap-2 hover:bg-accent flex-shrink-0"
           >
             <RotateCcw className={cn(isFullscreen ? "w-4 h-4" : "w-3 h-3")} />
           </Button>
 
-          <span className={cn(
-            "font-medium text-foreground",
-            isFullscreen ? "text-base" : "text-xs" // Larger text in fullscreen
+          {/* Progress Bar */}
+          <div className={cn(
+            "bg-muted rounded-full overflow-hidden",
+            isFullscreen ? "w-96 h-3" : "w-full h-1.5"
           )}>
-            {currentIndex + 1} / {flashcards.length} cards
-          </span>
-
-          <div className="w-8" /> {/* Spacer for centering */}
-        </div>
-
-        {/* Progress Bar */}
-        <div className={cn(
-          "w-full bg-muted rounded-full overflow-hidden",
-          isFullscreen ? "h-3" : "h-1.5" // Thicker in fullscreen
-        )}>
-          <motion.div
-            className="h-full bg-gradient-to-r from-green-500 to-green-600 rounded-full"
-            initial={{ width: 0 }}
-            animate={{ width: `${progress}%` }}
-            transition={{ duration: 0.3, ease: 'easeOut' }}
-          />
+            <motion.div
+              className="h-full bg-gradient-to-r from-green-500 to-green-600 rounded-full"
+              initial={{ width: 0 }}
+              animate={{ width: `${progress}%` }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
+            />
+          </div>
         </div>
       </div>
     </div>

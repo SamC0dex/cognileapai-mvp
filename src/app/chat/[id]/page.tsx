@@ -7,6 +7,7 @@ import { DashboardLayout } from '@/components/dashboard-layout'
 import { ChatContainer } from '@/components/chat/chat-container'
 import { ChatHistoryDrawer } from '@/components/chat-history-drawer'
 import { createThreadId, upsertThread, type ChatThread } from '@/lib/chat-history'
+import { useFlashcardStore } from '@/lib/flashcard-store'
 import type { GeminiModelKey } from '@/lib/ai-config'
 
 interface ChatPageProps {
@@ -25,6 +26,8 @@ export default function ChatPage({ params }: ChatPageProps) {
   const [documentId, setDocumentId] = useState<string | undefined>(undefined)
   const [chatType, setChatType] = useState<'course' | 'lesson' | 'document' | null>(null)
   const [isInitialized, setIsInitialized] = useState(false)
+  const { isViewerOpen, isFullscreen } = useFlashcardStore()
+  const isFlashcardFullscreen = isViewerOpen && isFullscreen
 
   // Sanitize potentially unsafe titles from URL
   const sanitizeTitle = useCallback((raw: string): string => {
@@ -154,8 +157,9 @@ export default function ChatPage({ params }: ChatPageProps) {
   return (
     <DashboardLayout>
       <div className="h-full min-h-0 flex flex-col bg-background">
-        {/* Header */}
-        <div className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex-shrink-0">
+        {/* Header - Hidden in flashcard fullscreen mode */}
+        {!isFlashcardFullscreen && (
+          <div className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex-shrink-0">
           <div className="px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
@@ -234,6 +238,7 @@ export default function ChatPage({ params }: ChatPageProps) {
             </div>
           </div>
         </div>
+        )}
 
         {/* Main Chat Area */}
         <div className="flex-1 min-h-0">

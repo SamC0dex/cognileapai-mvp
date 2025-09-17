@@ -30,7 +30,7 @@ interface FlashcardStore {
   // Flashcard set management
   addFlashcardSet: (flashcardSet: FlashcardSet) => void
   removeFlashcardSet: (id: string) => void
-  renameFlashcardSet: (id: string, newTitle: string) => void
+  renameFlashcardSet: (id: string, newTitle: string) => Promise<void>
   clearFlashcardSets: () => void
   deduplicateFlashcardSets: () => void
 
@@ -233,13 +233,58 @@ export const useFlashcardStore = create<FlashcardStore>()(
         }))
       },
 
-      renameFlashcardSet: (id: string, newTitle: string) => {
+      renameFlashcardSet: async (id: string, newTitle: string) => {
         console.log('[FlashcardStore] Renaming flashcard set:', id, 'to:', newTitle)
+
+        // Update locally first for immediate UI feedback
         set(state => ({
           flashcardSets: state.flashcardSets.map(set =>
             set.id === id ? { ...set, title: newTitle } : set
           )
         }))
+
+        // Sync with database
+        try {
+          // First, let's see what flashcard set we're trying to rename
+          const currentSet = get().flashcardSets.find(set => set.id === id)
+          console.log('[FlashcardStore] Attempting to sync rename to database:', {
+            id,
+            title: newTitle,
+            currentSet: currentSet ? {
+              id: currentSet.id,
+              title: currentSet.title,
+              createdAt: currentSet.createdAt,
+              documentId: currentSet.documentId,
+              conversationId: currentSet.conversationId
+            } : null
+          })
+
+          const response = await fetch('/api/study-tools/update', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              id,
+              title: newTitle
+            })
+          })
+
+          console.log('[FlashcardStore] API response status:', response.status)
+
+          if (!response.ok) {
+            const errorText = await response.text()
+            console.error('[FlashcardStore] API error response:', errorText)
+            throw new Error(`Failed to update in database: ${response.status} - ${errorText}`)
+          }
+
+          const result = await response.json()
+          console.log('[FlashcardStore] Successfully synced rename to database:', result)
+        } catch (error) {
+          console.error('[FlashcardStore] Failed to sync rename to database:', error)
+          // Note: We don't revert the local change since the user expects immediate feedback
+          // The change will persist in localStorage and the user can try again
+        }
       },
 
       clearFlashcardSets: () => {

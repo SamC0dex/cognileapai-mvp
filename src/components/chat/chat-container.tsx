@@ -13,6 +13,8 @@ import type { Citation } from './types'
 import { createClient } from '@supabase/supabase-js'
 import { useDocuments } from '@/contexts/documents-context'
 import { StudyToolsPanel, useStudyToolsStore } from '@/components/study-tools'
+import { FlashcardViewer } from '@/components/study-tools/flashcard-viewer'
+import { useFlashcardStore } from '@/lib/flashcard-store'
 import { motion, useReducedMotion } from 'framer-motion'
 
 // Enhanced chat area width variants for coordinated layout
@@ -74,6 +76,7 @@ export const ChatContainer: React.FC<{
 }) => {
   const { selectedDocuments, primaryDocument, removeSelectedDocument, updateDocumentStatus } = useDocuments()
   const { isPanelExpanded, isCanvasOpen } = useStudyToolsStore()
+  const { isViewerOpen, currentFlashcardSet, isFullscreen, closeViewer, toggleFullscreen } = useFlashcardStore()
   const prefersReducedMotion = useReducedMotion()
 
   // Use primary selected document if no URL document is provided
@@ -358,6 +361,19 @@ export const ChatContainer: React.FC<{
           onRemoveDocument={handleRemoveDocument}
         />
       </motion.div>
+
+      {/* Fullscreen Flashcard Viewer - Rendered at this level to respect sidebar layout */}
+      {isViewerOpen && currentFlashcardSet && isFullscreen && (
+        <div className="absolute inset-0 bg-background z-40">
+          <FlashcardViewer
+            flashcards={currentFlashcardSet.cards}
+            title={currentFlashcardSet.title}
+            onClose={closeViewer}
+            isFullscreen={true}
+            onToggleFullscreen={toggleFullscreen}
+          />
+        </div>
+      )}
     </div>
   )
 })

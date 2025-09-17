@@ -309,7 +309,7 @@ Comprehensive AI-powered study materials generation with professional UI/UX:
 - **Study Guide**: Multi-layered learning paths with Foundation → Connections → Applications → Mastery
 - **Smart Summary**: Significance hierarchy with strategic overview and practical implications
 - **Smart Notes**: Active learning methodology with interconnected knowledge networks
-- **Flashcards**: Interactive Q&A cards (coming soon)
+- **Flashcards**: Interactive Q&A cards with flip animations and card count tracking
 
 #### Architecture
 - **StudyToolsPanel** (`study-tools-panel.tsx`) - Collapsible panel with tool selection
