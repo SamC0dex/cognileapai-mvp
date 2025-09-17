@@ -1,4 +1,4 @@
-export interface ChatMessage {
+export interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
@@ -11,6 +11,8 @@ export interface ChatMessage {
     temperature?: number
   }
 }
+
+export interface ChatMessage extends Message {}
 
 export interface Citation {
   id: string

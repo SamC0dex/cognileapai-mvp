@@ -748,7 +748,7 @@ const ExpandedPanel: React.FC<{
         setTimeout(() => setIsCopied(false), 2000)
       } else {
         // Fallback using navigator.clipboard
-        await navigator.clipboard.writeText(cleanedContent)
+        await navigator.clipboard.writeText(canvasContent.content)
         setIsCopied(true)
         setTimeout(() => setIsCopied(false), 2000)
       }
@@ -756,7 +756,7 @@ const ExpandedPanel: React.FC<{
       console.error('Copy failed:', error)
       // Try fallback method
       try {
-        await navigator.clipboard.writeText(cleanedContent)
+        await navigator.clipboard.writeText(canvasContent.content)
         setIsCopied(true)
         setTimeout(() => setIsCopied(false), 2000)
       } catch (fallbackError) {
@@ -1414,7 +1414,6 @@ const FlashcardSetsSection: React.FC = () => {
                       : "bg-green-50 dark:bg-green-900/20"
                   )}
                   whileHover={!prefersReducedMotion && !isGenerating ? { scale: 1.05, rotate: 1 } : undefined}
-                  transition={{ duration: 0.2 }}
                   animate={isGenerating ? { rotate: [0, 360] } : undefined}
                   transition={isGenerating ? { duration: 2, repeat: Infinity, ease: "linear" } : { duration: 0.2 }}
                 >

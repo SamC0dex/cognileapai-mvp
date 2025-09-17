@@ -408,25 +408,26 @@ const LoadingSpinner = ({ className, ...props }: React.HTMLAttributes<HTMLDivEle
 )
 
 // Enhanced Animation Components
-const FadeIn = ({ children, delay = 0, ...props }: { 
+const FadeIn = ({ children, delay = 0, className, ...props }: {
   children: React.ReactNode
   delay?: number
-} & React.HTMLAttributes<HTMLDivElement>) => (
+} & Omit<React.HTMLAttributes<HTMLDivElement>, 'onAnimationStart' | 'onDrag' | 'onDragEnd' | 'onDragStart'>) => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.3, delay }}
+    className={className}
     {...props}
   >
     {children}
   </motion.div>
 )
 
-const SlideIn = ({ children, direction = 'left', delay = 0, ...props }: {
+const SlideIn = ({ children, direction = 'left', delay = 0, className, ...props }: {
   children: React.ReactNode
   direction?: 'left' | 'right' | 'up' | 'down'
   delay?: number
-} & React.HTMLAttributes<HTMLDivElement>) => {
+} & Omit<React.HTMLAttributes<HTMLDivElement>, 'onAnimationStart' | 'onDrag' | 'onDragEnd' | 'onDragStart'>) => {
   const directions = {
     left: { x: -20 },
     right: { x: 20 },
@@ -439,6 +440,7 @@ const SlideIn = ({ children, direction = 'left', delay = 0, ...props }: {
       initial={{ opacity: 0, ...directions[direction] }}
       animate={{ opacity: 1, x: 0, y: 0 }}
       transition={{ duration: 0.3, delay }}
+      className={className}
       {...props}
     >
       {children}

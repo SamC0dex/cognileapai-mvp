@@ -12,7 +12,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-const embeddingModel = openai.textEmbedding('text-embedding-3-small')
+const embeddingModel = openai.textEmbeddingModel('text-embedding-3-small')
 
 export interface RetrievedChunk {
   id: string
@@ -75,7 +75,7 @@ export async function retrieveRelevantContext(
 
     // Step 2: Generate query embedding
     const { embedding: queryEmbedding } = await embed({
-      model: embeddingModel,
+      model: embeddingModel as any,
       value: query
     })
 

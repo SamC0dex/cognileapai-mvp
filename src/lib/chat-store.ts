@@ -232,7 +232,7 @@ export function useChatStore(): StoreShape {
       const id = `u_${Date.now()}`
       user = { id, role: 'user', content, timestamp: new Date() }
       // Instantly show user message (optimistic UI)
-      setMessages(prev => [...prev, user])
+      setMessages(prev => [...prev, user!])
     }
 
     // Immediately add assistant placeholder for streaming

@@ -1,21 +1,22 @@
 # CogniLeapAI MVP
 
-🧠 **Transform PDFs into AI-powered study materials with intelligent chat**
+🧠 **Transform PDFs into AI-powered study materials with intelligent chat and FREE semantic search**
 
-A desktop-first web application that processes PDFs and generates comprehensive study materials including study guides, summaries, and smart notes. Features a complete chat system with streaming AI responses, document context integration, and persistent conversation storage.
+A desktop-first web application that processes PDFs and generates comprehensive study materials including study guides, summaries, smart notes, and interactive flashcards. Features a complete chat system with streaming AI responses, enterprise-grade RAG with FREE semantic search, document context integration, and persistent conversation storage.
 
 ## ✨ Features
 
 ### 📄 Document Processing
 - **PDF Upload & Processing** - Upload text-selectable PDFs with intelligent content extraction
 - **Smart Outline Detection** - Automatically detects document structure and hierarchical sections
+- **Enterprise RAG System** - FREE semantic search using Transformers.js (no API costs) + keyword hybrid search
 - **Document Context Integration** - Chat responses use relevant document sections for accurate context
 
 ### 🤖 AI-Powered Study Tools
 - **Study Guide Generation** - Multi-layered learning paths (Foundation → Connections → Applications → Mastery)
 - **Smart Summary** - Significance hierarchy with strategic overview and practical implications
 - **Smart Notes** - Active learning methodology with interconnected knowledge networks
-- **Flashcards** - Interactive Q&A cards (coming soon)
+- **Interactive Flashcards** - Tinder-style swipe animations, fullscreen mode, progress tracking, and study sessions
 
 ### 💬 Intelligent Chat System
 - **Document-Specific Chat** - Chat with AI about specific documents with context awareness
@@ -24,10 +25,11 @@ A desktop-first web application that processes PDFs and generates comprehensive 
 - **Keyboard Shortcuts** - Enter to send, Shift+Enter for newline, Cmd/Ctrl+K to focus
 
 ### 🎨 User Experience
-- **Export Options** - PDF and text exports with styled formatting
+- **Export Options** - Professional PDF and DOCX exports with styled formatting
 - **Light/Dark Themes** - Clean, professional design system with teal/amber accents
 - **Accessibility** - WCAG AA compliance, keyboard navigation, screen reader support
 - **Responsive Design** - Optimized for desktop-first productivity workflows
+- **Study Sessions** - Track progress, accuracy, and time spent on flashcards
 
 ## 🛠️ Tech Stack
 
@@ -36,8 +38,10 @@ A desktop-first web application that processes PDFs and generates comprehensive 
 - **Database**: Supabase PostgreSQL with Row Level Security
 - **Storage**: Supabase Storage for PDF files with private access
 - **AI**: Google Gemini 2.5 Pro/Flash/Lite via Vercel AI SDK
-- **State Management**: Zustand for chat and study tools state
+- **Semantic Search**: Transformers.js with mixedbread-ai/mxbai-embed-xsmall-v1 (FREE, no API costs)
+- **State Management**: Zustand for chat, study tools, and flashcards state
 - **Local Storage**: Dexie (IndexedDB) for chat history and offline capabilities
+- **Export System**: html2pdf.js and @mohtasham/md-to-docx for PDF/DOCX generation
 - **Package Manager**: pnpm 9.10.0
 
 ## 🚀 Quick Start
@@ -91,9 +95,10 @@ A desktop-first web application that processes PDFs and generates comprehensive 
 
 ### Core Systems
 - **Chat System** - Zustand store with custom hooks, streaming responses via Server-Sent Events
-- **Study Tools** - AI-powered generation with persistent canvas and export functionality
-- **Document Processing** - Smart context retrieval with intelligent chunking for large PDFs
+- **Study Tools** - AI-powered generation with persistent canvas, flashcard viewer, and export functionality
+- **Enterprise RAG** - FREE semantic search with Transformers.js + intelligent chunking for large PDFs
 - **AI Integration** - Auto-model selection (Gemini Flash Lite/Flash/Pro) based on query complexity
+- **Flashcard System** - Interactive study sessions with progress tracking and animations
 
 ### Key Components
 - **Frontend** - React components with TypeScript, optimized for desktop workflows
@@ -140,8 +145,10 @@ pnpm typecheck    # TypeScript type checking
 ## 🚀 Key Features in Detail
 
 ### Smart Context Management
-- **Intelligent Chunking** - Automatically splits large documents with configurable overlap
-- **Relevance Scoring** - Keyword-based ranking with phrase matching for accurate context
+- **Hybrid Search** - Combines FREE semantic search (Transformers.js) with keyword matching
+- **Intelligent Chunking** - Structure-aware document splitting with configurable overlap
+- **Semantic Embeddings** - mixedbread-ai/mxbai-embed-xsmall-v1 model (22MB, 384 dimensions) - completely FREE
+- **Performance Caching** - In-memory caching for embeddings (1 hour) and search results (30 minutes)
 - **Token Management** - Automatically selects most relevant chunks within AI model limits
 
 ### Advanced Chat System
@@ -152,9 +159,10 @@ pnpm typecheck    # TypeScript type checking
 
 ### Study Tools Generation
 - **Multi-Modal AI** - Uses different Gemini models based on complexity and document size
-- **Structured Output** - Hierarchical study guides, summaries, and interconnected notes
-- **Export Options** - PDF generation with styled formatting, markdown export
+- **Structured Output** - Hierarchical study guides, summaries, interconnected notes, and interactive flashcards
+- **Export Options** - Professional PDF/DOCX generation with styled formatting, markdown export
 - **Canvas Interface** - Full-screen content viewer with editing capabilities
+- **Flashcard Features** - Tinder-style animations, progress tracking, study sessions, keyboard shortcuts
 
 ## 📄 License
 

@@ -121,12 +121,14 @@ export async function POST(req: NextRequest) {
                 document.title,
                 document.document_content,
                 {
-                  maxTokens: 4000,
-                  chunkSize: 1000,
+                  maxTokens: 8000, // Increased for comprehensive coverage
+                  chunkSize: 800, // Smaller chunks for better granularity
                   overlap: 200,
                   useSemanticSearch: embeddingsAvailable,
-                  hybridWeight: 0.7, // 70% semantic, 30% keyword
-                  generateEmbeddings: false // Don't generate embeddings during chat (too slow)
+                  hybridWeight: 0.6, // 60% semantic, 40% keyword for overview queries
+                  generateEmbeddings: true, // Enable embeddings for semantic search
+                  minRelevanceScore: 0.05, // Lower threshold for better coverage
+                  maxChunks: 12 // Allow more chunks for comprehensive search
                 }
               )
 

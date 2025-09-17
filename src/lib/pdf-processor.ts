@@ -14,7 +14,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-const embeddingModel = openai.textEmbedding('text-embedding-3-small')
+const embeddingModel = openai.textEmbeddingModel('text-embedding-3-small')
 
 export interface PDFChunk {
   id?: string
@@ -46,12 +46,12 @@ export async function extractPDFText(pdfBuffer: Buffer): Promise<{
   metadata: { pageCount: number; title?: string }
 }> {
   // Dynamic import to avoid SSR issues
-  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.js')
+  const pdfjsLib = await import('pdfjs-dist')
 
   // Set up worker
   if (typeof window === 'undefined') {
     // Server-side: use node canvas factory
-    const pdfjsWorker = await import('pdfjs-dist/legacy/build/pdf.worker.entry.js')
+    const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.min.js')
     pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker.default
   }
 
@@ -196,7 +196,7 @@ export async function generateChunkEmbeddings(
       })
 
       const { embeddings } = await embedMany({
-        model: embeddingModel,
+        model: embeddingModel as any,
         values: batchContents
       })
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-CogniLeapAI MVP is a desktop-first web application that processes PDFs and generates AI-powered study materials (summaries, notes, and study guides) using Google Gemini models. The app features a complete chat system with streaming AI responses, document context integration, and persistent conversation storage.
+CogniLeapAI MVP is a desktop-first web application that processes PDFs and generates AI-powered study materials (summaries, notes, study guides, and flashcards) using Google Gemini models. The app features a complete chat system with streaming AI responses, document context integration, persistent conversation storage, and FREE semantic search using Transformers.js for enterprise-grade RAG capabilities without API costs.
 
 ## Must Follow Workflow
 
@@ -188,8 +188,10 @@ Both commands should pass before considering any implementation complete.
 - **Database**: Supabase PostgreSQL with Row Level Security
 - **Storage**: Supabase Storage for PDF files
 - **AI**: Google Gemini 2.5 Pro/Flash/Lite via Vercel AI SDK
-- **State Management**: Zustand for chat state management
-- **Local Storage**: Dexie (IndexedDB) for chat history
+- **Semantic Search**: Transformers.js with mixedbread-ai/mxbai-embed-xsmall-v1 (FREE, no API costs)
+- **State Management**: Zustand for chat, study tools, and flashcards state management
+- **Local Storage**: Dexie (IndexedDB) for chat history and offline capabilities
+- **Export System**: html2pdf.js and @mohtasham/md-to-docx for PDF/DOCX generation
 
 ### Core Architecture Patterns
 
@@ -306,14 +308,16 @@ Comprehensive AI-powered study materials generation with professional UI/UX:
 - **Study Guide**: Multi-layered learning paths with Foundation → Connections → Applications → Mastery
 - **Smart Summary**: Significance hierarchy with strategic overview and practical implications
 - **Smart Notes**: Active learning methodology with interconnected knowledge networks
-- **Flashcards**: Interactive Q&A cards with flip animations, customizable settings, and card count tracking
+- **Flashcards**: Fully interactive Q&A cards with Tinder-style swipe animations, fullscreen mode, progress tracking, and study sessions
 
 #### Architecture
 - **StudyToolsPanel** (`study-tools-panel.tsx`) - Collapsible panel with tool selection
 - **StudyToolsCanvas** (`study-tools-canvas.tsx`) - Full-screen content viewer with export options
+- **FlashcardViewer** (`flashcard-viewer.tsx`) - Interactive flashcard viewer with animations
 - **StudyToolsStore** (`study-tools-store.ts`) - Zustand state management with persistence
+- **FlashcardStore** (`flashcard-store.ts`) - Dedicated flashcard state with study session tracking
 - **Advanced Prompts** (`study-tools-prompts.ts`) - Specialized prompts for each tool type
-- **Export System** (`export-utils.ts`) - PDF and document export with styled formatting
+- **Export System** (`export-utils.ts`) - PDF/DOCX export with professional formatting
 
 #### Usage Pattern
 ```tsx
@@ -333,24 +337,35 @@ const { generateStudyTool, isGenerating } = useStudyToolsStore()
 - **Smart Context**: Automatically chunks large documents for optimal AI processing
 
 ### Smart Context Management
-Advanced document processing for large PDFs and efficient AI interactions:
+Enterprise-grade RAG system with FREE semantic search for large PDFs and efficient AI interactions:
 
 #### Features
-- **Intelligent Chunking**: Splits documents with configurable overlap and size
-- **Relevance Scoring**: Keyword-based ranking with phrase matching and numbered item detection
-- **Context Selection**: Automatically selects most relevant chunks within token limits
-- **Fallback Handling**: Ensures context availability even with low relevance scores
+- **Hybrid Search**: Combines FREE semantic search (Transformers.js) with keyword matching
+- **Intelligent Chunking**: Structure-aware document splitting with configurable overlap and size
+- **Semantic Embeddings**: Uses mixedbread-ai/mxbai-embed-xsmall-v1 model (22MB, 384 dimensions) - completely FREE
+- **Context Caching**: In-memory caching for embeddings and search results with TTL management
+- **Relevance Scoring**: Cosine similarity + keyword matching for optimal context selection
+- **Fallback Handling**: Graceful degradation to keyword-only search if embeddings fail
 
 #### Core Functions
 ```typescript
-// Chunk large documents intelligently
+// Generate FREE semantic embeddings
+const embeddingResult = await generateEmbedding(text)
+
+// Chunk large documents with structure awareness
 const chunks = chunkDocument(content, { chunkSize: 1000, overlap: 200 })
 
-// Get relevant context for queries
-const { context, chunks, totalRelevance } = getSmartContext(query, documentContent)
+// Hybrid semantic + keyword search
+const relevantChunks = await selectRelevantChunks(query, chunks, {
+  useSemanticSearch: true,
+  hybridWeight: 0.7 // 70% semantic, 30% keyword
+})
 
-// Build optimized prompts with context
-const prompt = buildContextPrompt(query, title, content)
+// Get smart context with caching
+const { context, chunks, searchStrategy } = await getSmartContext(query, documentContent)
+
+// Calculate cosine similarity for semantic search
+const similarity = cosineSimilarity(embedding1, embedding2)
 ```
 
 #### Configuration Options
@@ -358,6 +373,9 @@ const prompt = buildContextPrompt(query, title, content)
 - `chunkSize`: Words per chunk (default: 1000)
 - `overlap`: Overlap between chunks (default: 200)
 - `minRelevanceScore`: Minimum relevance threshold (default: 0.1)
+- `useSemanticSearch`: Enable FREE semantic search (default: true)
+- `hybridWeight`: Balance between semantic/keyword (default: 0.7)
+- `generateEmbeddings`: Generate embeddings on-demand (default: false)
 
 ### Design System
 - **Custom Tailwind Configuration** with design tokens
@@ -395,14 +413,17 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 - **Handle generation states** - tools can take 30-60 seconds to generate
 - **Context requirements** - most tools require either documentId or conversationId
 - **Canvas management** - canvas opens automatically after successful generation
-- **Export functionality** - PDF and text exports are handled by the store
-- **Persistence** - generated content is automatically saved to localStorage
+- **Flashcard system** - use FlashcardStore for flashcard-specific operations and study sessions
+- **Export functionality** - PDF/DOCX exports are handled by the store with professional formatting
+- **Persistence** - generated content is automatically saved to localStorage and database
 
 ### Working with Smart Context
 - **Automatic chunking** - use `getSmartContext()` for queries on large documents
 - **Relevance tuning** - adjust `minRelevanceScore` based on document type
 - **Token management** - monitor context size to stay within model limits
 - **Fallback strategy** - always provide context even with low relevance scores
+- **FREE semantic search** - use `generateEmbedding()` and `cosineSimilarity()` for semantic matching
+- **Performance optimization** - embeddings are cached for 1 hour, context results cached for 30 minutes
 
 ### Code Quality Standards  
 - **TypeScript strict mode** - no `any` types, proper interface definitions
@@ -417,15 +438,19 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 - **Efficient scrolling** - Smart auto-scroll with user interaction detection
 
 ## Key Files
-- `src/lib/chat-store.ts` - Central chat state management
+- `src/lib/chat-store.ts` - Central chat state management with streaming and persistence
 - `src/lib/study-tools-store.ts` - Study tools state management and generation
-- `src/lib/smart-context.ts` - Intelligent document chunking and context retrieval
+- `src/lib/flashcard-store.ts` - Flashcard-specific state with study sessions and progress tracking
+- `src/lib/smart-context.ts` - Enterprise-grade RAG system with FREE semantic search
+- `src/lib/embeddings.ts` - FREE semantic embeddings using Transformers.js (no API costs)
 - `src/lib/study-tools-prompts.ts` - Advanced AI prompts for study materials
-- `src/lib/export-utils.ts` - PDF and document export functionality
+- `src/lib/export-utils.ts` - Professional PDF/DOCX export functionality
 - `src/components/study-tools/study-tools-panel.tsx` - Study tools UI panel
 - `src/components/study-tools/study-tools-canvas.tsx` - Content viewer and editor
+- `src/components/study-tools/flashcard-viewer.tsx` - Interactive flashcard viewer with animations
 - `src/components/chat/README.md` - Comprehensive chat system documentation
 - `src/contexts/documents-context.tsx` - Document state management
+- `src/types/flashcards.ts` - TypeScript definitions for flashcard system
 - `package.json` - Dependencies and development scripts
 - `tailwind.config.ts` - Design system configuration
 - `docs/` - Detailed project documentation
