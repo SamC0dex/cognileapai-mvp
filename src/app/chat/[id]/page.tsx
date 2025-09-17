@@ -9,6 +9,8 @@ import { ChatHistoryDrawer } from '@/components/chat-history-drawer'
 import { createThreadId, upsertThread, type ChatThread } from '@/lib/chat-history'
 import { useFlashcardStore } from '@/lib/flashcard-store'
 import type { GeminiModelKey } from '@/lib/ai-config'
+import type { DocumentUploadedDetail } from '@/types/documents'
+import { GeminiLogo } from '@/components/icons/gemini-logo'
 
 interface ChatPageProps {
   params: Promise<{ id: string }>
@@ -110,6 +112,34 @@ export default function ChatPage({ params }: ChatPageProps) {
     initializeFromParams()
   }, [resolvedParams.id, searchParams, router, isInitialized])
 
+  useEffect(() => {
+    const handleDocumentUploaded = (event: Event) => {
+      const customEvent = event as CustomEvent<DocumentUploadedDetail>
+      const uploadedDocument = customEvent.detail?.document
+      if (!uploadedDocument) return
+
+      setDocumentId(uploadedDocument.id)
+      setChatType('document')
+      setPageTitle(uploadedDocument.title || 'Document')
+
+      if (typeof window !== 'undefined') {
+        const search = new URLSearchParams(window.location.search)
+        search.set('type', 'document')
+        search.set('documentId', uploadedDocument.id)
+        if (uploadedDocument.title) {
+          search.set('title', uploadedDocument.title)
+        }
+
+        router.replace(`/chat/${resolvedParams.id}?${search.toString()}`, { scroll: false })
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('document-uploaded', handleDocumentUploaded as EventListener)
+      return () => window.removeEventListener('document-uploaded', handleDocumentUploaded as EventListener)
+    }
+  }, [resolvedParams.id, router])
+
   const handleBackToDashboard = () => {
     router.push('/dashboard')
   }
@@ -160,7 +190,7 @@ export default function ChatPage({ params }: ChatPageProps) {
         {/* Header - Hidden in flashcard fullscreen mode */}
         {!isFlashcardFullscreen && (
           <div className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex-shrink-0">
-          <div className="px-6 py-4">
+          <div className="px-6 py-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <button
@@ -177,10 +207,8 @@ export default function ChatPage({ params }: ChatPageProps) {
 
                 {/* Page Title */}
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center">
-                    <svg className="w-4 h-4 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
+                  <div className="w-9 h-9 rounded-lg bg-primary/10 dark:bg-primary/15 flex items-center justify-center">
+                    <GeminiLogo size={22} />
                   </div>
                   <div>
                     <h1 className="text-lg font-semibold text-foreground">
@@ -226,13 +254,12 @@ export default function ChatPage({ params }: ChatPageProps) {
                 {/* Settings */}
                 <button
                   onClick={() => console.log('Open settings')}
-                  className="inline-flex items-center gap-2 h-10 px-3.5 rounded-xl border border-border bg-background hover:bg-muted text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-background hover:bg-muted text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                   title="Settings"
                   aria-label="Settings"
                   type="button"
                 >
                   <SettingsIcon className="w-[18px] h-[18px]" />
-                  <span className="hidden sm:inline">Settings</span>
                 </button>
               </div>
             </div>

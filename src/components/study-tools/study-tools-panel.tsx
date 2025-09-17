@@ -35,6 +35,7 @@ import {
   Minimize2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { FlashcardsStackIcon } from '@/components/icons/flashcards-stack-icon'
 
 // Enhanced animation variants
 const springTransition = {
@@ -108,7 +109,7 @@ const panelVariants = {
 
 const iconMap = {
   'study-guide': BookOpen,
-  'flashcards': FileText,
+  'flashcards': FlashcardsStackIcon,
   'smart-notes': PenTool,
   'smart-summary': Zap
 }
@@ -174,13 +175,13 @@ const StudyToolCard: React.FC<StudyToolCardProps> = React.memo(({
       <div className="flex items-start gap-2">
         <motion.div
           className={cn(
-            "p-1.5 rounded-lg transition-colors",
+            "p-2 rounded-lg transition-colors",
             tool.color,
             !isDisabled && "group-hover:scale-110 transition-transform duration-200"
           )}
           whileHover={!isDisabled ? { scale: 1.1 } : undefined}
         >
-          <IconComponent className={cn("w-4 h-4", tool.textColor)} />
+          <IconComponent className={cn("w-5 h-5", tool.textColor)} />
         </motion.div>
         <div className="flex-1 min-w-0">
           <h3 className={cn("font-semibold text-xs mb-0.5", tool.textColor)}>
@@ -1348,8 +1349,8 @@ const FlashcardSetsSection: React.FC = () => {
       className="space-y-2 mt-6"
     >
       <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
-        <Sparkles className="w-4 h-4" />
-Generated flashcards ({flashcardSets.length})
+        <FlashcardsStackIcon size={18} className="text-brand-teal-600" />
+        Generated flashcards ({flashcardSets.length})
       </h3>
 
       <motion.div
@@ -1420,7 +1421,7 @@ Generated flashcards ({flashcardSets.length})
                   {isGenerating ? (
                     <Loader2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                   ) : (
-                    <Sparkles className="w-3.5 h-3.5 text-green-700 dark:text-green-300" />
+                    <FlashcardsStackIcon size={16} className="text-green-700 dark:text-green-300" strokeWidth={1.4} />
                   )}
                 </motion.div>
 

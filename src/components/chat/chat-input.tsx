@@ -7,6 +7,7 @@ import { useChatStore } from '@/lib/chat-store'
 import { GeminiLogo } from '@/components/icons/gemini-logo'
 import { toast } from 'sonner'
 import type { ChatInputProps } from './types'
+import type { DocumentRecord, DocumentUploadedDetail } from '@/types/documents'
 
 const MIN_HEIGHT = 44 // Minimum height for textarea
 const MAX_HEIGHT = 144 // Maximum height (4 lines * 36px)
@@ -30,7 +31,6 @@ export const ChatInput: React.FC<ChatInputProps & {
   const [inputValue, setInputValue] = useState('')
   const [textareaHeight, setTextareaHeight] = useState(MIN_HEIGHT)
   const [showModelSelector, setShowModelSelector] = useState(false)
-  const [showToolsSelector, setShowToolsSelector] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   // const [lastUserMessage, setLastUserMessage] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -54,7 +54,6 @@ export const ChatInput: React.FC<ChatInputProps & {
         e.preventDefault()
         textareaRef.current?.focus()
         setShowModelSelector(false)
-        setShowToolsSelector(false)
       }
       
       // Cmd/Ctrl + Shift + K: Focus input and clear
@@ -64,7 +63,6 @@ export const ChatInput: React.FC<ChatInputProps & {
         setTextareaHeight(MIN_HEIGHT)
         textareaRef.current?.focus()
         setShowModelSelector(false)
-        setShowToolsSelector(false)
       }
     }
 
@@ -212,29 +210,9 @@ export const ChatInput: React.FC<ChatInputProps & {
 
   const toggleModelSelector = useCallback(() => {
     setShowModelSelector(!showModelSelector)
-    if (!showModelSelector) setShowToolsSelector(false)
   }, [showModelSelector])
 
-  const toggleToolsSelector = useCallback(() => {
-    setShowToolsSelector(!showToolsSelector)
-    if (!showToolsSelector) setShowModelSelector(false)
-  }, [showToolsSelector])
 
-  const handleToolSelect = useCallback((tool: 'study_guide' | 'smart_summary' | 'smart_notes' | 'flashcards') => {
-    const presets: Record<string, string> = {
-      study_guide: 'Create a thorough study guide for this material with sections, key terms, and practice questions.',
-      smart_summary: 'Write a concise, structured summary of the main points and insights.',
-      smart_notes: 'Produce smart notes: bullet points, definitions, examples, and takeaways.',
-      flashcards: 'Generate a high-quality set of Q&A flashcards that cover key concepts.'
-    }
-    const preset = presets[tool]
-    setInputValue(preset)
-    setShowToolsSelector(false)
-    requestAnimationFrame(() => {
-      calculateHeight()
-      textareaRef.current?.focus()
-    })
-  }, [calculateHeight])
 
   const handleFileUpload = useCallback(async () => {
     if (isUploading) return
@@ -259,18 +237,30 @@ export const ChatInput: React.FC<ChatInputProps & {
           })
 
           if (response.ok) {
-            const result = await response.json()
-            toast.success(`"${file.name}" uploaded successfully! You can now chat with this document.`)
-
-            // Navigate to document chat
-            if (result.document?.id && typeof window !== 'undefined') {
-              // Navigate to document chat page
-              window.location.href = `/chat?type=document&documentId=${result.document.id}&title=${encodeURIComponent(result.document.title || file.name)}`
+            const result = await response.json() as {
+              success: boolean
+              alreadyExists?: boolean
+              document?: DocumentRecord
             }
 
-            // Dispatch custom event for documents panel to refresh
-            if (typeof window !== 'undefined') {
-              window.dispatchEvent(new CustomEvent('document-uploaded'))
+            const uploadedDocument = result.document
+
+            if (uploadedDocument) {
+              if (result.alreadyExists) {
+                toast.info(`"${uploadedDocument.title || file.name}" is already uploaded. Reusing the existing document.`)
+              } else {
+                toast.success(`"${file.name}" uploaded successfully! You can now chat with this document.`)
+              }
+
+              if (typeof window !== 'undefined') {
+                const detail: DocumentUploadedDetail = {
+                  document: uploadedDocument,
+                  alreadyExists: result.alreadyExists
+                }
+                window.dispatchEvent(new CustomEvent<DocumentUploadedDetail>('document-uploaded', { detail }))
+              }
+            } else {
+              toast.success(`"${file.name}" uploaded successfully!`)
             }
           } else {
             const error = await response.json()
@@ -288,8 +278,8 @@ export const ChatInput: React.FC<ChatInputProps & {
   }, [isUploading])
 
   return (
-    <div className="border-t border-border/50 bg-background/80 backdrop-blur-xl">
-      <div className="px-6 pb-6 pt-2 max-w-4xl mx-auto">
+    <div className="border-t border-border/50 bg-background/80 backdrop-blur-xl mb-[0.3rem]">
+      <div className="px-6 pb-[0.6rem] pt-2 max-w-4xl mx-auto">
         {/* Selected Documents Pills - Above the chat box */}
         {(selectedDocuments.length > 0 || urlSelectedDocument) && (
           <div className="mb-1.5">
@@ -455,56 +445,6 @@ export const ChatInput: React.FC<ChatInputProps & {
                   )}
                 </motion.button>
 
-                {/* Tools button */}
-                <div className="relative">
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={toggleToolsSelector}
-                    className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg border border-border hover:bg-muted/50 text-foreground"
-                    title="Tools"
-                  >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                      <circle cx="6" cy="8" r="1.5"/>
-                      <circle cx="6" cy="16" r="1.5"/>
-                      <path d="M10 8h8M10 16h8" strokeWidth="2" strokeLinecap="round"/>
-                    </svg>
-                    <span>Tools</span>
-                    <svg className={`w-3 h-3 transition-transform duration-200 ${showToolsSelector ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </motion.button>
-                  <AnimatePresence>
-                    {showToolsSelector && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 10, scale: 0.98 }}
-                        transition={{ duration: 0.12, ease: 'easeOut' }}
-                        className="absolute bottom-full left-0 mb-2 w-80 max-h-[60vh] overflow-auto bg-background rounded-xl border border-border shadow-xl z-50"
-                      >
-                        <div className="p-2">
-                          <motion.button whileHover={{ scale: 1.01, x: 4 }} whileTap={{ scale: 0.98 }} onClick={() => handleToolSelect('study_guide')} className="w-full text-left p-3 rounded-lg hover:bg-muted/50">
-                            <div className="font-medium text-sm">Study Guide</div>
-                            <div className="text-xs text-muted-foreground mt-0.5">Structured guide with key topics, questions, and outcomes.</div>
-                          </motion.button>
-                          <motion.button whileHover={{ scale: 1.01, x: 4 }} whileTap={{ scale: 0.98 }} onClick={() => handleToolSelect('smart_summary')} className="w-full text-left p-3 rounded-lg hover:bg-muted/50">
-                            <div className="font-medium text-sm">Smart Summary</div>
-                            <div className="text-xs text-muted-foreground mt-0.5">Concise and well-structured summary of core ideas.</div>
-                          </motion.button>
-                          <motion.button whileHover={{ scale: 1.01, x: 4 }} whileTap={{ scale: 0.98 }} onClick={() => handleToolSelect('smart_notes')} className="w-full text-left p-3 rounded-lg hover:bg-muted/50">
-                            <div className="font-medium text-sm">Smart Notes</div>
-                            <div className="text-xs text-muted-foreground mt-0.5">Bullet notes with definitions, examples, and takeaways.</div>
-                          </motion.button>
-                          <motion.button whileHover={{ scale: 1.01, x: 4 }} whileTap={{ scale: 0.98 }} onClick={() => handleToolSelect('flashcards')} className="w-full text-left p-3 rounded-lg hover:bg-muted/50">
-                            <div className="font-medium text-sm">Flashcards</div>
-                            <div className="text-xs text-muted-foreground mt-0.5">Q&A cards that reinforce key concepts.</div>
-                          </motion.button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
               </div>
               
               {/* Right side controls */}
@@ -514,7 +454,7 @@ export const ChatInput: React.FC<ChatInputProps & {
             </div>
             
             {/* Text Input Area */}
-            <div className="relative p-4">
+            <div className="relative px-4 pt-4 pb-[0.36rem]">
               <textarea
                 ref={textareaRef}
                 data-chat-input
@@ -595,7 +535,7 @@ export const ChatInput: React.FC<ChatInputProps & {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex justify-between items-center mt-4 px-2"
+            className="flex justify-between items-center mt-2 px-2"
           >
             <div className="flex items-center gap-3">
               {/* Status Indicator */}

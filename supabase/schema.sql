@@ -11,9 +11,18 @@ create table if not exists public.documents (
   page_count int not null default 0,
   bytes bigint not null default 0,
   storage_path text, -- path in storage bucket
+  checksum text,
+  processing_status text not null default 'pending',
+  chunk_count int not null default 0,
+  error_message text,
+  document_content text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create unique index if not exists documents_checksum_unique_idx
+  on public.documents(checksum)
+  where checksum is not null;
 
 -- Sections
 create table if not exists public.sections (

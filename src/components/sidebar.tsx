@@ -9,14 +9,14 @@ import {
   Plus,
   LayoutDashboard,
   Settings,
-  Lightbulb,
   FileText,
   ChevronDown,
   MoreHorizontal,
   User,
   Sun,
   Moon,
-  Palette
+  Palette,
+  Lightbulb
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { cn } from '@/lib/utils'
@@ -33,6 +33,7 @@ import {
 } from '@/components/ui'
 import { ClientOnly } from '@/components/client-only'
 import { Logo } from './logo'
+import { ChatDuotoneIcon } from '@/components/icons/chat-duotone'
 
 interface SidebarProps {
   isCollapsed?: boolean
@@ -86,7 +87,7 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange, isDocumentsPan
     {
       name: 'Chat',
       href: '/chat',
-      icon: Lightbulb,
+      icon: ChatDuotoneIcon,
       current: pathname?.startsWith('/chat') || false
     },
     {

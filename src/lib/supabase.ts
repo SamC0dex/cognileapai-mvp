@@ -15,6 +15,11 @@ export type Database = {
           page_count: number
           bytes: number
           storage_path: string | null
+          checksum: string | null
+          processing_status: string
+          chunk_count: number
+          error_message: string | null
+          document_content: string | null
           created_at: string
           updated_at: string
         }
@@ -24,6 +29,11 @@ export type Database = {
           page_count?: number
           bytes?: number
           storage_path?: string | null
+          checksum?: string | null
+          processing_status?: string
+          chunk_count?: number
+          error_message?: string | null
+          document_content?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -33,6 +43,11 @@ export type Database = {
           page_count?: number
           bytes?: number
           storage_path?: string | null
+          checksum?: string | null
+          processing_status?: string
+          chunk_count?: number
+          error_message?: string | null
+          document_content?: string | null
           created_at?: string
           updated_at?: string
         }

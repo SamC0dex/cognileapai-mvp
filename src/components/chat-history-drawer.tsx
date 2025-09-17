@@ -148,7 +148,7 @@ export function ChatHistoryDrawer({
             animate={{ x: 0 }}
             exit={{ x: 360 }}
             transition={{ duration: 0.16, ease: 'easeOut' }}
-            className="fixed right-0 top-0 bottom-0 z-[310] w-[320px] sm:w-[360px] bg-gradient-to-b from-[hsl(var(--background))] to-[hsl(var(--background)/0.96)] border-l border-border shadow-2xl"
+            className="fixed right-0 top-0 bottom-0 z-[310] w-[320px] sm:w-[360px] bg-gradient-to-b from-[hsl(var(--background))] to-[hsl(var(--background)/0.96)] border-l border-border shadow-2xl flex flex-col"
           >
             <div className="h-14 px-4 flex items-center justify-between border-b border-border">
               <div className="text-sm font-semibold">Chat History</div>
@@ -179,7 +179,7 @@ export function ChatHistoryDrawer({
             </div>
 
             {/* List */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-thin">
+            <div className="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-thin scrollbar-thumb-primary/30 scrollbar-track-transparent">
               <div className="px-1 text-xs font-medium text-primary/80">Today</div>
               {loading && (
                 <div className="text-sm text-muted-foreground px-1 py-8">Loading threads...</div>

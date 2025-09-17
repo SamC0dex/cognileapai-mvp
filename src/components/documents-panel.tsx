@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import { useDocuments } from '@/contexts/documents-context'
 import type { Database } from '@/lib/supabase'
+import type { DocumentUploadedDetail } from '@/types/documents'
 
 type DocumentItem = Database['public']['Tables']['documents']['Row']
 
@@ -64,7 +65,31 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
     if (isOpen) {
       fetchDocuments()
     }
-  }, [isOpen])
+  }, [fetchDocuments, isOpen])
+
+  useEffect(() => {
+    const handleDocumentUploaded = (event: Event) => {
+      const customEvent = event as CustomEvent<DocumentUploadedDetail>
+      const uploadedDocument = customEvent.detail?.document
+      if (!uploadedDocument) return
+
+      setDocuments(prev => {
+        const existingIndex = prev.findIndex(doc => doc.id === uploadedDocument.id)
+        const updatedDocument: DocumentItem = uploadedDocument
+        if (existingIndex !== -1) {
+          const next = [...prev]
+          next[existingIndex] = updatedDocument
+          return next
+        }
+        return [updatedDocument, ...prev]
+      })
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('document-uploaded', handleDocumentUploaded as EventListener)
+      return () => window.removeEventListener('document-uploaded', handleDocumentUploaded as EventListener)
+    }
+  }, [])
 
   const handleUpload = React.useCallback(() => {
     if (isUploading) return
@@ -102,7 +127,12 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
 
         if (response.ok) {
           const result = await response.json()
-          toast.success(`"${file.name}" uploaded successfully!`)
+
+          if (result.alreadyExists) {
+            toast.info(`"${result.document?.title || file.name}" is already in your library.`)
+          } else {
+            toast.success(`"${file.name}" uploaded successfully!`)
+          }
         } else {
           const error = await response.json()
           toast.error(error.error || 'Upload failed')

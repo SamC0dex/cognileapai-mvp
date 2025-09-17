@@ -1,34 +1,126 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createHash } from 'crypto'
 import { supabase } from '@/lib/supabase'
 
 export async function POST(req: NextRequest) {
   try {
     console.log('Upload API called')
-    
+
     const formData = await req.formData()
     const file = formData.get('file') as File
-    
+
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
-    
+
     if (file.type !== 'application/pdf') {
       return NextResponse.json({ error: 'File must be a PDF' }, { status: 400 })
     }
-    
+
     console.log('Processing file:', file.name, file.size)
-    
-    // Convert file to buffer
+
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
+    const checksum = createHash('sha256').update(buffer).digest('hex')
 
-    // Parse PDF to get page count
+    const { data: duplicateDocument, error: duplicateError } = await supabase
+      .from('documents')
+      .select('id, title, page_count, bytes, storage_path, processing_status, chunk_count, error_message, document_content, created_at, updated_at')
+      .eq('checksum', checksum)
+      .maybeSingle()
+
+    if (duplicateError && duplicateError.code !== 'PGRST116') {
+      console.error('Failed to check for duplicate document:', duplicateError)
+    }
+
+    const handleDuplicate = async (document: any) => {
+      console.log(`Duplicate document detected for checksum ${checksum}, reusing document ${document.id}`)
+
+      let nextStatus = document.processing_status || 'processing'
+
+      if (document.processing_status === 'failed') {
+        nextStatus = 'processing'
+        await supabase
+          .from('documents')
+          .update({
+            processing_status: 'processing',
+            error_message: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', document.id)
+
+        queueBackgroundProcessing(document.id, buffer)
+      } else {
+        await supabase
+          .from('documents')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', document.id)
+      }
+
+      return NextResponse.json({
+        success: true,
+        alreadyExists: true,
+        document: {
+          ...document,
+          processing_status: nextStatus,
+          hasStudyGuide: false,
+          hasSummary: false,
+          hasNotes: false
+        }
+      })
+    }
+
+    if (duplicateDocument) {
+      return handleDuplicate(duplicateDocument)
+    }
+
+    const { data: existingCandidates, error: existingError } = await supabase
+      .from('documents')
+      .select('id, title, page_count, bytes, storage_path, processing_status, chunk_count, error_message, document_content, created_at, updated_at')
+      .is('checksum', null)
+      .eq('bytes', file.size)
+
+    if (existingError) {
+      console.error('Failed to fetch checksum-less documents:', existingError)
+    } else if (existingCandidates && existingCandidates.length > 0) {
+      for (const candidate of existingCandidates) {
+        if (!candidate.storage_path) continue
+
+        try {
+          const downloadResult = await supabase.storage.from('documents').download(candidate.storage_path)
+          if (downloadResult.error) {
+            console.error(`Failed to download existing document ${candidate.id}:`, downloadResult.error)
+            continue
+          }
+
+          const candidateBuffer = Buffer.from(await downloadResult.data.arrayBuffer())
+          const candidateChecksum = createHash('sha256').update(candidateBuffer).digest('hex')
+
+          if (candidateChecksum === checksum) {
+            const { data: updatedDocument, error: updateError } = await supabase
+              .from('documents')
+              .update({ checksum, updated_at: new Date().toISOString() })
+              .eq('id', candidate.id)
+              .select('id, title, page_count, bytes, storage_path, processing_status, chunk_count, error_message, document_content, created_at, updated_at')
+              .single()
+
+            if (updateError) {
+              console.error(`Failed to stamp checksum on existing document ${candidate.id}:`, updateError)
+              continue
+            }
+
+            return handleDuplicate(updatedDocument)
+          }
+        } catch (candidateError) {
+          console.error(`Failed to verify existing document ${candidate.id}:`, candidateError)
+        }
+      }
+    }
+
     let pageCount = 0
     try {
-      // Use pdf2json which is more stable and doesn't have debug code issues
       const PDFParser = require('pdf2json')
 
-      // Create a promise wrapper for pdf2json
       const parsePdf = () => {
         return new Promise((resolve, reject) => {
           const pdfParser = new PDFParser()
@@ -38,12 +130,10 @@ export async function POST(req: NextRequest) {
           })
 
           pdfParser.on('pdfParser_dataReady', (pdfData: any) => {
-            // pdf2json provides page count via Pages array length
             const pages = pdfData.Pages ? pdfData.Pages.length : 0
             resolve(pages)
           })
 
-          // Parse the buffer
           pdfParser.parseBuffer(buffer)
         })
       }
@@ -52,10 +142,8 @@ export async function POST(req: NextRequest) {
       console.log('PDF parsed successfully, pages:', pageCount)
     } catch (parseError) {
       console.error('PDF parsing error:', parseError)
-      // Continue with pageCount = 0, don't fail the upload
     }
 
-    // Sanitize filename for Supabase storage
     const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
     const fileName = `${Date.now()}-${sanitizedFileName}`
     const { data: uploadData, error: uploadError } = await supabase.storage
@@ -63,37 +151,53 @@ export async function POST(req: NextRequest) {
       .upload(fileName, buffer, {
         contentType: 'application/pdf'
       })
-    
+
     if (uploadError) {
       console.error('Upload error:', uploadError)
       return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 })
     }
-    
+
     console.log('File uploaded successfully:', uploadData.path)
-    
-    // Create document record with processing status
+
     const { data: document, error: dbError } = await supabase
       .from('documents')
       .insert({
-        title: file.name.replace('.pdf', ''),
+        title: file.name.replace(/\.pdf$/i, ''),
         page_count: pageCount,
         bytes: file.size,
         storage_path: uploadData.path,
-        processing_status: 'processing'
+        processing_status: 'processing',
+        checksum
       })
       .select()
       .single()
 
     if (dbError) {
+      if (dbError.code === '23505') {
+        console.warn(`Checksum conflict detected during insert for checksum ${checksum}`)
+
+        const { data: conflictingDocument, error: conflictError } = await supabase
+          .from('documents')
+          .select('id, title, page_count, bytes, storage_path, processing_status, chunk_count, error_message, document_content, created_at, updated_at')
+          .eq('checksum', checksum)
+          .maybeSingle()
+
+        await supabase.storage.from('documents').remove([uploadData.path])
+
+        if (conflictError && conflictError.code !== 'PGRST116') {
+          console.error('Failed to retrieve conflicting document:', conflictError)
+        } else if (conflictingDocument) {
+          return handleDuplicate(conflictingDocument)
+        }
+      }
+
       console.error('Database error:', dbError)
-      // Clean up uploaded file
       await supabase.storage.from('documents').remove([uploadData.path])
       return NextResponse.json({ error: 'Failed to save document' }, { status: 500 })
     }
 
     console.log('Document created successfully:', document.id)
 
-    // Create basic sections (legacy support)
     await supabase
       .from('sections')
       .insert({
@@ -104,20 +208,7 @@ export async function POST(req: NextRequest) {
         page_end: pageCount > 0 ? pageCount : 1
       })
 
-    // Start background PDF processing for chat functionality
-    // This runs asynchronously so upload response is fast
-    startBackgroundProcessing(document.id, buffer).catch(error => {
-      console.error(`Background PDF processing failed for document ${document.id}:`, error)
-      // Update document with error status
-      supabase
-        .from('documents')
-        .update({
-          processing_status: 'failed',
-          error_message: error instanceof Error ? error.message : 'Processing failed'
-        })
-        .eq('id', document.id)
-        .then(() => console.log(`Updated document ${document.id} with error status`))
-    })
+    queueBackgroundProcessing(document.id, buffer)
 
     return NextResponse.json({
       success: true,
@@ -129,7 +220,7 @@ export async function POST(req: NextRequest) {
         processing_status: 'processing'
       }
     })
-    
+
   } catch (error) {
     console.error('Upload error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -230,4 +321,19 @@ async function startBackgroundProcessing(documentId: string, buffer: Buffer) {
       })
       .eq('id', documentId)
   }
+}
+
+function queueBackgroundProcessing(documentId: string, buffer: Buffer) {
+  startBackgroundProcessing(documentId, buffer).catch(error => {
+    console.error(`Background PDF processing failed for document ${documentId}:`, error)
+
+    supabase
+      .from('documents')
+      .update({
+        processing_status: 'failed',
+        error_message: error instanceof Error ? error.message : 'Processing failed'
+      })
+      .eq('id', documentId)
+      .then(() => console.log(`Updated document ${documentId} with error status`))
+  })
 }

@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from 'sonner'
 import Script from 'next/script'
 import { AppWrapper } from '@/components/app-wrapper'
+import { ErrorManagementProvider } from '@/components/error-management/provider'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -141,16 +142,18 @@ export default function RootLayout({
       </head>
       <body className={inter.className} suppressHydrationWarning>
         <AppWrapper>
-          <ThemeProvider 
-            attribute="class" 
-            defaultTheme="light" 
-            enableSystem={false}
-            disableTransitionOnChange
-            storageKey="cognileap-theme"
-          >
-            {children}
-            <Toaster richColors closeButton position="top-right" />
-          </ThemeProvider>
+          <ErrorManagementProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="light"
+              enableSystem={false}
+              disableTransitionOnChange
+              storageKey="cognileap-theme"
+            >
+              {children}
+              <Toaster richColors closeButton position="top-right" />
+            </ThemeProvider>
+          </ErrorManagementProvider>
         </AppWrapper>
       </body>
     </html>

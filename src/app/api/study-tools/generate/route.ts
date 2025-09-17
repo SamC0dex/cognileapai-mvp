@@ -3,6 +3,7 @@ import { generateText } from 'ai'
 import { google } from '@ai-sdk/google'
 import { createClient } from '@supabase/supabase-js'
 import { getStudyToolPrompt, generateStudyToolTitle, type StudyToolPromptType } from '@/lib/study-tools-prompts'
+// import { addRetryAttempt, classifyError } from '@/lib/retry-manager'
 
 // Initialize Supabase client with service role key for server-side operations
 const supabase = createClient(
@@ -373,44 +374,46 @@ export async function POST(req: NextRequest) {
     })
 
   } catch (error) {
-    console.error('[StudyTools] Generation failed:', error)
+    const errorInstance = error instanceof Error ? error : new Error('Unknown error')
+    console.error('[StudyTools] Generation failed:', errorInstance)
 
     // Log detailed error information for debugging
-    if (error instanceof Error) {
-      console.error('[StudyTools] Error name:', error.name)
-      console.error('[StudyTools] Error message:', error.message)
-      console.error('[StudyTools] Error stack:', error.stack)
-    } else {
-      console.error('[StudyTools] Unknown error type:', typeof error)
-      console.error('[StudyTools] Error content:', error)
-    }
+    console.error('[StudyTools] Error name:', errorInstance.name)
+    console.error('[StudyTools] Error message:', errorInstance.message)
+    console.error('[StudyTools] Error stack:', errorInstance.stack)
 
     // Handle specific error types
-    if (error instanceof Error) {
-      if (error.message.includes('API key') || error.message.includes('GOOGLE_GENERATIVE_AI_API_KEY')) {
-        return NextResponse.json(
-          { error: 'AI service configuration error: API key not found or invalid' },
-          { status: 500 }
-        )
-      }
-      if (error.message.includes('quota') || error.message.includes('rate limit')) {
-        return NextResponse.json(
-          { error: 'AI service temporarily unavailable. Please try again in a few minutes.' },
-          { status: 429 }
-        )
-      }
-      if (error.message.includes('fetch')) {
-        return NextResponse.json(
-          { error: 'Network error connecting to AI service. Please check your internet connection.' },
-          { status: 503 }
-        )
-      }
+    if (errorInstance.message.includes('API key') || errorInstance.message.includes('GOOGLE_GENERATIVE_AI_API_KEY')) {
+      return NextResponse.json(
+        {
+          error: 'AI service configuration error: API key not found or invalid'
+        },
+        { status: 500 }
+      )
+    }
+
+    if (errorInstance.message.includes('quota') || errorInstance.message.includes('rate limit')) {
+      return NextResponse.json(
+        {
+          error: 'AI service temporarily unavailable. Please try again in a few minutes.'
+        },
+        { status: 429 }
+      )
+    }
+
+    if (errorInstance.message.includes('fetch')) {
+      return NextResponse.json(
+        {
+          error: 'Network error connecting to AI service. Please check your internet connection.'
+        },
+        { status: 503 }
+      )
     }
 
     return NextResponse.json(
       {
         error: 'Failed to generate study tool. Please try again.',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: errorInstance.message
       },
       { status: 500 }
     )

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback, useMemo, useEffect } from 'react'
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { ChatInput } from './chat-input'
 import { ChatMessages } from './chat-messages'
 import { ChatEmptyState } from './chat-empty-state'
@@ -16,6 +16,7 @@ import { StudyToolsPanel, useStudyToolsStore } from '@/components/study-tools'
 import { FlashcardViewer } from '@/components/study-tools/flashcard-viewer'
 import { useFlashcardStore } from '@/lib/flashcard-store'
 import { motion, useReducedMotion } from 'framer-motion'
+import type { DocumentUploadedDetail } from '@/types/documents'
 
 // Enhanced chat area width variants for coordinated layout
 const layoutVariants = {
@@ -74,7 +75,14 @@ export const ChatContainer: React.FC<{
   selectedModel = 'FLASH',
   onModelChange
 }) => {
-  const { selectedDocuments, primaryDocument, removeSelectedDocument, updateDocumentStatus } = useDocuments()
+  const {
+    selectedDocuments,
+    primaryDocument,
+    removeSelectedDocument,
+    updateDocumentStatus,
+    addSelectedDocument,
+    clearSelectedDocuments
+  } = useDocuments()
   const { isPanelExpanded, isCanvasOpen } = useStudyToolsStore()
   const { isViewerOpen, currentFlashcardSet, isFullscreen, closeViewer, toggleFullscreen } = useFlashcardStore()
   const prefersReducedMotion = useReducedMotion()
@@ -108,6 +116,7 @@ export const ChatContainer: React.FC<{
     size?: number
     processing_status?: string
   } | null>(null)
+  const lastUploadedDocumentRef = useRef<DocumentUploadedDetail['document'] | null>(null)
 
   // Handle scroll state changes from ChatMessages
   const handleScrollStateChange = useCallback((userScrolled: boolean, showButton: boolean) => {
@@ -127,6 +136,18 @@ export const ChatContainer: React.FC<{
         return
       }
 
+      if (lastUploadedDocumentRef.current?.id === documentId) {
+        const doc = lastUploadedDocumentRef.current
+        setUrlSelectedDocument({
+          id: doc.id,
+          title: doc.title,
+          size: doc.bytes ?? undefined,
+          processing_status: doc.processing_status ?? undefined
+        })
+        lastUploadedDocumentRef.current = null
+        return
+      }
+
       try {
         const { data, error } = await supabase
           .from('documents')
@@ -135,7 +156,9 @@ export const ChatContainer: React.FC<{
           .single()
 
         if (error) {
-          console.error('Error fetching document:', error)
+          if (error.message) {
+            console.error('Error fetching document:', error)
+          }
           setUrlSelectedDocument(null)
         } else if (data) {
           setUrlSelectedDocument({
@@ -195,19 +218,37 @@ export const ChatContainer: React.FC<{
 
   // Listen for document uploads from chat input
   useEffect(() => {
-    const handleDocumentUploaded = () => {
-      // Refresh selected document if needed
-      if (documentId) {
-        // Re-fetch document info to get updated status
-        window.location.reload() // Simple approach for now
+    const handleDocumentUploaded = (event: Event) => {
+      const customEvent = event as CustomEvent<DocumentUploadedDetail>
+      const uploadedDocument = customEvent.detail?.document
+
+      if (!uploadedDocument) return
+
+      lastUploadedDocumentRef.current = uploadedDocument
+
+      const selectedDoc = {
+        id: uploadedDocument.id,
+        title: uploadedDocument.title,
+        size: uploadedDocument.bytes ?? undefined,
+        processing_status: uploadedDocument.processing_status ?? undefined
+      }
+
+      clearSelectedDocuments()
+      addSelectedDocument(selectedDoc)
+      setUrlSelectedDocument(selectedDoc)
+
+      if (uploadedDocument.processing_status) {
+        updateDocumentStatus(uploadedDocument.id, uploadedDocument.processing_status)
+      } else {
+        updateDocumentStatus(uploadedDocument.id, 'processing')
       }
     }
 
     if (typeof window !== 'undefined') {
-      window.addEventListener('document-uploaded', handleDocumentUploaded)
-      return () => window.removeEventListener('document-uploaded', handleDocumentUploaded)
+      window.addEventListener('document-uploaded', handleDocumentUploaded as EventListener)
+      return () => window.removeEventListener('document-uploaded', handleDocumentUploaded as EventListener)
     }
-  }, [documentId])
+  }, [addSelectedDocument, clearSelectedDocuments, updateDocumentStatus])
 
   // Handle document removal
   const handleRemoveDocument = useCallback((documentId: string) => {

@@ -16,6 +16,7 @@
     "@ai-sdk/google": "^0.0.45",
     "@ai-sdk/openai": "^2.0.30",
     "@hookform/resolvers": "^3.9.0",
+    "@huggingface/transformers": "^3.7.3",
     "@mohtasham/md-to-docx": "^2.3.0",
     "@radix-ui/react-accordion": "^1.2.0",
     "@radix-ui/react-alert-dialog": "^1.1.15",

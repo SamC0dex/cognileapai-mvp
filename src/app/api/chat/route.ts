@@ -3,7 +3,9 @@ import { streamText, convertToCoreMessages } from 'ai'
 import { GeminiModelSelector, validateGeminiConfig, type MessageContext } from '@/lib/ai-config'
 import type { GeminiModelKey } from '@/lib/ai-config'
 import { createClient } from '@supabase/supabase-js'
-import { buildContextPrompt } from '@/lib/smart-context'
+import { buildContextPrompt, buildContextPromptSync } from '@/lib/smart-context'
+import { isEmbeddingsReady } from '@/lib/embeddings'
+// import { addRetryAttempt, classifyError, type RetryAttempt } from '@/lib/retry-manager'
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -99,23 +101,48 @@ export async function POST(req: NextRequest) {
           if (document.document_content && document.document_content.trim()) {
             console.log(`[AI] Using document content (${document.document_content.length} characters)`)
 
-            // Use smart context system for better relevance
+            // Check if FREE embeddings system is ready (with fallback)
+            let embeddingsAvailable = false
+            try {
+              embeddingsAvailable = await isEmbeddingsReady()
+              console.log(`[AI] FREE embeddings system: ${embeddingsAvailable ? 'READY' : 'LOADING'}`)
+            } catch (embedError) {
+              console.log(`[AI] Embeddings system error, using keyword-only search:`, embedError)
+              embeddingsAvailable = false
+            }
+
+            // Use enhanced smart context system with FREE semantic search
             const userQuery = lastMessage.content
-            const contextPrompt = buildContextPrompt(
-              userQuery,
-              document.title,
-              document.document_content,
-              {
-                maxTokens: 4000, // Adjust based on model limits
-                chunkSize: 1000,
-                overlap: 200
-              }
-            )
 
-            console.log(`[AI] Smart context system selected relevant content`)
+            try {
+              // Try context building with semantic search if available
+              const contextPrompt = await buildContextPrompt(
+                userQuery,
+                document.title,
+                document.document_content,
+                {
+                  maxTokens: 4000,
+                  chunkSize: 1000,
+                  overlap: 200,
+                  useSemanticSearch: embeddingsAvailable,
+                  hybridWeight: 0.7, // 70% semantic, 30% keyword
+                  generateEmbeddings: false // Don't generate embeddings during chat (too slow)
+                }
+              )
 
-            // Enhanced system prompt with smart context
-            systemPrompt = getSystemPrompt('document', documentId, selectedModelKey) + '\n\n' + contextPrompt
+              console.log(`[AI] RAG context assembled using ${embeddingsAvailable ? 'semantic + keyword' : 'keyword-only'} search`)
+              systemPrompt = getSystemPrompt('document', documentId, selectedModelKey) + '\n\n' + contextPrompt
+
+            } catch (contextError) {
+              console.warn(`[AI] Context building failed, using simple fallback:`, contextError)
+
+              // Simple fallback: use document title and first 4000 characters
+              const fallbackContent = document.document_content.slice(0, 4000)
+              systemPrompt = getSystemPrompt('document', documentId, selectedModelKey) +
+                '\n\nDocument Content:\n' + fallbackContent
+
+              console.log(`[AI] Simple fallback context used`)
+            }
           } else {
             console.log(`[AI] No document content available, using metadata only`)
 
@@ -181,15 +208,17 @@ export async function POST(req: NextRequest) {
     return result.toDataStreamResponse()
 
   } catch (error) {
-    console.error('[API] Chat error:', error)
+    const errorInstance = error instanceof Error ? error : new Error('Unknown error')
+    console.error('[API] Chat error:', errorInstance)
+
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: 'An error occurred while processing your request',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: errorInstance.message
       }),
-      { 
-        status: 500, 
-        headers: { 'Content-Type': 'application/json' } 
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
       }
     )
   }

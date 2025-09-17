@@ -100,21 +100,14 @@ CogniLeapAI MVP is a desktop-first web application that processes PDFs and gener
      // Verify response appears correctly
      ```
 
-2. **Error Detection using BrowserTools MCP**:
-   - Check console for JavaScript errors
-   - Monitor network requests for failures
-   - Verify no broken functionality
-   - Check for accessibility violations
-   - Monitor performance metrics
-
-3. **Context7 MCP**:
+2. **Context7 MCP**:
    - Verify any library/framework changes
    - Ensure compliance with latest best practices
    - Check for deprecated methods or patterns
    - Uptodate Documentation lookup for libraries and frameworks
    - Ensure proper usage of any new APIs or features
 
-4. **Functional Testing Requirements**:
+3. **Functional Testing Requirements**:
    - Test the specific feature/improvement implemented
    - Verify all existing features still work perfectly
    - Test edge cases and error scenarios
@@ -126,7 +119,6 @@ CogniLeapAI MVP is a desktop-first web application that processes PDFs and gener
 
 - **Supabase MCP**: Database operations, schema validation, query testing
 - **Playwright MCP**: UI automation, user flow testing, cross-browser validation
-- **BrowserTools MCP**: Error monitoring, performance analysis, accessibility audits
 - **Context7 MCP**: Documentation lookup for libraries and frameworks
 - **Filesystem MCP**: File operations, directory structure management
 

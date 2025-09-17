@@ -42,8 +42,8 @@ export function Header() {
 
   return (
     <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-14 items-center justify-between">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-2">
+        <div className="flex h-10 items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-2">
             <Logo width={24} height={24} />
             <span className="text-lg font-semibold">CogniLeap</span>

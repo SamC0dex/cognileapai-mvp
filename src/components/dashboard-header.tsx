@@ -13,7 +13,7 @@ export function DashboardHeader({ userName = "Swami" }: DashboardHeaderProps) {
       {/* Background Pattern */}
       <div className="absolute inset-0 bg-grid-pattern opacity-[0.02] dark:opacity-[0.05]" />
       
-      <div className="relative px-8 py-8">
+      <div className="relative px-8 py-4">
         <div className="max-w-4xl">
           <div className="space-y-3">
             {/* Greeting */}
