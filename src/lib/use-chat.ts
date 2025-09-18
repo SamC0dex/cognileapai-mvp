@@ -7,7 +7,7 @@ import { useChatStore, createNewConversation, getSuggestedQuestions } from './ch
  * Custom hook for chat functionality
  * Provides a simplified API for components to interact with the chat store
  */
-export function useChat(documentId?: string, conversationId?: string) {
+export function useChat(documentId?: string, conversationId?: string, selectedDocuments?: Array<{id: string, title: string}>) {
   const store = useChatStore()
 
   // Initialize conversation when documentId or conversationId changes
@@ -31,26 +31,26 @@ export function useChat(documentId?: string, conversationId?: string) {
     if (!content.trim()) return
 
     try {
-      await store.sendMessage(content.trim(), documentId, modelOverride)
+      await store.sendMessage(content.trim(), documentId, modelOverride, selectedDocuments)
       store.setError(null)
     } catch (error) {
       console.error('Failed to send message:', error)
       store.setError(error instanceof Error ? error.message : 'Failed to send message')
     }
-  }, [store, documentId])
+  }, [store, documentId, selectedDocuments])
 
 
 
   // Regenerate last message with optional model override
   const regenerateLastMessage = useCallback(async (modelOverride?: import('./ai-config').GeminiModelKey) => {
     try {
-      await store.regenerateLastMessage(modelOverride)
+      await store.regenerateLastMessage(modelOverride, selectedDocuments)
       store.setError(null)
     } catch (error) {
       console.error('Failed to regenerate message:', error)
       store.setError(error instanceof Error ? error.message : 'Failed to regenerate message')
     }
-  }, [store])
+  }, [store, selectedDocuments])
 
   // Create new conversation
   const createConversation = useCallback(async () => {
@@ -78,19 +78,25 @@ export function useChat(documentId?: string, conversationId?: string) {
     error: store.error,
     documentContext: store.documentContext,
     currentConversation: store.currentConversation,
-    
+
+    // Token tracking
+    conversationTokens: store.conversationTokens,
+    contextWarning: store.contextWarning,
+
     // Computed values
     hasMessages,
     lastMessage,
     canRegenerateLastMessage,
     suggestedQuestions,
-    
+
     // Actions
     sendMessage,
     regenerateLastMessage,
     createConversation,
     setError: store.setError,
     resetState: store.resetState,
+    updateTokenTracking: store.updateTokenTracking,
+    canAddMessage: store.canAddMessage,
     
     // Advanced actions (direct store access)
     loadConversation: store.loadConversation,

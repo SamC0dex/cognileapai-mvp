@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import type { GeminiModelKey } from './ai-config'
+import { TokenManager, type ConversationTokens } from './token-manager'
 
 export type Role = 'user' | 'assistant'
 
@@ -14,6 +15,10 @@ export interface Message {
   isStreaming?: boolean
   metadata?: Record<string, unknown>
   citations?: Citation[]
+  tokenCount?: {
+    estimated: number
+    confidence: 'high' | 'medium' | 'low'
+  }
 }
 
 export interface Citation {
@@ -48,17 +53,25 @@ interface StoreShape {
   currentConversation: string | null
   selectedModel: GeminiModelKey
 
+  // token tracking
+  conversationTokens: ConversationTokens | null
+  contextWarning: string | null
+
   // actions
   loadConversation: (conversationId: string, documentId?: string) => Promise<void>
-  sendMessage: (content: string, documentId?: string | null, model?: GeminiModelKey) => Promise<void>
+  sendMessage: (content: string, documentId?: string | null, model?: GeminiModelKey, selectedDocuments?: Array<{id: string, title: string}>, skipUserMessage?: boolean) => Promise<void>
 
-  regenerateLastMessage: (modelOverride?: GeminiModelKey) => Promise<void>
+  regenerateLastMessage: (modelOverride?: GeminiModelKey, selectedDocuments?: Array<{id: string, title: string}>) => Promise<void>
   setDocumentContext: (ctx: DocumentContext | null) => void
   setStreamingMessage: (val: string) => void
   setError: (err: string | null) => void
   setSelectedModel: (model: GeminiModelKey) => void
   createNewConversation: (documentId?: string) => Promise<string>
   resetState: () => void
+
+  // token tracking actions
+  updateTokenTracking: () => void
+  canAddMessage: (content: string) => { canAdd: boolean; warning?: string }
 }
 
 // Initialize Supabase client
@@ -76,6 +89,10 @@ export function useChatStore(): StoreShape {
   const [documentContext, setDocumentContext] = useState<DocumentContext | null>(null)
   const [currentConversation, setCurrentConversation] = useState<string | null>(null)
   const [selectedModel, setSelectedModel] = useState<GeminiModelKey>('FLASH')
+
+  // token tracking state
+  const [conversationTokens, setConversationTokens] = useState<ConversationTokens | null>(null)
+  const [contextWarning, setContextWarning] = useState<string | null>(null)
 
   const conversationRef = useRef<string | null>(null)
   const allMessagesRef = useRef<Message[]>([])
@@ -125,6 +142,9 @@ export function useChatStore(): StoreShape {
       }))
 
       setMessages(loadedMessages)
+
+      // Update token tracking after loading messages
+      setTimeout(() => updateTokenTracking(), 0)
       console.log(`[Chat] Loaded ${loadedMessages.length} messages for conversation ${conversationId}`)
 
       // Load document context if documentId provided and not already loaded
@@ -223,16 +243,29 @@ export function useChatStore(): StoreShape {
     }
   }
 
-  const sendMessage = useCallback(async (content: string, documentId?: string | null, model?: GeminiModelKey, skipUserMessage?: boolean) => {
+  const sendMessage = useCallback(async (content: string, documentId?: string | null, model?: GeminiModelKey, selectedDocuments?: Array<{id: string, title: string}>, skipUserMessage?: boolean) => {
     const modelToUse = model || selectedModel
     let user: Message | null = null
 
     // Add user message unless this is a regeneration
     if (!skipUserMessage) {
       const id = `u_${Date.now()}`
-      user = { id, role: 'user', content, timestamp: new Date() }
+      const tokenCount = TokenManager.estimate(content)
+      user = {
+        id,
+        role: 'user',
+        content,
+        timestamp: new Date(),
+        tokenCount: {
+          estimated: tokenCount.estimated,
+          confidence: tokenCount.confidence
+        }
+      }
       // Instantly show user message (optimistic UI)
       setMessages(prev => [...prev, user!])
+
+      // Update token tracking immediately after adding user message
+      setTimeout(() => updateTokenTracking(), 0)
     }
 
     // Immediately add assistant placeholder for streaming
@@ -245,6 +278,9 @@ export function useChatStore(): StoreShape {
       isStreaming: true
     }
     setMessages(prev => [...prev, assistantPlaceholder])
+
+    // Update token tracking immediately after adding assistant placeholder
+    setTimeout(() => updateTokenTracking(), 0)
 
     setIsLoading(false) // No loading state needed with optimistic UI
     setStreamingMessage('')
@@ -288,8 +324,9 @@ export function useChatStore(): StoreShape {
 
       const payload = {
         messages: messagesToSend,
-        chatType: documentId ? 'document' : 'general',
+        chatType: (documentId || selectedDocuments?.length) ? 'document' : 'general',
         documentId: documentId || documentContext?.id,
+        selectedDocuments: selectedDocuments,
         conversationId: convId,
         preferredModel: modelToUse
       }
@@ -351,6 +388,7 @@ export function useChatStore(): StoreShape {
       startSmoothStreaming()
 
       // Collect chunks from server as fast as possible
+      let finalTokenUsage: number | undefined
       while (true) {
         const { value, done } = await reader.read()
         if (done) {
@@ -380,6 +418,17 @@ export function useChatStore(): StoreShape {
                   serverBuffer += data
                 }
               }
+            } else if (line.startsWith('8:')) {
+              // Handle completion metadata (usage tokens)
+              try {
+                const metadata = JSON.parse(line.slice(2))
+                if (metadata?.usage?.totalTokens) {
+                  finalTokenUsage = metadata.usage.totalTokens
+                  console.log('[Chat] Received token usage:', finalTokenUsage)
+                }
+              } catch (parseError) {
+                // Continue if metadata parsing fails
+              }
             }
           } catch (parseError) {
             continue
@@ -408,20 +457,29 @@ export function useChatStore(): StoreShape {
 
       // Final update with metadata (will be handled by the interval completion)
       const finalUpdate = () => {
+        const assistantTokenCount = TokenManager.estimate(serverBuffer)
         setMessages(prev => prev.map(msg =>
           msg.id === assistantId
             ? {
                 ...msg,
                 content: serverBuffer,
                 isStreaming: false,
+                tokenCount: {
+                  estimated: assistantTokenCount.estimated,
+                  confidence: assistantTokenCount.confidence
+                },
                 metadata: {
                   model: modelConfig.displayName,
                   modelKey: modelToUse,
-                  duration
+                  duration,
+                  tokens: finalTokenUsage || assistantTokenCount.estimated // Use API tokens if available
                 }
               }
             : msg
         ))
+
+        // Update token tracking after message is complete
+        updateTokenTracking()
       }
 
       // Wait a bit for smooth streaming to complete, then add metadata
@@ -506,7 +564,7 @@ export function useChatStore(): StoreShape {
     }
   }
 
-  const regenerateLastMessage = useCallback(async (modelOverride?: GeminiModelKey) => {
+  const regenerateLastMessage = useCallback(async (modelOverride?: GeminiModelKey, selectedDocuments?: Array<{id: string, title: string}>) => {
     // Find last assistant and user message indices
     let lastAssistantIndex = -1
     let lastUserIndex = -1
@@ -533,7 +591,8 @@ export function useChatStore(): StoreShape {
       allMessagesRef.current = messagesForRegeneration
 
       // Use the existing sendMessage with skipUserMessage=true to reuse proven streaming logic
-      await sendMessage(lastUserMessage.content, documentContext?.id, modelOverride, true)
+      // Preserve the selectedDocuments that were used in the original conversation
+      await sendMessage(lastUserMessage.content, documentContext?.id, modelOverride, selectedDocuments, true)
     }
   }, [messages, documentContext, sendMessage])
 
@@ -547,11 +606,69 @@ export function useChatStore(): StoreShape {
     setError(null)
     setCurrentConversation(null)
     conversationRef.current = null
+
+    // Reset token tracking
+    setConversationTokens(null)
+    setContextWarning(null)
   }, [])
 
   const stableSetDocumentContext = useCallback((ctx: DocumentContext | null) => {
     setDocumentContext(ctx)
   }, [])
+
+  // Token tracking functions
+  const updateTokenTracking = useCallback(() => {
+    if (messages.length === 0) {
+      setConversationTokens(null)
+      setContextWarning(null)
+      return
+    }
+
+    // Convert messages to format expected by TokenManager
+    const messagesWithTokens = messages.map(msg => ({
+      id: msg.id,
+      role: msg.role === 'user' ? 'user' : msg.role === 'assistant' ? 'assistant' : 'system',
+      content: msg.content,
+      timestamp: msg.timestamp,
+      tokenCount: msg.metadata?.tokens ? {
+        estimated: msg.metadata.tokens,
+        confidence: 'high' as const,
+        method: 'api_count' as const,
+        timestamp: new Date()
+      } : msg.tokenCount ? {
+        estimated: msg.tokenCount.estimated,
+        confidence: msg.tokenCount.confidence,
+        method: 'estimation' as const,
+        timestamp: new Date()
+      } : TokenManager.estimate(msg.content)
+    }))
+
+    // Calculate conversation tokens
+    const tokens = TokenManager.estimateConversation(messagesWithTokens)
+    tokens.conversationId = currentConversation || 'temp-conversation'
+
+    // Generate warning message
+    const warning = TokenManager.getWarning(tokens)
+
+    setConversationTokens(tokens)
+    setContextWarning(warning)
+
+    console.log(`[TokenTracker] Conversation ${currentConversation}: ${tokens.totalTokens.toLocaleString()} tokens (${tokens.warningLevel})`)
+  }, [messages, currentConversation])
+
+  const canAddMessage = useCallback((content: string): { canAdd: boolean; warning?: string } => {
+    if (!conversationTokens) {
+      return { canAdd: true }
+    }
+
+    const newMessageTokens = TokenManager.estimate(content).estimated
+    const result = TokenManager.canAdd(conversationTokens.totalTokens, newMessageTokens)
+
+    return {
+      canAdd: result.canAdd,
+      warning: result.suggestedAction
+    }
+  }, [conversationTokens])
 
   return {
     messages,
@@ -561,6 +678,11 @@ export function useChatStore(): StoreShape {
     documentContext,
     currentConversation,
     selectedModel,
+
+    // token tracking
+    conversationTokens,
+    contextWarning,
+
     loadConversation,
     sendMessage,
 
@@ -570,7 +692,11 @@ export function useChatStore(): StoreShape {
     setError,
     setSelectedModel,
     createNewConversation,
-    resetState
+    resetState,
+
+    // token tracking actions
+    updateTokenTracking,
+    canAddMessage
   }
 }
 

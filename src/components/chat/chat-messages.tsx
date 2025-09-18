@@ -15,6 +15,7 @@ interface ChatMessagesProps {
   onRegenerate?: (modelOverride?: import('../../lib/ai-config').GeminiModelKey) => void
   onCopy?: (text: string) => void
   forceScrollToBottom?: number
+  conversationTokens?: import('../../lib/token-manager').ConversationTokens
 }
 
 const LoadingSkeleton = React.memo(() => (
@@ -44,7 +45,8 @@ export const ChatMessages = React.memo<ChatMessagesProps>(({
   onScrollStateChange,
   onRegenerate,
   onCopy,
-  forceScrollToBottom = 0
+  forceScrollToBottom = 0,
+  conversationTokens
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
@@ -137,6 +139,7 @@ export const ChatMessages = React.memo<ChatMessagesProps>(({
                 onCitationClick={onCitationClick}
                 onRegenerate={onRegenerate}
                 onCopy={onCopy}
+                conversationTokens={conversationTokens}
                 showAvatar={true}
                 showTimestamp={true}
               />

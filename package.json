@@ -4,13 +4,13 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "next dev",
-    "dev:turbo": "next dev --turbopack",
-    "build": "next build",
-    "build:analyze": "ANALYZE=true next build",
-    "start": "next start",
-    "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "dev": "cross-env NODE_NO_WARNINGS=1 next dev",
+    "dev:turbo": "cross-env NODE_NO_WARNINGS=1 next dev --turbopack",
+    "build": "cross-env NODE_NO_WARNINGS=1 next build",
+    "build:analyze": "cross-env NODE_NO_WARNINGS=1 ANALYZE=true next build",
+    "start": "cross-env NODE_NO_WARNINGS=1 next start",
+    "lint": "cross-env NODE_NO_WARNINGS=1 next lint",
+    "typecheck": "cross-env NODE_NO_WARNINGS=1 tsc --noEmit"
   },
   "dependencies": {
     "@ai-sdk/google": "^0.0.45",
@@ -64,6 +64,7 @@
     "@types/prismjs": "^1.26.5",
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
+    "cross-env": "^10.0.0",
     "eslint": "^8.57.0",
     "eslint-config-next": "^15.5.3",
     "typescript": "^5.6.2"

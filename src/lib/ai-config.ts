@@ -6,7 +6,7 @@ export const GEMINI_MODELS = {
   FLASH_LITE: {
     name: 'gemini-2.5-flash-lite',
     displayName: 'Gemini 2.5 Flash Lite',
-    maxTokens: 8192,
+    maxTokens: 800000, // 800K tokens input (leaving 200K for response)
     temperature: 0.7,
     description: 'Fastest model for simple queries and follow-ups',
     avgResponseTime: 150, // milliseconds
@@ -16,8 +16,8 @@ export const GEMINI_MODELS = {
   // Balanced for most tasks
   FLASH: {
     name: 'gemini-2.5-flash',
-    displayName: 'Gemini 2.5 Flash', 
-    maxTokens: 8192,
+    displayName: 'Gemini 2.5 Flash',
+    maxTokens: 800000, // 800K tokens input (leaving 200K for response)
     temperature: 0.7,
     description: 'Balanced speed and capability for study materials',
     avgResponseTime: 500,
@@ -28,7 +28,7 @@ export const GEMINI_MODELS = {
   PRO: {
     name: 'gemini-2.5-pro',
     displayName: 'Gemini 2.5 Pro',
-    maxTokens: 8192,
+    maxTokens: 800000, // 800K tokens input (leaving 200K for response)
     temperature: 0.7,
     description: 'Most capable for complex reasoning and analysis',
     avgResponseTime: 2000,

@@ -16,6 +16,38 @@ const supabase = createClient(
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30
 
+// Conversation-level document context cache to prevent re-fetching
+interface ConversationContext {
+  documents: Array<{
+    id: string
+    title: string
+    content: string
+    tokenCount: number
+  }>
+  totalTokens: number
+  systemPrompt?: string
+  lastUpdated: number
+}
+
+const conversationContextCache = new Map<string, ConversationContext>()
+const CONTEXT_CACHE_TTL = 30 * 60 * 1000 // 30 minutes
+const RAG_THRESHOLD = 100_000 // Use RAG only for 100K+ tokens
+
+// Clean expired cache entries
+function cleanExpiredCache() {
+  const now = Date.now()
+  for (const [key, context] of conversationContextCache.entries()) {
+    if (now - context.lastUpdated > CONTEXT_CACHE_TTL) {
+      conversationContextCache.delete(key)
+    }
+  }
+}
+
+// Determine context strategy based on token count
+function determineContextStrategy(totalTokens: number): 'SIMPLE' | 'RAG' {
+  return totalTokens >= RAG_THRESHOLD ? 'RAG' : 'SIMPLE'
+}
+
 interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
@@ -27,6 +59,7 @@ interface ChatRequest {
   messages: ChatMessage[]
   chatType: 'course' | 'lesson' | 'document' | 'general'
   documentId?: string
+  selectedDocuments?: Array<{id: string, title: string}> // Multi-document support
   conversationId?: string
   preferredModel?: GeminiModelKey
 }
@@ -42,7 +75,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { messages, chatType, documentId, conversationId, preferredModel }: ChatRequest = await req.json()
+    const { messages, chatType, documentId, selectedDocuments, conversationId, preferredModel }: ChatRequest = await req.json()
 
     if (!messages || messages.length === 0) {
       return new Response(
@@ -84,81 +117,140 @@ export async function POST(req: NextRequest) {
     let systemPrompt = getSystemPrompt(chatType, documentId, selectedModelKey)
     const documentCitations: any[] = []
 
-    if (documentId) {
-      console.log(`[AI] Document chat requested for: ${documentId}`)
+    // Handle document context with caching and conditional RAG
+    if (documentId || selectedDocuments?.length) {
+      // Clean expired cache entries
+      cleanExpiredCache()
 
-      try {
-        // Get document info and actual content
-        const { data: document, error: docError } = await supabase
-          .from('documents')
-          .select('id, title, page_count, processing_status, document_content')
-          .eq('id', documentId)
-          .single()
+      // Determine documents to process (priority: selectedDocuments > single documentId)
+      const documentsToProcess = selectedDocuments?.length
+        ? selectedDocuments
+        : documentId
+        ? [{ id: documentId, title: 'Document' }]
+        : []
 
-        if (!docError && document) {
-          console.log(`[AI] Found document: ${document.title} (${document.page_count} pages)`)
+      if (documentsToProcess.length > 0) {
+        console.log(`[AI] Document chat requested for: ${documentsToProcess.map(d => d.id).join(', ')}`)
 
-          if (document.document_content && document.document_content.trim()) {
-            console.log(`[AI] Using document content (${document.document_content.length} characters)`)
+        // Check conversation cache first
+        let conversationContext = conversationId ? conversationContextCache.get(conversationId) : null
 
-            // Check if FREE embeddings system is ready (with fallback)
-            let embeddingsAvailable = false
-            try {
-              embeddingsAvailable = await isEmbeddingsReady()
-              console.log(`[AI] FREE embeddings system: ${embeddingsAvailable ? 'READY' : 'LOADING'}`)
-            } catch (embedError) {
-              console.log(`[AI] Embeddings system error, using keyword-only search:`, embedError)
-              embeddingsAvailable = false
-            }
+        // If cache miss or documents changed, fetch and process
+        const currentDocIds = documentsToProcess.map(d => d.id).sort().join(',')
+        const cachedDocIds = conversationContext?.documents.map(d => d.id).sort().join(',')
 
-            // Use enhanced smart context system with FREE semantic search
-            const userQuery = lastMessage.content
+        if (!conversationContext || cachedDocIds !== currentDocIds) {
+          console.log(`[AI] Cache miss or document change - fetching document context`)
 
-            try {
-              // Try context building with semantic search if available
-              const contextPrompt = await buildContextPrompt(
-                userQuery,
-                document.title,
-                document.document_content,
-                {
-                  maxTokens: 8000, // Increased for comprehensive coverage
-                  chunkSize: 800, // Smaller chunks for better granularity
-                  overlap: 200,
-                  useSemanticSearch: embeddingsAvailable,
-                  hybridWeight: 0.6, // 60% semantic, 40% keyword for overview queries
-                  generateEmbeddings: true, // Enable embeddings for semantic search
-                  minRelevanceScore: 0.05, // Lower threshold for better coverage
-                  maxChunks: 12 // Allow more chunks for comprehensive search
+          try {
+            // Fetch all document contents
+            const { data: documents, error: docError } = await supabase
+              .from('documents')
+              .select('id, title, page_count, processing_status, document_content')
+              .in('id', documentsToProcess.map(d => d.id))
+
+            if (!docError && documents && documents.length > 0) {
+              console.log(`[AI] Found ${documents.length} documents`)
+
+              // Process documents and estimate tokens
+              let totalTokens = 0
+              const processedDocs = documents
+                .filter(doc => doc.document_content && doc.document_content.trim())
+                .map(doc => {
+                  const tokenCount = Math.ceil(doc.document_content.length / 4) // Rough estimation
+                  totalTokens += tokenCount
+                  return {
+                    id: doc.id,
+                    title: doc.title,
+                    content: doc.document_content,
+                    tokenCount
+                  }
+                })
+
+              // Determine context strategy
+              const strategy = determineContextStrategy(totalTokens)
+              console.log(`[AI] Total tokens: ${totalTokens.toLocaleString()}, Strategy: ${strategy}`)
+
+              let contextPrompt = ''
+
+              if (strategy === 'SIMPLE') {
+                // Simple concatenation for small documents (< 100K tokens)
+                console.log(`[AI] Using SIMPLE concatenation (${totalTokens.toLocaleString()} tokens)`)
+                contextPrompt = processedDocs.map(doc =>
+                  `\n\n=== ${doc.title} ===\n${doc.content}`
+                ).join('')
+              } else {
+                // Advanced RAG for large document collections (>= 100K tokens)
+                console.log(`[AI] Using SMART RAG (${totalTokens.toLocaleString()} tokens)`)
+
+                try {
+                  // Check if embeddings system is ready
+                  let embeddingsAvailable = false
+                  try {
+                    embeddingsAvailable = await isEmbeddingsReady()
+                    console.log(`[AI] FREE embeddings system: ${embeddingsAvailable ? 'READY' : 'LOADING'}`)
+                  } catch (embedError) {
+                    console.log(`[AI] Embeddings system error, using keyword-only search:`, embedError)
+                    embeddingsAvailable = false
+                  }
+
+                  // For multi-document RAG, combine all content and use smart context
+                  const combinedContent = processedDocs.map(doc => `=== ${doc.title} ===\n${doc.content}`).join('\n\n')
+                  const userQuery = lastMessage.content
+
+                  contextPrompt = await buildContextPrompt(
+                    userQuery,
+                    `${processedDocs.length} Documents`,
+                    combinedContent,
+                    {
+                      maxTokens: 200000, // 200K optimal limit
+                      chunkSize: 800,
+                      overlap: 200,
+                      useSemanticSearch: embeddingsAvailable,
+                      hybridWeight: 0.6, // 60% semantic, 40% keyword
+                      generateEmbeddings: true,
+                      minRelevanceScore: 0.05,
+                      maxChunks: 20 // More chunks for multi-document
+                    }
+                  )
+
+                  console.log(`[AI] Multi-document RAG context assembled using ${embeddingsAvailable ? 'semantic + keyword' : 'keyword-only'} search`)
+                } catch (contextError) {
+                  console.warn(`[AI] RAG failed, using simple fallback:`, contextError)
+                  // Fallback to simple truncation
+                  const truncatedContent = processedDocs.map(doc =>
+                    `=== ${doc.title} ===\n${doc.content.slice(0, 200000)}`
+                  ).join('\n\n').slice(0, 800000) // Max 200K tokens
+                  contextPrompt = '\n\nDocument Content:\n' + truncatedContent
                 }
-              )
+              }
 
-              console.log(`[AI] RAG context assembled using ${embeddingsAvailable ? 'semantic + keyword' : 'keyword-only'} search`)
-              systemPrompt = getSystemPrompt('document', documentId, selectedModelKey) + '\n\n' + contextPrompt
+              // Update cache
+              if (conversationId) {
+                conversationContextCache.set(conversationId, {
+                  documents: processedDocs,
+                  totalTokens,
+                  systemPrompt: systemPrompt + contextPrompt,
+                  lastUpdated: Date.now()
+                })
+              }
 
-            } catch (contextError) {
-              console.warn(`[AI] Context building failed, using simple fallback:`, contextError)
+              // Update system prompt with context
+              systemPrompt = getSystemPrompt('document', documentsToProcess[0].id, selectedModelKey) + contextPrompt
 
-              // Simple fallback: use document title and first 4000 characters
-              const fallbackContent = document.document_content.slice(0, 4000)
-              systemPrompt = getSystemPrompt('document', documentId, selectedModelKey) +
-                '\n\nDocument Content:\n' + fallbackContent
-
-              console.log(`[AI] Simple fallback context used`)
+            } else {
+              console.log(`[AI] No document content available`)
+              systemPrompt = getSystemPrompt('document', documentsToProcess[0].id, selectedModelKey) +
+                `\n\nYou're helping with ${documentsToProcess.length} document(s). The content is being processed.`
             }
-          } else {
-            console.log(`[AI] No document content available, using metadata only`)
-
-            // Fallback for documents without extracted content
-            systemPrompt = getSystemPrompt('document', documentId, selectedModelKey) +
-              `\n\nYou're helping with a document titled "${document.title}" (${document.page_count} pages). ` +
-              `The document content is being processed. For now, help the user by asking them to share ` +
-              `specific text or sections they'd like to discuss.`
+          } catch (error) {
+            console.error('[AI] Error fetching document context:', error)
           }
         } else {
-          console.error('[AI] Failed to fetch document:', docError)
+          // Use cached context
+          console.log(`[AI] Using cached document context (${conversationContext.totalTokens.toLocaleString()} tokens)`)
+          systemPrompt = conversationContext.systemPrompt || systemPrompt
         }
-      } catch (error) {
-        console.error('[AI] Error fetching document context:', error)
       }
     }
 
@@ -204,6 +296,10 @@ export async function POST(req: NextRequest) {
             console.error('[DB] Failed to save messages:', error)
           }
         }
+      },
+      experimental_telemetry: {
+        isEnabled: true,
+        functionId: 'chat-completion'
       }
     })
 

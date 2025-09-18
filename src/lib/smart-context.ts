@@ -378,7 +378,7 @@ export async function selectRelevantChunks(
   options: ContextRetrievalOptions = {}
 ): Promise<DocumentChunk[]> {
   const {
-    maxTokens = 4000,
+    maxTokens = 200000, // 200K practical limit for optimal quality
     minRelevanceScore = 0.1,
     useSemanticSearch = true,
     hybridWeight = 0.7, // 0.7 semantic, 0.3 keyword
@@ -780,8 +780,8 @@ export async function getSmartContext(
     return cached.result
   }
 
-  // For smaller documents, return full content
-  if (documentContent.length <= 8000) {
+  // For smaller documents, return full content (200K tokens ≈ 800K characters)
+  if (documentContent.length <= 800000) {
     return {
       context: documentContent,
       chunks: [{
@@ -911,8 +911,8 @@ export async function getSmartContext(
   } catch (error) {
     console.error('[SmartContext] Error in getSmartContext:', error)
 
-    // Emergency fallback: return first 4000 characters
-    const fallbackContent = documentContent.slice(0, 4000)
+    // Emergency fallback: return first 800K characters (200K tokens)
+    const fallbackContent = documentContent.slice(0, 800000)
 
     return {
       context: fallbackContent,
@@ -920,7 +920,7 @@ export async function getSmartContext(
         id: 'fallback_chunk',
         content: fallbackContent,
         startIndex: 0,
-        endIndex: 4000,
+        endIndex: Math.min(800000, documentContent.length),
         keywordScore: 0.5,
         chunkType: 'paragraph'
       }],
@@ -1467,8 +1467,8 @@ export function buildContextPromptSync(
   documentContent: string,
   options: ContextRetrievalOptions = {}
 ): string {
-  // For small documents, use simple approach
-  if (documentContent.length <= 8000) {
+  // For small documents, use simple approach (200K tokens ≈ 800K characters)
+  if (documentContent.length <= 800000) {
     return `You have access to the following content from "${documentTitle}":
 
 ${documentContent}

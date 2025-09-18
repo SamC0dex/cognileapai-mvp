@@ -6,6 +6,7 @@ import { ChatMessages } from './chat-messages'
 import { ChatEmptyState } from './chat-empty-state'
 import { SelectedDocumentDisplay } from './selected-document-display'
 import { ChatScrollButton } from './chat-scroll-button'
+import { ContextWarning } from './context-warning'
 import { useChat } from '@/lib/use-chat'
 import { getSuggestedQuestions } from '@/lib/chat-store'
 import type { GeminiModelKey } from '@/lib/ai-config'
@@ -105,8 +106,12 @@ export const ChatContainer: React.FC<{
     documentContext,
     sendMessage,
     regenerateLastMessage,
-    setError
-  } = useChat(effectiveDocumentId, conversationId)
+    setError,
+    conversationTokens,
+    contextWarning,
+    updateTokenTracking,
+    resetState
+  } = useChat(effectiveDocumentId, conversationId, selectedDocuments)
 
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [scrollTrigger, setScrollTrigger] = useState(0)
@@ -250,6 +255,13 @@ export const ChatContainer: React.FC<{
     }
   }, [addSelectedDocument, clearSelectedDocuments, updateDocumentStatus])
 
+  // Update token tracking when messages change
+  useEffect(() => {
+    if (messages.length > 0) {
+      updateTokenTracking()
+    }
+  }, [messages, updateTokenTracking])
+
   // Handle document removal
   const handleRemoveDocument = useCallback((documentId: string) => {
     // Remove from context if it's a selected document
@@ -355,6 +367,13 @@ export const ChatContainer: React.FC<{
           </div>
         )}
 
+        {/* Context Warning - Show when approaching token limits */}
+        <ContextWarning
+          conversationTokens={conversationTokens}
+          contextWarning={contextWarning}
+          onStartNewChat={() => resetState()}
+        />
+
         {/* Messages or Empty State */}
         {messages.length === 0 && !isLoading && !error ? (
           <div className="flex-1 overflow-y-auto">
@@ -373,6 +392,7 @@ export const ChatContainer: React.FC<{
             onRegenerate={handleRegenerate}
             onCopy={handleCopy}
             forceScrollToBottom={scrollTrigger}
+            conversationTokens={conversationTokens}
           />
         )}
 

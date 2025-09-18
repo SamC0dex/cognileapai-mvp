@@ -87,12 +87,14 @@ CitationLink.displayName = 'CitationLink'
 export const ChatMessage: React.FC<ChatMessageProps & {
   onRegenerate?: (modelOverride?: import('../../lib/ai-config').GeminiModelKey) => void
   onCopy?: (text: string) => void
+  conversationTokens?: import('../../lib/token-manager').ConversationTokens
 }> = React.memo(({
   message,
   onCitationClick,
   showAvatar = true,
   onRegenerate,
-  onCopy
+  onCopy,
+  conversationTokens
 }) => {
   const { role, content, timestamp, isStreaming, citations } = message
   const [showActions, setShowActions] = useState(false)
@@ -298,15 +300,10 @@ export const ChatMessage: React.FC<ChatMessageProps & {
             )}
 
             {/* Metadata for AI messages */}
-            {role === 'assistant' && message.metadata && !isStreaming && (
+            {role === 'assistant' && message.metadata?.model && !isStreaming && (
               <div className="mt-3 pt-2 border-t border-border/30 text-xs text-muted-foreground">
-                <div className="flex items-center justify-between">
-                  {message.metadata.model && (
-                    <span className="font-medium">{message.metadata.model}</span>
-                  )}
-                  {message.metadata.tokens && (
-                    <span>{message.metadata.tokens} tokens</span>
-                  )}
+                <div className="flex items-center">
+                  <span className="font-medium">{message.metadata.model}</span>
                 </div>
               </div>
             )}
@@ -417,6 +414,39 @@ export const ChatMessage: React.FC<ChatMessageProps & {
                           </motion.div>
                         )}
                       </AnimatePresence>
+                    </div>
+                  )}
+
+                  {/* Token Display */}
+                  {(message.metadata?.tokens || conversationTokens) && (
+                    <div className="px-2 py-1.5 rounded-md bg-background/80 backdrop-blur-sm border border-border/40 shadow-sm">
+                      <div className="text-xs text-muted-foreground flex items-center gap-3">
+                        {/* Individual Message Tokens */}
+                        {(() => {
+                          const apiTokens = message.metadata?.tokens
+                          const estimatedTokens = Math.ceil(message.content.length / 4) // Fallback estimation
+                          const messageTokens = apiTokens || estimatedTokens
+
+                          return (
+                            <div className="flex items-center gap-1">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                              <span>{messageTokens.toLocaleString()} tokens{!apiTokens ? ' ~' : ''}</span>
+                            </div>
+                          )
+                        })()}
+
+                        {/* Conversation Total */}
+                        {conversationTokens && (
+                          <div className="flex items-center gap-1">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                            </svg>
+                            <span>Total: {conversationTokens.totalTokens.toLocaleString()}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
 
