@@ -76,33 +76,27 @@ const panelVariants = {
     width: 48,
     opacity: 1,
     transition: {
-      type: 'spring',
-      stiffness: 400,
-      damping: 40,
-      mass: 0.5,
-      duration: 0.3
+      type: 'tween',
+      duration: 0.15,
+      ease: 'easeOut'
     }
   },
   expanded: {
     width: '40%',
     opacity: 1,
     transition: {
-      type: 'spring',
-      stiffness: 400,
-      damping: 40,
-      mass: 0.5,
-      duration: 0.3
+      type: 'tween',
+      duration: 0.2,
+      ease: 'easeInOut'
     }
   },
   expandedWithCanvas: {
     width: '50%',
     opacity: 1,
     transition: {
-      type: 'spring',
-      stiffness: 400,
-      damping: 40,
-      mass: 0.5,
-      duration: 0.3
+      type: 'tween',
+      duration: 0.2,
+      ease: 'easeInOut'
     }
   }
 }
@@ -797,7 +791,7 @@ const ExpandedPanel: React.FC<{
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -10, transition: { delay: 0.2, duration: 0.15 } }}
+        exit={{ opacity: 0, transition: { duration: 0.05 } }}
         transition={{ delay: 0.05, ...smoothTransition }}
         className="flex items-center justify-between p-4 border-b border-border bg-gradient-to-r from-brand-teal-50 to-transparent dark:from-brand-teal-900/20"
       >
@@ -840,7 +834,7 @@ const ExpandedPanel: React.FC<{
             key="canvas"
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20, transition: { delay: 0.2, duration: 0.15 } }}
+            exit={{ opacity: 0, transition: { duration: 0.05 } }}
             transition={{ type: 'spring', stiffness: 400, damping: 40 }}
             className="flex-1 flex flex-col min-h-0"
           >
@@ -1162,7 +1156,7 @@ const ExpandedPanel: React.FC<{
             key="flashcards"
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20, transition: { delay: 0.2, duration: 0.15 } }}
+            exit={{ opacity: 0, transition: { duration: 0.05 } }}
             transition={{ type: 'spring', stiffness: 400, damping: 40 }}
             className="flex-1 flex flex-col min-h-0"
           >
@@ -1180,7 +1174,7 @@ const ExpandedPanel: React.FC<{
             key="tools"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20, transition: { delay: 0.2, duration: 0.15 } }}
+            exit={{ opacity: 0, transition: { duration: 0.05 } }}
             transition={{ type: 'spring', stiffness: 400, damping: 40 }}
             className="flex-1 p-4 space-y-3 overflow-y-auto"
           >
@@ -1624,7 +1618,7 @@ export const StudyToolsPanel: React.FC<{
 
   return (
     <>
-      <AnimatePresence mode="wait">
+      <AnimatePresence>
         {isPanelExpanded ? (
           <ExpandedPanel
             key="expanded"

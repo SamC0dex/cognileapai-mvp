@@ -116,6 +116,8 @@ export async function POST(req: NextRequest) {
     // Get document context if documentId is provided
     let systemPrompt = getSystemPrompt(chatType, documentId, selectedModelKey)
     const documentCitations: any[] = []
+    let relevantContext = ''
+    let documentContextSentAlready = false
 
     // Handle document context with caching and conditional RAG
     if (documentId || selectedDocuments?.length) {
@@ -131,13 +133,27 @@ export async function POST(req: NextRequest) {
 
       if (documentsToProcess.length > 0) {
         console.log(`[AI] Document chat requested for: ${documentsToProcess.map(d => d.id).join(', ')}`)
+        console.log(`[AI] ConversationId: ${conversationId || 'undefined'}`)
+        console.log(`[AI] Cache size: ${conversationContextCache.size}`)
+
+        // Check if document context was already sent in conversation history
+        // For first message: coreMessages.length <= 1 (only user message)
+        // For subsequent messages: coreMessages.length > 1 (user + AI responses)
+        documentContextSentAlready = coreMessages.length > 1
+
+        console.log(`[AI] Document already in conversation: ${documentContextSentAlready}`)
+        console.log(`[AI] Conversation length: ${coreMessages.length} messages`)
 
         // Check conversation cache first
         let conversationContext = conversationId ? conversationContextCache.get(conversationId) : null
+        console.log(`[AI] Cache lookup result: ${conversationContext ? 'HIT' : 'MISS'}`)
 
         // If cache miss or documents changed, fetch and process
         const currentDocIds = documentsToProcess.map(d => d.id).sort().join(',')
         const cachedDocIds = conversationContext?.documents.map(d => d.id).sort().join(',')
+
+        console.log(`[AI] Current doc IDs: ${currentDocIds}`)
+        console.log(`[AI] Cached doc IDs: ${cachedDocIds || 'none'}`)
 
         if (!conversationContext || cachedDocIds !== currentDocIds) {
           console.log(`[AI] Cache miss or document change - fetching document context`)
@@ -233,10 +249,22 @@ export async function POST(req: NextRequest) {
                   systemPrompt: systemPrompt + contextPrompt,
                   lastUpdated: Date.now()
                 })
+                console.log(`[AI] ✅ CACHE UPDATED for conversation: ${conversationId}`)
+                console.log(`[AI] Cache now contains ${conversationContextCache.size} conversations`)
+              } else {
+                console.log(`[AI] ⚠️ No conversationId - cache not updated`)
               }
 
-              // Update system prompt with context
-              systemPrompt = getSystemPrompt('document', documentsToProcess[0].id, selectedModelKey) + contextPrompt
+              // Update system prompt with context ONLY if not already sent in conversation
+              if (!documentContextSentAlready) {
+                console.log(`[AI] 🎯 FIRST MESSAGE (${coreMessages.length} msg): Adding document to system prompt`)
+                systemPrompt = getSystemPrompt('document', documentsToProcess[0].id, selectedModelKey) + contextPrompt
+                relevantContext = contextPrompt
+              } else {
+                console.log(`[AI] ♻️ SUBSEQUENT MESSAGE (${coreMessages.length} msgs): Using lightweight system prompt (document already in conversation)`)
+                systemPrompt = getSystemPrompt('document', documentsToProcess[0].id, selectedModelKey)
+                // No contextPrompt added to prevent re-sending document
+              }
 
             } else {
               console.log(`[AI] No document content available`)
@@ -248,10 +276,41 @@ export async function POST(req: NextRequest) {
           }
         } else {
           // Use cached context
-          console.log(`[AI] Using cached document context (${conversationContext.totalTokens.toLocaleString()} tokens)`)
-          systemPrompt = conversationContext.systemPrompt || systemPrompt
+          console.log(`[AI] 🚀 CACHE HIT! Using cached document context (${conversationContext.totalTokens.toLocaleString()} tokens)`)
+          console.log(`[AI] Cache contains ${conversationContext.documents.length} documents`)
+
+          // Only use cached system prompt (with document) if not already sent in conversation
+          if (!documentContextSentAlready) {
+            console.log(`[AI] 🎯 FIRST MESSAGE (${coreMessages.length} msg): Using cached system prompt with document`)
+            systemPrompt = conversationContext.systemPrompt || systemPrompt
+          } else {
+            console.log(`[AI] ♻️ SUBSEQUENT MESSAGE (${coreMessages.length} msgs): Using lightweight system prompt (document already in conversation)`)
+            systemPrompt = getSystemPrompt('document', documentsToProcess[0].id, selectedModelKey)
+          }
         }
       }
+    }
+
+    // Calculate total context tokens being sent to AI
+    const systemPromptTokens = Math.ceil(systemPrompt.length / 4)
+    const conversationTokens = coreMessages.reduce((total, msg) =>
+      total + Math.ceil(msg.content.length / 4), 0
+    )
+    const totalContextTokens = systemPromptTokens + conversationTokens
+
+    const contextUsagePercent = modelConfig.maxTokens ? Math.round((totalContextTokens / modelConfig.maxTokens) * 100) : 0
+
+    console.log(`[AI] 📊 Context Window Analysis:`)
+    console.log(`[AI] System Prompt: ${systemPromptTokens.toLocaleString()} tokens`)
+    console.log(`[AI] Conversation: ${conversationTokens.toLocaleString()} tokens`)
+    console.log(`[AI] TOTAL CONTEXT: ${totalContextTokens.toLocaleString()} tokens`)
+    console.log(`[AI] Model Limit: ${modelConfig.maxTokens?.toLocaleString() || 'unlimited'} tokens`)
+    console.log(`[AI] Context Usage: ${contextUsagePercent}%`)
+
+    if (documentContextSentAlready) {
+      console.log(`[AI] 🎉 TOKEN OPTIMIZATION: Document not re-sent (already in conversation history)`)
+    } else if (relevantContext) {
+      console.log(`[AI] 📋 FIRST MESSAGE: Document included in system prompt (${Math.ceil(relevantContext.length / 4).toLocaleString()} tokens)`)
     }
 
     // Create the streaming response
