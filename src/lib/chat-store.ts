@@ -74,6 +74,14 @@ interface StoreShape {
   canAddMessage: (content: string) => { canAdd: boolean; warning?: string }
 }
 
+// Feature flags for stateful chat
+const FEATURE_FLAGS = {
+  STATEFUL_CHAT: process.env.NEXT_PUBLIC_FEATURE_FLAG_STATEFUL_CHAT === 'true',
+  STATEFUL_CHAT_PERCENTAGE: parseInt(process.env.NEXT_PUBLIC_FEATURE_FLAG_STATEFUL_CHAT_PERCENTAGE || '100'),
+  LIVE_CHAT: process.env.NEXT_PUBLIC_FEATURE_FLAG_LIVE_CHAT === 'true',
+  LIVE_CHAT_PERCENTAGE: parseInt(process.env.NEXT_PUBLIC_FEATURE_FLAG_LIVE_CHAT_PERCENTAGE || '0')
+}
+
 // Initialize Supabase client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -339,7 +347,23 @@ export function useChatStore(): StoreShape {
       let displayedText = '' // Text currently shown to user
       let isStreamingActive = true
 
-      const res = await fetch('/api/chat', {
+      // 🚀 ROUTE TO LIVE, STATEFUL OR LEGACY ENDPOINT
+      const useLiveChat = FEATURE_FLAGS.LIVE_CHAT &&
+        (Math.random() * 100 < FEATURE_FLAGS.LIVE_CHAT_PERCENTAGE)
+
+      const useStatefulChat = !useLiveChat && FEATURE_FLAGS.STATEFUL_CHAT &&
+        (Math.random() * 100 < FEATURE_FLAGS.STATEFUL_CHAT_PERCENTAGE)
+
+      const apiEndpoint = useLiveChat
+        ? '/api/chat/live'
+        : useStatefulChat
+        ? '/api/chat/stateful'
+        : '/api/chat'
+
+      const chatType = useLiveChat ? 'LIVE (TRUE stateful)' : useStatefulChat ? 'STATEFUL' : 'LEGACY'
+      console.log(`[Chat] Using ${chatType} chat endpoint`)
+
+      const res = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
