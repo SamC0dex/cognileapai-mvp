@@ -563,7 +563,7 @@ export function useChatStore(): StoreShape {
       role: msg.role as 'user' | 'assistant' | 'system',
       content: msg.content,
       timestamp: msg.timestamp,
-      tokenCount: msg.metadata?.tokens ? {
+      tokenCount: msg.metadata?.tokens && typeof msg.metadata.tokens === 'number' ? {
         estimated: msg.metadata.tokens,
         confidence: 'high' as const,
         method: 'api_count' as const,

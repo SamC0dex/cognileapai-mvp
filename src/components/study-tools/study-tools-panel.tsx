@@ -30,7 +30,6 @@ import {
   Copy,
   X,
   Check,
-  Search,
   Maximize2,
   Minimize2
 } from 'lucide-react'
@@ -96,6 +95,15 @@ const panelVariants = {
     transition: {
       type: 'tween',
       duration: 0.2,
+      ease: 'easeInOut'
+    }
+  },
+  fullscreenCanvas: {
+    width: '85%',
+    opacity: 1,
+    transition: {
+      type: 'tween',
+      duration: 0.3,
       ease: 'easeInOut'
     }
   }
@@ -296,9 +304,16 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
     setEditingValue('')
   }
 
-  const handleDelete = (id: string) => {
-    removeGeneratedContent(id)
-    setActiveDropdown(null)
+  const handleDelete = async (id: string) => {
+    try {
+      await removeGeneratedContent(id)
+      setActiveDropdown(null)
+    } catch (error) {
+      console.error('Failed to delete study tool:', error)
+      setActiveDropdown(null)
+      // Note: Error is logged but UI continues to work. The rollback in the store
+      // will restore the item if database deletion failed.
+    }
   }
 
   const handleCopyContent = async (content: string) => {
@@ -714,10 +729,9 @@ const ExpandedPanel: React.FC<{
   hasContext: boolean
 }> = ({ onCollapse, onGenerateStudyTool, isGenerating, generatingType, hasContext }) => {
   const prefersReducedMotion = useReducedMotion()
-  const { isCanvasOpen, canvasContent, closeCanvas, copyToClipboard, downloadAsPDF, downloadAsDOCX } = useStudyToolsStore()
+  const { isCanvasOpen, isCanvasFullscreen, canvasContent, closeCanvas, toggleCanvasFullscreen, copyToClipboard, downloadAsPDF, downloadAsDOCX } = useStudyToolsStore()
   const { isViewerOpen, currentFlashcardSet, isFullscreen, closeViewer, toggleFullscreen } = useFlashcardStore()
   const [isCopied, setIsCopied] = React.useState(false)
-  const [searchTerm, setSearchTerm] = React.useState('')
   const [showExportMenu, setShowExportMenu] = React.useState(false)
 
   // Close export menu when clicking outside
@@ -783,7 +797,11 @@ const ExpandedPanel: React.FC<{
     <motion.div
       variants={panelVariants}
       initial="collapsed"
-      animate={isCanvasOpen ? "expandedWithCanvas" : "expanded"}
+      animate={
+        isCanvasOpen && !isCanvasFullscreen
+          ? "expandedWithCanvas"
+          : "expanded"
+      }
       exit="collapsed"
       className="h-full bg-background/95 backdrop-blur-sm border-r border-border flex flex-col shadow-lg"
     >
@@ -829,7 +847,7 @@ const ExpandedPanel: React.FC<{
 
       {/* Canvas Content or Tools Grid */}
       <AnimatePresence mode="wait">
-        {isCanvasOpen && canvasContent ? (
+        {isCanvasOpen && canvasContent && !isCanvasFullscreen ? (
           <motion.div
             key="canvas"
             initial={{ opacity: 0, x: -20 }}
@@ -869,53 +887,80 @@ const ExpandedPanel: React.FC<{
               </div>
 
               <div className="flex items-center gap-2">
-                {/* Copy button */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCopy}
-                  className={cn(
-                    "flex items-center gap-2 transition-all duration-200",
-                    isCopied && "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400"
-                  )}
+                {/* Fullscreen toggle - Icon only */}
+                <motion.div
+                  whileHover={!prefersReducedMotion ? { scale: 1.05 } : undefined}
+                  whileTap={!prefersReducedMotion ? { scale: 0.95 } : undefined}
                 >
-                  <AnimatePresence mode="wait">
-                    {isCopied ? (
-                      <motion.div
-                        key="copied"
-                        initial={{ scale: 0, rotate: -180 }}
-                        animate={{ scale: 1, rotate: 0 }}
-                        exit={{ scale: 0, rotate: 180 }}
-                        className="flex items-center gap-1"
-                      >
-                        <Check className="w-3 h-3" />
-                        <span className="text-xs">Copied</span>
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        key="copy"
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="flex items-center gap-1"
-                      >
-                        <Copy className="w-3 h-3" />
-                        <span className="text-xs">Copy</span>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </Button>
-
-                {/* Export menu */}
-                <div className="relative" data-dropdown="true">
                   <Button
                     variant="outline"
-                    size="sm"
-                    onClick={() => setShowExportMenu(!showExportMenu)}
-                    className="flex items-center gap-1"
+                    size="icon"
+                    onClick={toggleCanvasFullscreen}
+                    className="w-8 h-8"
+                    title={isCanvasFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
                   >
-                    <Download className="w-3 h-3" />
-                    <span className="text-xs">Export</span>
+                    {isCanvasFullscreen ? (
+                      <Minimize2 className="w-4 h-4" />
+                    ) : (
+                      <Maximize2 className="w-4 h-4" />
+                    )}
                   </Button>
+                </motion.div>
+
+                {/* Copy button - Icon only */}
+                <motion.div
+                  whileHover={!prefersReducedMotion ? { scale: 1.05 } : undefined}
+                  whileTap={!prefersReducedMotion ? { scale: 0.95 } : undefined}
+                >
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleCopy}
+                    className={cn(
+                      "w-8 h-8 transition-all duration-200",
+                      isCopied && "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400"
+                    )}
+                    title={isCopied ? "Copied!" : "Copy to clipboard"}
+                  >
+                    <AnimatePresence mode="wait">
+                      {isCopied ? (
+                        <motion.div
+                          key="copied"
+                          initial={{ scale: 0, rotate: -180 }}
+                          animate={{ scale: 1, rotate: 0 }}
+                          exit={{ scale: 0, rotate: 180 }}
+                        >
+                          <Check className="w-4 h-4" />
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          key="copy"
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                        >
+                          <Copy className="w-4 h-4" />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </Button>
+                </motion.div>
+
+                {/* Export menu - Icon only */}
+                <div className="relative" data-dropdown="true">
+                  <motion.div
+                    whileHover={!prefersReducedMotion ? { scale: 1.05 } : undefined}
+                    whileTap={!prefersReducedMotion ? { scale: 0.95 } : undefined}
+                  >
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setShowExportMenu(!showExportMenu)}
+                      className="w-8 h-8"
+                      title="Export options"
+                    >
+                      <Download className="w-4 h-4" />
+                    </Button>
+                  </motion.div>
 
                   <AnimatePresence>
                     {showExportMenu && (
@@ -971,22 +1016,6 @@ const ExpandedPanel: React.FC<{
               </div>
             </div>
 
-            {/* Search toolbar */}
-            <div className="flex items-center gap-2 p-3 border-b border-border bg-muted/20 relative z-0">
-              <div className="relative flex-1">
-                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-muted-foreground" />
-                <input
-                  type="text"
-                  placeholder="Search in document..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-7 pr-3 py-1.5 text-xs border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary/50"
-                />
-              </div>
-              <span className="text-xs text-muted-foreground">
-                {Math.round(canvasContent.content.length / 1000)}k chars
-              </span>
-            </div>
 
             {/* Canvas Content */}
             <div className="flex-1 overflow-y-auto">
@@ -1018,37 +1047,6 @@ const ExpandedPanel: React.FC<{
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      // Custom text renderer to handle search highlighting
-                      text: ({ children, ...props }) => {
-                        if (!searchTerm || typeof children !== 'string' || !children.trim()) {
-                          return <span {...props}>{children}</span>
-                        }
-
-                        try {
-                          // Escape special regex characters
-                          const escapedTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-                          const regex = new RegExp(`(${escapedTerm})`, 'gi')
-                          const parts = children.split(regex)
-
-                          return (
-                            <span {...props}>
-                              {parts.map((part, index) => {
-                                if (part && regex.test(part)) {
-                                  return (
-                                    <mark key={index} className="bg-yellow-200 dark:bg-yellow-800 px-0.5 rounded text-black dark:text-white">
-                                      {part}
-                                    </mark>
-                                  )
-                                }
-                                return part || ''
-                              })}
-                            </span>
-                          )
-                        } catch (error) {
-                          console.error('Search highlighting error:', error)
-                          return <span {...props}>{children}</span>
-                        }
-                      },
                       h1: ({ children }) => (
                         <h1 className="text-xl font-bold text-foreground border-b-2 border-primary/20 pb-3 mb-4 mt-8 first:mt-0 bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
                           {children}
@@ -1262,8 +1260,14 @@ const FlashcardSetsSection: React.FC = () => {
 
   // handleCopyFlashcards function removed as per user request
 
-  const handleDelete = (flashcardSetId: string) => {
-    removeFlashcardSet(flashcardSetId)
+  const handleDelete = async (flashcardSetId: string) => {
+    try {
+      await removeFlashcardSet(flashcardSetId)
+    } catch (error) {
+      console.error('Failed to delete flashcard set:', error)
+      // Note: Error is logged but UI continues to work. The rollback in the store
+      // will restore the item if database deletion failed.
+    }
   }
 
   // Flashcard Dropdown Menu Component

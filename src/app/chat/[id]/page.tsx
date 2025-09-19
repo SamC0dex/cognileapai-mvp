@@ -8,6 +8,7 @@ import { ChatContainer } from '@/components/chat/chat-container'
 import { ChatHistoryDrawer } from '@/components/chat-history-drawer'
 import { createThreadId, upsertThread, type ChatThread } from '@/lib/chat-history'
 import { useFlashcardStore } from '@/lib/flashcard-store'
+import { useStudyToolsStore } from '@/components/study-tools'
 import type { GeminiModelKey } from '@/lib/ai-config'
 import type { DocumentUploadedDetail } from '@/types/documents'
 import { GeminiLogo } from '@/components/icons/gemini-logo'
@@ -29,7 +30,9 @@ export default function ChatPage({ params }: ChatPageProps) {
   const [chatType, setChatType] = useState<'course' | 'lesson' | 'document' | null>(null)
   const [isInitialized, setIsInitialized] = useState(false)
   const { isViewerOpen, isFullscreen } = useFlashcardStore()
+  const { isCanvasOpen, isCanvasFullscreen } = useStudyToolsStore()
   const isFlashcardFullscreen = isViewerOpen && isFullscreen
+  const isCanvasFullscreenMode = isCanvasOpen && isCanvasFullscreen
 
   // Sanitize potentially unsafe titles from URL
   const sanitizeTitle = useCallback((raw: string): string => {
@@ -187,8 +190,8 @@ export default function ChatPage({ params }: ChatPageProps) {
   return (
     <DashboardLayout>
       <div className="h-full min-h-0 flex flex-col bg-background">
-        {/* Header - Hidden in flashcard fullscreen mode */}
-        {!isFlashcardFullscreen && (
+        {/* Header - Hidden in fullscreen modes */}
+        {!isFlashcardFullscreen && !isCanvasFullscreenMode && (
           <div className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex-shrink-0">
           <div className="px-6 py-2">
             <div className="flex items-center justify-between">

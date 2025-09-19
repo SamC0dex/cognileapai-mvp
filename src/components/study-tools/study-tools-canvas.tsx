@@ -22,7 +22,6 @@ import {
   ExternalLink,
   Share2,
   Maximize2,
-  Search,
   Minimize2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -98,6 +97,8 @@ interface CanvasHeaderProps {
   onCopy: () => void
   onDownloadPDF: () => void
   onDownloadDOCX: () => void
+  onToggleFullscreen: () => void
+  isFullscreen: boolean
   isCopied: boolean
 }
 
@@ -107,6 +108,8 @@ const CanvasHeader: React.FC<CanvasHeaderProps> = ({
   onCopy,
   onDownloadPDF,
   onDownloadDOCX,
+  onToggleFullscreen,
+  isFullscreen,
   isCopied
 }) => {
   const tool = STUDY_TOOLS[content.type]
@@ -174,19 +177,20 @@ const CanvasHeader: React.FC<CanvasHeaderProps> = ({
         transition={{ delay: 0.3 }}
         className="flex items-center gap-2"
       >
-        {/* Copy button */}
+        {/* Copy button - Icon only */}
         <motion.div
-          whileHover={!prefersReducedMotion ? { scale: 1.02 } : undefined}
-          whileTap={!prefersReducedMotion ? { scale: 0.98 } : undefined}
+          whileHover={!prefersReducedMotion ? { scale: 1.05 } : undefined}
+          whileTap={!prefersReducedMotion ? { scale: 0.95 } : undefined}
         >
           <Button
             variant="outline"
-            size="sm"
+            size="icon"
             onClick={onCopy}
             className={cn(
-              "flex items-center gap-2 transition-all duration-200",
+              "w-9 h-9 transition-all duration-200",
               isCopied && "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400"
             )}
+            title={isCopied ? "Copied!" : "Copy to clipboard"}
           >
             <AnimatePresence mode="wait">
               {isCopied ? (
@@ -195,46 +199,56 @@ const CanvasHeader: React.FC<CanvasHeaderProps> = ({
                   initial={{ scale: 0, rotate: -180 }}
                   animate={{ scale: 1, rotate: 0 }}
                   exit={{ scale: 0, rotate: 180 }}
-                  className="flex items-center gap-2"
                 >
                   <Check className="w-4 h-4" />
-                  Copied
                 </motion.div>
               ) : (
                 <motion.div
                   key="copy"
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
-                  className="flex items-center gap-2"
                 >
                   <Copy className="w-4 h-4" />
-                  Copy
                 </motion.div>
               )}
             </AnimatePresence>
           </Button>
         </motion.div>
 
-        {/* Export menu */}
+        {/* Fullscreen toggle - Icon only */}
+        <motion.div
+          whileHover={!prefersReducedMotion ? { scale: 1.05 } : undefined}
+          whileTap={!prefersReducedMotion ? { scale: 0.95 } : undefined}
+        >
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={onToggleFullscreen}
+            className="w-9 h-9"
+            title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+          >
+            {isFullscreen ? (
+              <Minimize2 className="w-4 h-4" />
+            ) : (
+              <Maximize2 className="w-4 h-4" />
+            )}
+          </Button>
+        </motion.div>
+
+        {/* Export menu - Icon only */}
         <div className="relative">
           <motion.div
-            whileHover={!prefersReducedMotion ? { scale: 1.02 } : undefined}
-            whileTap={!prefersReducedMotion ? { scale: 0.98 } : undefined}
+            whileHover={!prefersReducedMotion ? { scale: 1.05 } : undefined}
+            whileTap={!prefersReducedMotion ? { scale: 0.95 } : undefined}
           >
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
               onClick={() => setShowExportMenu(!showExportMenu)}
-              className="flex items-center gap-2"
+              className="w-9 h-9"
+              title="Export options"
             >
               <Download className="w-4 h-4" />
-              Export
-              <motion.div
-                animate={{ rotate: showExportMenu ? 180 : 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                <MoreHorizontal className="w-3 h-3" />
-              </motion.div>
             </Button>
           </motion.div>
 
@@ -299,11 +313,10 @@ const CanvasHeader: React.FC<CanvasHeaderProps> = ({
 
 interface ContentRendererProps {
   content: StudyToolContent
+  isFullscreen: boolean
 }
 
-const ContentRenderer: React.FC<ContentRendererProps> = ({ content }) => {
-  const [searchTerm, setSearchTerm] = useState('')
-  const [isFullscreen, setIsFullscreen] = useState(false)
+const ContentRenderer: React.FC<ContentRendererProps> = ({ content, isFullscreen }) => {
 
   // Handle flashcards specifically
   if (content.type === 'flashcards') {
@@ -348,19 +361,14 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ content }) => {
                 </span>
               </div>
 
-              {/* Fullscreen toggle */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsFullscreen(!isFullscreen)}
-                className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
-              >
+              {/* Fullscreen status indicator */}
+              <div className="flex items-center gap-2 text-muted-foreground">
                 {isFullscreen ? (
-                  <><Minimize2 className="w-4 h-4" /> Exit Fullscreen</>
+                  <><Minimize2 className="w-4 h-4" /> Fullscreen Mode</>
                 ) : (
-                  <><Maximize2 className="w-4 h-4" /> Fullscreen</>
+                  <><Maximize2 className="w-4 h-4" /> Standard View</>
                 )}
-              </Button>
+              </div>
             </motion.div>
 
             {/* Flashcard viewer */}
@@ -369,7 +377,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ content }) => {
                 flashcards={parsedContent}
                 title={content.title}
                 isFullscreen={isFullscreen}
-                onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
+                onToggleFullscreen={() => {}} // Disabled - controlled by canvas header
                 className="h-full"
               />
             </div>
@@ -530,62 +538,55 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ content }) => {
     )
   }
 
-  const highlightSearchTerm = (text: string) => {
-    if (!searchTerm) return text
-    const regex = new RegExp(`(${searchTerm})`, 'gi')
-    return text.replace(regex, '<mark class="bg-yellow-200 dark:bg-yellow-800">$1</mark>')
-  }
 
   return (
-    <div className={cn(
-      "flex flex-col h-full",
-      isFullscreen && "fixed inset-0 z-50 bg-background"
-    )}>
+    <div className="flex flex-col h-full">
       {/* Enhanced toolbar */}
       <motion.div
         initial={{ opacity: 0, y: -5 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center gap-3 p-4 border-b border-border bg-muted/30 backdrop-blur-sm sticky top-0 z-10"
+        className={cn(
+          "flex items-center gap-3 border-b border-border bg-muted/30 backdrop-blur-sm sticky top-0 z-10",
+          isFullscreen ? "px-8 py-4" : "p-4"
+        )}
       >
-        {/* Search */}
-        <div className="flex items-center gap-2 flex-1 max-w-md">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search in document..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-sm border border-border rounded-lg bg-background/50 focus:outline-none focus:ring-2 focus:ring-brand-teal-500/50"
-            />
-          </div>
+        {/* Status indicator */}
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+          <span className="text-sm text-muted-foreground">
+            {content.type === 'flashcards' ? 'Interactive Content' : 'Study Material'}
+          </span>
         </div>
-
-        {/* Fullscreen toggle */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setIsFullscreen(!isFullscreen)}
-          className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
-        >
-          {isFullscreen ? (
-            <><Minimize2 className="w-4 h-4" /> Exit Fullscreen</>
-          ) : (
-            <><Maximize2 className="w-4 h-4" /> Fullscreen</>
-          )}
-        </Button>
+        {isFullscreen && (
+          <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+            <Maximize2 className="w-3 h-3" />
+            Fullscreen Reading Mode
+          </div>
+        )}
       </motion.div>
 
       {/* Content area with enhanced scrolling */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-none p-6 pb-12">
+        <div className={cn(
+          "max-w-none pb-12",
+          isFullscreen
+            ? "px-12 py-8 mx-auto max-w-4xl" // Centered, paper-like layout for fullscreen
+            : "p-6" // Standard padding for normal view
+        )}>
           {renderTypeSpecificHeader()}
 
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.1 }}
-            className="prose prose-base max-w-none dark:prose-invert prose-headings:scroll-m-4"
+            className={cn(
+              "prose prose-base max-w-none dark:prose-invert prose-headings:scroll-m-4",
+              isFullscreen && [
+                "bg-background/80 rounded-lg border border-border/50 shadow-lg",
+                "px-8 py-6 backdrop-blur-sm",
+                "prose-lg" // Larger text for fullscreen reading
+              ]
+            )}
             style={{
               '--tw-prose-body': 'hsl(var(--foreground))',
               '--tw-prose-headings': 'hsl(var(--foreground))',
@@ -621,8 +622,10 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ content }) => {
 export const StudyToolsCanvas: React.FC = React.memo(() => {
   const {
     isCanvasOpen,
+    isCanvasFullscreen,
     canvasContent,
     closeCanvas,
+    toggleCanvasFullscreen,
     copyToClipboard,
     downloadAsPDF,
     downloadAsDOCX,
@@ -662,6 +665,10 @@ export const StudyToolsCanvas: React.FC = React.memo(() => {
     }
   }, [canvasContent, downloadAsDOCX])
 
+  const handleToggleFullscreen = useCallback(() => {
+    toggleCanvasFullscreen()
+  }, [toggleCanvasFullscreen])
+
   return (
     <AnimatePresence mode="wait">
       {isCanvasOpen && canvasContent && (
@@ -671,7 +678,12 @@ export const StudyToolsCanvas: React.FC = React.memo(() => {
           initial="hidden"
           animate="visible"
           exit="exit"
-          className="h-full bg-background/95 backdrop-blur-sm border-l border-border flex flex-col shadow-xl"
+          className={cn(
+            "h-full bg-background/95 backdrop-blur-sm border-l border-border flex flex-col",
+            isCanvasFullscreen
+              ? "shadow-2xl border-2 border-primary/20 bg-background/98"
+              : "shadow-xl"
+          )}
         >
           <CanvasHeader
             content={canvasContent}
@@ -679,6 +691,8 @@ export const StudyToolsCanvas: React.FC = React.memo(() => {
             onCopy={handleCopy}
             onDownloadPDF={handleDownloadPDF}
             onDownloadDOCX={handleDownloadDOCX}
+            onToggleFullscreen={handleToggleFullscreen}
+            isFullscreen={isCanvasFullscreen}
             isCopied={isCopied}
           />
           <motion.div
@@ -687,7 +701,7 @@ export const StudyToolsCanvas: React.FC = React.memo(() => {
             animate="visible"
             className="flex-1 overflow-hidden"
           >
-            <ContentRenderer content={canvasContent} />
+            <ContentRenderer content={canvasContent} isFullscreen={isCanvasFullscreen} />
           </motion.div>
         </motion.div>
       )}

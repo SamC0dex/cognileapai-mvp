@@ -35,6 +35,7 @@ interface ChatDocumentRequest {
 }
 
 interface DocumentContext {
+  id: string
   title: string
   content: string
   sections: Array<{
@@ -200,7 +201,18 @@ async function loadDocumentContext(documentId: string, message: string): Promise
     
     if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
       console.log(`[Cache] Using cached document context for ${documentId}`)
-      return selectRelevantSections(cached.data, message)
+      // Reconstruct proper DocumentContext from cached data
+      const cachedContext: DocumentContext = {
+        id: cached.data.id,
+        title: cached.data.title,
+        content: cached.content,
+        sections: (cached.data.sections || []).map((section, index) => ({
+          id: `cached-section-${index}`,
+          title: section.title || '',
+          content: section.content || ''
+        }))
+      }
+      return selectRelevantSections(cachedContext, message)
     }
 
     // Fetch document from database
@@ -228,6 +240,7 @@ async function loadDocumentContext(documentId: string, message: string): Promise
     }
 
     const documentData: DocumentContext = {
+      id: document.id,
       title: document.title,
       content: document.content || '',
       sections: (sections || []).map(section => ({

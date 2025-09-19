@@ -9,6 +9,7 @@ interface ChatHistoryDrawerProps {
   open: boolean
   onClose: () => void
   onSelectThread?: (thread: ChatThread) => void
+  onNewChat?: () => void
   currentConversationId?: string | null
   onCurrentChatDeleted?: () => void
 }
@@ -17,6 +18,7 @@ export function ChatHistoryDrawer({
   open,
   onClose,
   onSelectThread,
+  onNewChat,
   currentConversationId,
   onCurrentChatDeleted
 }: ChatHistoryDrawerProps) {

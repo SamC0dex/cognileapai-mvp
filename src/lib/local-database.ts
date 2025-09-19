@@ -77,8 +77,7 @@ export class LocalChatDatabase extends Dexie {
     return this.messages
       .where('conversationId')
       .equals(conversationId)
-      .orderBy('timestamp')
-      .toArray()
+      .sortBy('timestamp')
   }
 
   async addMessage(message: Omit<LocalMessage, 'timestamp'>): Promise<string> {

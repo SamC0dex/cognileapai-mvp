@@ -213,14 +213,12 @@ export async function POST(req: NextRequest) {
     const startTime = Date.now()
 
     const result = await generateText({
-      model: google('gemini-2.5-pro', {
-        topK: 40,
-        topP: 0.95,
-        temperature: 0.7,
-      }),
+      model: google('gemini-2.5-pro'),
       system: systemPrompt,
       prompt: userPrompt,
       maxTokens: undefined, // No limit for comprehensive generation
+      topK: 40,
+      temperature: 0.7,
     })
 
     const duration = Date.now() - startTime

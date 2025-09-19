@@ -51,8 +51,8 @@ export async function extractPDFText(pdfBuffer: Buffer): Promise<{
   // Set up worker
   if (typeof window === 'undefined') {
     // Server-side: use node canvas factory
-    const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.min.js')
-    pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker.default
+    // Use CDN worker for better compatibility
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.worker.min.js'
   }
 
   const loadingTask = pdfjsLib.getDocument({ data: pdfBuffer })
@@ -84,7 +84,7 @@ export async function extractPDFText(pdfBuffer: Buffer): Promise<{
     pageTexts,
     metadata: {
       pageCount: pdf.numPages,
-      title: metadata.info?.Title
+      title: (metadata.info as any)?.Title || 'Untitled Document'
     }
   }
 }

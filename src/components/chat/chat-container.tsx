@@ -14,9 +14,27 @@ import { createClient } from '@supabase/supabase-js'
 import { useDocuments } from '@/contexts/documents-context'
 import { StudyToolsPanel, useStudyToolsStore } from '@/components/study-tools'
 import { FlashcardViewer } from '@/components/study-tools/flashcard-viewer'
+// Fullscreen canvas will be created inline
 import { useFlashcardStore } from '@/lib/flashcard-store'
 import { motion, useReducedMotion } from 'framer-motion'
 import type { DocumentUploadedDetail } from '@/types/documents'
+import {
+  Copy,
+  Download,
+  Minimize2,
+  Check,
+  Sparkles,
+  X,
+  FileText,
+  Calendar,
+  ZoomIn,
+  Plus,
+  Minus
+} from 'lucide-react'
+import { Button } from '@/components/ui'
+import { cn } from '@/lib/utils'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 // Enhanced chat area width variants for coordinated layout
 const layoutVariants = {
@@ -83,7 +101,7 @@ export const ChatContainer: React.FC<{
     addSelectedDocument,
     clearSelectedDocuments
   } = useDocuments()
-  const { isPanelExpanded, isCanvasOpen } = useStudyToolsStore()
+  const { isPanelExpanded, isCanvasOpen, isCanvasFullscreen, canvasContent } = useStudyToolsStore()
   const { isViewerOpen, currentFlashcardSet, isFullscreen, closeViewer, toggleFullscreen } = useFlashcardStore()
   const prefersReducedMotion = useReducedMotion()
 
@@ -434,8 +452,240 @@ export const ChatContainer: React.FC<{
           />
         </div>
       )}
+
+      {/* Fullscreen Canvas Viewer - Rendered at this level to respect sidebar layout */}
+      {isCanvasOpen && canvasContent && isCanvasFullscreen && (
+        <FullscreenCanvas />
+      )}
     </div>
   )
 })
+
+// Fullscreen Canvas Component
+const FullscreenCanvas: React.FC = () => {
+  const { canvasContent, closeCanvas, toggleCanvasFullscreen, copyToClipboard, downloadAsPDF, downloadAsDOCX } = useStudyToolsStore()
+  const [isCopied, setIsCopied] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showZoomControl, setShowZoomControl] = useState(false)
+  const [zoomLevel, setZoomLevel] = useState(100)
+
+  if (!canvasContent) return null
+
+  const handleCopy = async () => {
+    const success = await copyToClipboard(canvasContent.content)
+    if (success) {
+      setIsCopied(true)
+      setTimeout(() => setIsCopied(false), 2000)
+    }
+  }
+
+  const handleDownloadPDF = async () => {
+    try {
+      await downloadAsPDF(canvasContent)
+      setShowExportMenu(false)
+    } catch (error) {
+      console.error('PDF download failed:', error)
+    }
+  }
+
+  const handleDownloadDOCX = async () => {
+    try {
+      await downloadAsDOCX(canvasContent)
+      setShowExportMenu(false)
+    } catch (error) {
+      console.error('DOCX download failed:', error)
+    }
+  }
+
+  const handleZoomIn = () => {
+    setZoomLevel(prev => Math.min(prev + 10, 200))
+  }
+
+  const handleZoomOut = () => {
+    setZoomLevel(prev => Math.max(prev - 10, 50))
+  }
+
+  const handleResetZoom = () => {
+    setZoomLevel(100)
+  }
+
+  // Close menus when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element
+      if (showZoomControl && !target.closest('[data-zoom-control]')) {
+        setShowZoomControl(false)
+      }
+      if (showExportMenu && !target.closest('[data-export-menu]')) {
+        setShowExportMenu(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showZoomControl, showExportMenu])
+
+  return (
+    <div className="absolute inset-0 bg-background z-40">
+      <div className="h-full flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-3 border-b border-border bg-background/95 backdrop-blur-sm">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-primary/10 border border-primary/20">
+              <FileText className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <h1 className="font-semibold text-xl text-foreground">
+                {canvasContent.title}
+              </h1>
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  {canvasContent.createdAt.toLocaleDateString()}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Sparkles className="w-3 h-3" />
+                  Fullscreen Reading Mode
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Zoom button */}
+            <div className="relative" data-zoom-control>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowZoomControl(!showZoomControl)}
+                title="Zoom control"
+              >
+                <ZoomIn className="w-4 h-4" />
+              </Button>
+
+              {showZoomControl && (
+                <div className="absolute right-full top-1/2 -translate-y-1/2 mr-2 bg-popover border border-border rounded-xl shadow-xl z-[9999] overflow-hidden whitespace-nowrap">
+                  <div className="flex items-center bg-background/95 backdrop-blur-sm">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleZoomOut}
+                      disabled={zoomLevel <= 50}
+                      className="rounded-none border-r border-border px-3 py-2 h-10"
+                      title="Zoom out"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </Button>
+                    <div className="px-4 py-2 min-w-[60px] text-center text-sm font-medium bg-background border-r border-border">
+                      {zoomLevel}%
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleZoomIn}
+                      disabled={zoomLevel >= 200}
+                      className="rounded-none px-3 py-2 h-10"
+                      title="Zoom in"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Copy button */}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleCopy}
+              className={cn(
+                "transition-all duration-200",
+                isCopied && "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400"
+              )}
+              title={isCopied ? "Copied!" : "Copy to clipboard"}
+            >
+              {isCopied ? (
+                <Check className="w-4 h-4" />
+              ) : (
+                <Copy className="w-4 h-4" />
+              )}
+            </Button>
+
+            {/* Export button */}
+            <div className="relative" data-export-menu>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                title="Export options"
+              >
+                <Download className="w-4 h-4" />
+              </Button>
+
+              {showExportMenu && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-popover border border-border rounded-xl shadow-xl z-[9999]">
+                  <div className="p-1">
+                    <button
+                      onClick={handleDownloadPDF}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors hover:bg-accent"
+                    >
+                      <FileText className="w-4 h-4 text-red-500" />
+                      Download as PDF
+                    </button>
+                    <button
+                      onClick={handleDownloadDOCX}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors hover:bg-accent"
+                    >
+                      <FileText className="w-4 h-4 text-blue-500" />
+                      Download as Text
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Exit fullscreen */}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={toggleCanvasFullscreen}
+              title="Exit fullscreen"
+            >
+              <Minimize2 className="w-4 h-4" />
+            </Button>
+
+            {/* Close button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={closeCanvas}
+              className="hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+              title="Close canvas"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto">
+          <div
+            className="max-w-4xl mx-auto px-8 py-8 transition-transform duration-200 origin-top"
+            style={{ transform: `scale(${zoomLevel / 100})` }}
+          >
+            <div className="bg-background/80 rounded-lg border border-border/50 shadow-lg px-8 py-6 backdrop-blur-sm">
+              <div className="prose prose-lg max-w-none dark:prose-invert">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {canvasContent.content}
+                </ReactMarkdown>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 ChatContainer.displayName = 'ChatContainer'

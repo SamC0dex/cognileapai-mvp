@@ -71,9 +71,11 @@ interface StudyToolsStore {
 
   // Canvas state
   isCanvasOpen: boolean
+  isCanvasFullscreen: boolean
   canvasContent: StudyToolContent | null
   openCanvas: (content: StudyToolContent) => void
   closeCanvas: () => void
+  toggleCanvasFullscreen: () => void
 
   // Generation state
   isGenerating: boolean
@@ -85,7 +87,7 @@ interface StudyToolsStore {
   // Content management
   generatedContent: StudyToolContent[]
   addGeneratedContent: (content: StudyToolContent) => void
-  removeGeneratedContent: (id: string) => void
+  removeGeneratedContent: (id: string) => Promise<void>
   renameGeneratedContent: (id: string, newTitle: string) => void
   clearGeneratedContent: () => void
 
@@ -109,6 +111,7 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
 
   // Canvas state
   isCanvasOpen: false,
+  isCanvasFullscreen: false,
   canvasContent: null,
   openCanvas: (content: StudyToolContent) => {
     console.log('[StudyToolsStore] Opening canvas with content:', content)
@@ -127,9 +130,14 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
     set({ canvasContent: content, isCanvasOpen: true })
   },
   closeCanvas: () => {
-    set({ isCanvasOpen: false })
+    set({ isCanvasOpen: false, isCanvasFullscreen: false })
     // Don't clear content immediately to allow for smooth animation
     setTimeout(() => set({ canvasContent: null }), 300)
+  },
+  toggleCanvasFullscreen: () => {
+    set(state => ({
+      isCanvasFullscreen: !state.isCanvasFullscreen
+    }))
   },
 
   // Generation state
@@ -210,7 +218,7 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
         if (type === 'flashcards') {
           const { useFlashcardStore } = require('@/lib/flashcard-store')
           const flashcardStore = useFlashcardStore.getState()
-          const updatedSets = flashcardStore.flashcardSets.map(set =>
+          const updatedSets = flashcardStore.flashcardSets.map((set: any) =>
             set.id === placeholderContent.id
               ? {
                   ...set,
@@ -345,10 +353,56 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
       generatedContent: [content, ...state.generatedContent]
     }))
   },
-  removeGeneratedContent: (id: string) => {
+  removeGeneratedContent: async (id: string) => {
+    console.log('[StudyToolsStore] Removing generated content:', id)
+
+    // Find the content to remove for potential rollback
+    const currentState = get()
+    const contentToRemove = currentState.generatedContent.find(content => content.id === id)
+
+    if (!contentToRemove) {
+      console.warn('[StudyToolsStore] Content not found in local state:', id)
+      return
+    }
+
+    // Remove from local state immediately for responsive UI
     set(state => ({
       generatedContent: state.generatedContent.filter(content => content.id !== id)
     }))
+
+    try {
+      // Sync deletion with database
+      const response = await fetch('/api/study-tools/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id })
+      })
+
+      console.log('[StudyToolsStore] Delete API response status:', response.status)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('[StudyToolsStore] Delete API error response:', errorText)
+        throw new Error(`Failed to delete from database: ${response.status} - ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log('[StudyToolsStore] Successfully deleted from database:', result)
+    } catch (error) {
+      console.error('[StudyToolsStore] Failed to sync deletion to database:', error)
+
+      // Rollback: add the content back to local state since database deletion failed
+      set(state => ({
+        generatedContent: [contentToRemove, ...state.generatedContent].sort((a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )
+      }))
+
+      // Re-throw error to allow UI to show error message if needed
+      throw error
+    }
   },
   renameGeneratedContent: (id: string, newTitle: string) => {
     set(state => ({
@@ -428,7 +482,7 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
                     id: flashcardTool.id,
                     title: flashcardTool.title,
                     cards: parsedCards,
-                    options: { numberOfCards: 'standard', difficulty: 'medium' },
+                    options: { numberOfCards: 'standard' as const, difficulty: 'medium' as const },
                     createdAt: new Date(flashcardTool.createdAt),
                     documentId: flashcardTool.documentId,
                     conversationId: flashcardTool.conversationId,

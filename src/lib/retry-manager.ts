@@ -288,18 +288,10 @@ class BackgroundRetryManager {
   }
 
   private async retryChatTask(payload: any): Promise<boolean> {
-    // Import chat functionality dynamically to avoid circular dependencies
-    const { useChatStore } = await import('./chat-store')
-
-    try {
-      // This would trigger the chat API call again
-      const store = useChatStore.getState()
-      await store.sendMessage(payload.message, payload.documentId, payload.conversationId)
-      return true
-    } catch (error) {
-      console.error('[RetryManager] Chat retry failed:', error)
-      return false
-    }
+    // TODO: Implement proper chat retry mechanism
+    // Note: This requires refactoring to use the actual store instance
+    console.warn('[RetryManager] Chat retry not implemented - requires store instance')
+    return false
   }
 
   private async retryStudyToolTask(payload: any): Promise<boolean> {

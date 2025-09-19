@@ -24,7 +24,6 @@ export function ChatExample({ documentId, conversationId }: ChatExampleProps) {
     
     // Actions
     sendMessage,
-    clearChat,
     regenerateLastMessage,
     createConversation
   } = useChat(documentId, conversationId)
@@ -58,15 +57,7 @@ export function ChatExample({ documentId, conversationId }: ChatExampleProps) {
         {hasMessages && (
           <div className="flex gap-2 mt-3">
             <button
-              onClick={clearChat}
-              disabled={isStreaming}
-              className="px-3 py-1 text-sm bg-red-50 text-red-700 border border-red-200 rounded-md hover:bg-red-100 disabled:opacity-50"
-            >
-              Clear Chat
-            </button>
-            
-            <button
-              onClick={regenerateLastMessage}
+              onClick={() => regenerateLastMessage()}
               disabled={isStreaming}
               className="px-3 py-1 text-sm bg-blue-50 text-blue-700 border border-blue-200 rounded-md hover:bg-blue-100 disabled:opacity-50"
             >

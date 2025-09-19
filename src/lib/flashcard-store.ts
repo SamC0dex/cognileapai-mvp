@@ -29,7 +29,7 @@ interface FlashcardStore {
 
   // Flashcard set management
   addFlashcardSet: (flashcardSet: FlashcardSet) => void
-  removeFlashcardSet: (id: string) => void
+  removeFlashcardSet: (id: string) => Promise<void>
   renameFlashcardSet: (id: string, newTitle: string) => Promise<void>
   clearFlashcardSets: () => void
   deduplicateFlashcardSets: () => void
@@ -226,11 +226,56 @@ export const useFlashcardStore = create<FlashcardStore>()(
         })
       },
 
-      removeFlashcardSet: (id: string) => {
+      removeFlashcardSet: async (id: string) => {
         console.log('[FlashcardStore] Removing flashcard set:', id)
+
+        // Find the flashcard set to remove for potential rollback
+        const currentState = get()
+        const setToRemove = currentState.flashcardSets.find(set => set.id === id)
+
+        if (!setToRemove) {
+          console.warn('[FlashcardStore] Flashcard set not found in local state:', id)
+          return
+        }
+
+        // Remove from local state immediately for responsive UI
         set(state => ({
           flashcardSets: state.flashcardSets.filter(set => set.id !== id)
         }))
+
+        try {
+          // Sync deletion with database
+          const response = await fetch('/api/study-tools/delete', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ id })
+          })
+
+          console.log('[FlashcardStore] Delete API response status:', response.status)
+
+          if (!response.ok) {
+            const errorText = await response.text()
+            console.error('[FlashcardStore] Delete API error response:', errorText)
+            throw new Error(`Failed to delete from database: ${response.status} - ${errorText}`)
+          }
+
+          const result = await response.json()
+          console.log('[FlashcardStore] Successfully deleted from database:', result)
+        } catch (error) {
+          console.error('[FlashcardStore] Failed to sync deletion to database:', error)
+
+          // Rollback: add the flashcard set back to local state since database deletion failed
+          set(state => ({
+            flashcardSets: [setToRemove, ...state.flashcardSets].sort((a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            )
+          }))
+
+          // Re-throw error to allow UI to show error message if needed
+          throw error
+        }
       },
 
       renameFlashcardSet: async (id: string, newTitle: string) => {
