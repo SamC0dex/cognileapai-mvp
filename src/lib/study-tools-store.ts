@@ -414,7 +414,7 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
             for (const flashcardTool of flashcards) {
               try {
                 // Parse the flashcard content
-                let cleanedContent = flashcardTool.content
+                const cleanedContent = flashcardTool.content
                   .trim()
                   .replace(/^```json\n?/, '')
                   .replace(/\n?```$/, '')

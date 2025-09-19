@@ -285,7 +285,7 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      let insertData: any = {
+      const insertData: any = {
         section_id: null,
         overall: true,
         type: dbType,

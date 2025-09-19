@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
       console.log(`[StatefulChat] Creating new session for conversation: ${conversationId}`)
 
       // Build system prompt and context
-      let systemPrompt = getSystemPrompt(chatType, documentId, selectedModelKey)
+      const systemPrompt = getSystemPrompt(chatType, documentId, selectedModelKey)
       let documentContext = ''
 
       // Handle document context for new sessions
@@ -219,7 +219,6 @@ export async function POST(req: NextRequest) {
       async start(controller) {
         try {
           let fullResponse = ''
-          let tokenCount = 0
 
           for await (const chunk of sendStatefulMessage(sendOptions)) {
             if (chunk.text) {
@@ -285,7 +284,8 @@ export async function POST(req: NextRequest) {
           }
         } catch (error) {
           console.error('[StatefulChat] Streaming error:', error)
-          const errorData = JSON.stringify({ error: error.message })
+          const errorInstance = error instanceof Error ? error : new Error('Unknown error')
+          const errorData = JSON.stringify({ error: errorInstance.message })
           controller.enqueue(new TextEncoder().encode(`error:${errorData}\n`))
           controller.close()
         }

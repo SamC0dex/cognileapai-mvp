@@ -4,7 +4,6 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { ChatInput } from './chat-input'
 import { ChatMessages } from './chat-messages'
 import { ChatEmptyState } from './chat-empty-state'
-import { SelectedDocumentDisplay } from './selected-document-display'
 import { ChatScrollButton } from './chat-scroll-button'
 import { ContextWarning } from './context-warning'
 import { useChat } from '@/lib/use-chat'
@@ -392,7 +391,7 @@ export const ChatContainer: React.FC<{
             onRegenerate={handleRegenerate}
             onCopy={handleCopy}
             forceScrollToBottom={scrollTrigger}
-            conversationTokens={conversationTokens}
+            conversationTokens={conversationTokens || undefined}
           />
         )}
 

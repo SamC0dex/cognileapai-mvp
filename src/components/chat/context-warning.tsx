@@ -21,6 +21,13 @@ export function ContextWarning({ conversationTokens, contextWarning, onStartNewC
 
   // Define warning styles based on level
   const warningStyles = {
+    none: {
+      bgColor: 'bg-gray-50 dark:bg-gray-950/20',
+      borderColor: 'border-gray-200 dark:border-gray-800',
+      textColor: 'text-gray-800 dark:text-gray-200',
+      iconColor: 'text-gray-600 dark:text-gray-400',
+      icon: Zap
+    },
     caution: {
       bgColor: 'bg-amber-50 dark:bg-amber-950/20',
       borderColor: 'border-amber-200 dark:border-amber-800',
@@ -42,7 +49,7 @@ export function ContextWarning({ conversationTokens, contextWarning, onStartNewC
       iconColor: 'text-red-600 dark:text-red-400',
       icon: AlertTriangle
     }
-  }
+  } as const
 
   const currentStyle = warningStyles[warningLevel] || warningStyles.caution
   const IconComponent = currentStyle.icon

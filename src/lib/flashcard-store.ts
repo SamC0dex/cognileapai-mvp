@@ -169,7 +169,7 @@ export const useFlashcardStore = create<FlashcardStore>()(
             answer => answer.cardId === cardId
           )
 
-          let updatedAnswers = [...state.currentSession.answers]
+          const updatedAnswers = [...state.currentSession.answers]
 
           if (existingAnswerIndex >= 0) {
             // Update existing answer

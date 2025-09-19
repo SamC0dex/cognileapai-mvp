@@ -74,13 +74,6 @@ interface StoreShape {
   canAddMessage: (content: string) => { canAdd: boolean; warning?: string }
 }
 
-// Feature flags for stateful chat
-const FEATURE_FLAGS = {
-  STATEFUL_CHAT: process.env.NEXT_PUBLIC_FEATURE_FLAG_STATEFUL_CHAT === 'true',
-  STATEFUL_CHAT_PERCENTAGE: parseInt(process.env.NEXT_PUBLIC_FEATURE_FLAG_STATEFUL_CHAT_PERCENTAGE || '100'),
-  LIVE_CHAT: process.env.NEXT_PUBLIC_FEATURE_FLAG_LIVE_CHAT === 'true',
-  LIVE_CHAT_PERCENTAGE: parseInt(process.env.NEXT_PUBLIC_FEATURE_FLAG_LIVE_CHAT_PERCENTAGE || '0')
-}
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -178,78 +171,6 @@ export function useChatStore(): StoreShape {
     }
   }, [documentContext])
 
-  // AI SDK v3 DataStream response parser
-  async function streamFromApi(payload: unknown): Promise<{text: string, metadata?: unknown}> {
-    const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-
-    if (!res.ok) {
-      const errorText = await res.text()
-      throw new Error(`API error: ${res.status} - ${errorText}`)
-    }
-
-    if (!res.body) {
-      const text = await res.text()
-      return { text }
-    }
-
-    let accumulatedText = ''
-    let finalMetadata: unknown = null
-
-    try {
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-
-      while (true) {
-        const { value, done } = await reader.read()
-        if (done) break
-
-        const chunk = decoder.decode(value, { stream: true })
-
-        // Parse AI SDK v3 DataStream format
-        const lines = chunk.split('\n').filter(line => line.trim())
-
-        for (const line of lines) {
-          try {
-            if (line.startsWith('0:')) {
-              // Text content line in AI SDK v3 format
-              const content = JSON.parse(line.slice(2))
-              if (typeof content === 'string') {
-                accumulatedText += content
-                setStreamingMessage(accumulatedText)
-              }
-            } else if (line.startsWith('2:')) {
-              // Data/metadata line
-              const metadata = JSON.parse(line.slice(2))
-              if (metadata) {
-                finalMetadata = metadata
-              }
-            } else if (line.startsWith('d:')) {
-              // Delta line - parse JSON
-              const data = line.slice(2)
-              const parsed = JSON.parse(data)
-              if (parsed?.text) {
-                accumulatedText += parsed.text
-                setStreamingMessage(accumulatedText)
-              }
-            }
-          } catch (parseError) {
-            // Continue if parsing fails - this is normal for some stream chunks
-            continue
-          }
-        }
-      }
-
-      return { text: accumulatedText, metadata: finalMetadata }
-
-    } catch (error) {
-      console.error('[Chat] Stream reading error:', error)
-      throw error
-    }
-  }
 
   const sendMessage = useCallback(async (content: string, documentId?: string | null, model?: GeminiModelKey, selectedDocuments?: Array<{id: string, title: string}>, skipUserMessage?: boolean) => {
     const modelToUse = model || selectedModel
@@ -347,21 +268,9 @@ export function useChatStore(): StoreShape {
       let displayedText = '' // Text currently shown to user
       let isStreamingActive = true
 
-      // 🚀 ROUTE TO LIVE, STATEFUL OR LEGACY ENDPOINT
-      const useLiveChat = FEATURE_FLAGS.LIVE_CHAT &&
-        (Math.random() * 100 < FEATURE_FLAGS.LIVE_CHAT_PERCENTAGE)
-
-      const useStatefulChat = !useLiveChat && FEATURE_FLAGS.STATEFUL_CHAT &&
-        (Math.random() * 100 < FEATURE_FLAGS.STATEFUL_CHAT_PERCENTAGE)
-
-      const apiEndpoint = useLiveChat
-        ? '/api/chat/live'
-        : useStatefulChat
-        ? '/api/chat/stateful'
-        : '/api/chat'
-
-      const chatType = useLiveChat ? 'LIVE (TRUE stateful)' : useStatefulChat ? 'STATEFUL' : 'LEGACY'
-      console.log(`[Chat] Using ${chatType} chat endpoint`)
+      // 🚀 ROUTE TO STATEFUL CHAT ENDPOINT
+      const apiEndpoint = '/api/chat/stateful'
+      console.log(`[Chat] Using STATEFUL chat endpoint`)
 
       const res = await fetch(apiEndpoint, {
         method: 'POST',
@@ -651,7 +560,7 @@ export function useChatStore(): StoreShape {
     // Convert messages to format expected by TokenManager
     const messagesWithTokens = messages.map(msg => ({
       id: msg.id,
-      role: msg.role === 'user' ? 'user' : msg.role === 'assistant' ? 'assistant' : 'system',
+      role: msg.role as 'user' | 'assistant' | 'system',
       content: msg.content,
       timestamp: msg.timestamp,
       tokenCount: msg.metadata?.tokens ? {

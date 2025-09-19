@@ -12,7 +12,9 @@ export interface Message {
   }
 }
 
-export interface ChatMessage extends Message {}
+export interface ChatMessage extends Message {
+  // Extends Message with any chat-specific properties if needed in the future
+}
 
 export interface Citation {
   id: string
