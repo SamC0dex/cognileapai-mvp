@@ -241,7 +241,7 @@ export const FlashcardViewer: React.FC<FlashcardViewerProps> = ({
           }}
         >
           <div className="relative w-full h-full">
-            <AnimatePresence mode="wait">
+            <AnimatePresence>
               <motion.div
                 key={`${currentIndex}-${showAnswer}`}
                 initial={{

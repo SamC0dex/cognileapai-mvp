@@ -215,6 +215,7 @@ const config: Config = {
         '80': '80',
         '90': '90',
         '100': '100',
+        '500': '500',
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',

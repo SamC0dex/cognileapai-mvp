@@ -468,6 +468,7 @@ const FullscreenCanvas: React.FC = () => {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [showZoomControl, setShowZoomControl] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(100)
+  const [zoomInputValue, setZoomInputValue] = useState('100%')
 
   if (!canvasContent) return null
 
@@ -498,15 +499,20 @@ const FullscreenCanvas: React.FC = () => {
   }
 
   const handleZoomIn = () => {
-    setZoomLevel(prev => Math.min(prev + 10, 200))
+    const newZoom = Math.min(zoomLevel + 10, 200)
+    setZoomLevel(newZoom)
+    setZoomInputValue(`${newZoom}%`)
   }
 
   const handleZoomOut = () => {
-    setZoomLevel(prev => Math.max(prev - 10, 50))
+    const newZoom = Math.max(zoomLevel - 10, 50)
+    setZoomLevel(newZoom)
+    setZoomInputValue(`${newZoom}%`)
   }
 
   const handleResetZoom = () => {
     setZoomLevel(100)
+    setZoomInputValue('100%')
   }
 
   // Close menus when clicking outside
@@ -576,9 +582,31 @@ const FullscreenCanvas: React.FC = () => {
                     >
                       <Minus className="w-4 h-4" />
                     </Button>
-                    <div className="px-4 py-2 min-w-[60px] text-center text-sm font-medium bg-background border-r border-border">
-                      {zoomLevel}%
-                    </div>
+                    <input
+                      type="text"
+                      value={zoomInputValue}
+                      onChange={(e) => {
+                        setZoomInputValue(e.target.value)
+                      }}
+                      onBlur={(e) => {
+                        const inputValue = e.target.value.replace('%', '').trim()
+                        const value = parseInt(inputValue)
+                        if (!isNaN(value) && value >= 50 && value <= 200) {
+                          setZoomLevel(value)
+                          setZoomInputValue(`${value}%`)
+                        } else {
+                          // Reset to current zoom level if invalid
+                          setZoomInputValue(`${zoomLevel}%`)
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.currentTarget.blur()
+                        }
+                      }}
+                      className="w-16 px-2 py-2 text-center text-sm font-medium bg-background border-r border-border focus:outline-none focus:ring-1 focus:ring-primary focus:bg-accent/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      title="Enter zoom percentage (50-200%)"
+                    />
                     <Button
                       variant="ghost"
                       size="sm"
@@ -624,7 +652,7 @@ const FullscreenCanvas: React.FC = () => {
               </Button>
 
               {showExportMenu && (
-                <div className="absolute right-0 top-full mt-2 w-48 bg-popover border border-border rounded-xl shadow-xl z-[9999]">
+                <div className="absolute -right-28 top-full mt-2 w-48 bg-popover border border-border rounded-xl shadow-xl z-[9999]">
                   <div className="p-1">
                     <button
                       onClick={handleDownloadPDF}
@@ -638,7 +666,7 @@ const FullscreenCanvas: React.FC = () => {
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors hover:bg-accent"
                     >
                       <FileText className="w-4 h-4 text-blue-500" />
-                      Download as Text
+                      Download as DOCX
                     </button>
                   </div>
                 </div>

@@ -259,7 +259,9 @@ const CanvasHeader: React.FC<CanvasHeaderProps> = ({
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: -5 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                className="absolute right-0 top-full mt-2 w-48 bg-popover border border-border rounded-xl shadow-xl z-20 overflow-hidden"
+                className="absolute right-0 top-full mt-2 w-48 bg-popover border border-border rounded-xl shadow-xl z-[500] overflow-hidden"
+                onMouseEnter={(e) => e.stopPropagation()}
+                onMouseMove={(e) => e.stopPropagation()}
               >
                 <div className="p-1">
                   <motion.button
@@ -283,7 +285,7 @@ const CanvasHeader: React.FC<CanvasHeaderProps> = ({
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors"
                   >
                     <FileText className="w-4 h-4 text-blue-500" />
-                    Download as Text
+                    Download as DOCX
                     <ExternalLink className="w-3 h-3 ml-auto opacity-50" />
                   </motion.button>
                 </div>

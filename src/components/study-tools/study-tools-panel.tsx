@@ -359,6 +359,7 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
             "p-1.5 rounded-md transition-colors duration-200",
             "hover:bg-muted/70 focus:outline-none focus:bg-muted/70",
             "opacity-0 group-hover:opacity-100 transition-opacity",
+            "pointer-events-auto relative z-10",
             isActive && "opacity-100 bg-muted/70"
           )}
           onClick={(e) => {
@@ -378,7 +379,9 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: -5 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              className="absolute right-0 top-full mt-1 w-48 bg-popover border border-border rounded-lg shadow-xl z-[60] overflow-hidden" data-dropdown="true"
+              className="absolute right-0 top-full mt-1 w-48 bg-popover border border-border rounded-lg shadow-xl z-[500] overflow-hidden" data-dropdown="true"
+              onMouseEnter={(e) => e.stopPropagation()}
+              onMouseMove={(e) => e.stopPropagation()}
             >
               <div className="p-1">
                 <motion.button
@@ -465,15 +468,31 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.2, ...smoothTransition }}
-      className="space-y-2"
+      className="space-y-2 relative"
     >
       <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
         <FileText className="w-4 h-4" />
         Generated Documents ({generatedContent.length})
       </h3>
 
+      {/* Backdrop overlay when dropdown is open */}
+      <AnimatePresence>
+        {activeDropdown && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0 }}
+            className="absolute inset-0 bg-transparent z-[400] cursor-default"
+            onClick={() => setActiveDropdown(null)}
+            onMouseMove={(e) => e.stopPropagation()}
+            onMouseEnter={(e) => e.stopPropagation()}
+          />
+        )}
+      </AnimatePresence>
+
       <motion.div
-        className="space-y-2"
+        className="space-y-2 relative"
         variants={{
           hidden: {},
           visible: {
@@ -507,12 +526,12 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
                   }
                 }
               }}
-              whileHover={!prefersReducedMotion && !isGenerating ? {
+              whileHover={!prefersReducedMotion && !isGenerating && !activeDropdown ? {
                 y: -1,
                 scale: 1.01,
                 transition: { duration: 0.15 }
               } : undefined}
-              whileTap={!prefersReducedMotion && !isGenerating ? {
+              whileTap={!prefersReducedMotion && !isGenerating && !activeDropdown ? {
                 scale: 0.98,
                 transition: { duration: 0.08 }
               } : undefined}
@@ -969,7 +988,9 @@ const ExpandedPanel: React.FC<{
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: -5 }}
                         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                        className="absolute right-0 top-full mt-2 w-48 bg-popover border border-border rounded-lg shadow-xl z-[100] overflow-hidden" data-dropdown="true"
+                        className="absolute right-0 top-full mt-2 w-48 bg-popover border border-border rounded-lg shadow-xl z-[500] overflow-hidden" data-dropdown="true"
+                        onMouseEnter={(e) => e.stopPropagation()}
+                        onMouseMove={(e) => e.stopPropagation()}
                       >
                         <div className="p-1">
                           <motion.button
@@ -996,7 +1017,7 @@ const ExpandedPanel: React.FC<{
                             className="w-full flex items-center gap-2 px-3 py-2 text-xs rounded-md transition-colors hover:bg-accent"
                           >
                             <FileText className="w-3 h-3 text-blue-500" />
-                            Download as Text
+                            Download as DOCX
                           </motion.button>
                         </div>
                       </motion.div>
@@ -1237,8 +1258,23 @@ const ExpandedPanel: React.FC<{
 const FlashcardSetsSection: React.FC = () => {
   const { flashcardSets, openViewer, removeFlashcardSet, renameFlashcardSet } = useFlashcardStore()
   const prefersReducedMotion = useReducedMotion()
+  const [activeDropdown, setActiveDropdown] = React.useState<string | null>(null)
   const [editingTitle, setEditingTitle] = React.useState<string | null>(null)
   const [editingValue, setEditingValue] = React.useState('')
+
+  // Close dropdown when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element
+      if (activeDropdown && !target.closest('[data-flashcard-dropdown="true"]')) {
+        setActiveDropdown(null)
+      }
+    }
+    if (activeDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [activeDropdown])
 
   const handleStartRename = (flashcardSet: any) => {
     setEditingTitle(flashcardSet.id)
@@ -1272,7 +1308,7 @@ const FlashcardSetsSection: React.FC = () => {
 
   // Flashcard Dropdown Menu Component
   const FlashcardDropdownMenu: React.FC<{ flashcardSet: any }> = ({ flashcardSet }) => {
-    const [isOpen, setIsOpen] = React.useState(false)
+    const isOpen = activeDropdown === flashcardSet.id
 
     return (
       <div className="relative">
@@ -1281,9 +1317,10 @@ const FlashcardSetsSection: React.FC = () => {
           whileTap={{ scale: 0.9 }}
           onClick={(e) => {
             e.stopPropagation()
-            setIsOpen(!isOpen)
+            setActiveDropdown(isOpen ? null : flashcardSet.id)
           }}
-          className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-accent transition-colors"
+          className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-accent transition-colors pointer-events-auto relative z-10"
+          data-flashcard-dropdown="true"
         >
           <MoreVertical className="w-3 h-3 text-muted-foreground" />
         </motion.button>
@@ -1295,8 +1332,10 @@ const FlashcardSetsSection: React.FC = () => {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: -5 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              className="absolute right-0 top-full mt-1 w-36 bg-popover border border-border rounded-lg shadow-xl z-20 overflow-hidden"
-              onMouseLeave={() => setIsOpen(false)}
+              className="absolute right-0 top-full mt-1 w-36 bg-popover border border-border rounded-lg shadow-xl z-[500] overflow-hidden"
+              data-flashcard-dropdown="true"
+              onMouseEnter={(e) => e.stopPropagation()}
+              onMouseMove={(e) => e.stopPropagation()}
             >
               <div className="p-1">
                 <motion.button
@@ -1305,7 +1344,7 @@ const FlashcardSetsSection: React.FC = () => {
                     e.stopPropagation()
                     e.preventDefault()
                     handleStartRename(flashcardSet)
-                    setIsOpen(false)
+                    setActiveDropdown(null)
                   }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left hover:bg-accent"
                 >
@@ -1320,7 +1359,7 @@ const FlashcardSetsSection: React.FC = () => {
                     e.stopPropagation()
                     e.preventDefault()
                     handleDelete(flashcardSet.id)
-                    setIsOpen(false)
+                    setActiveDropdown(null)
                   }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left text-destructive hover:text-destructive hover:bg-destructive/10"
                 >
@@ -1344,15 +1383,31 @@ const FlashcardSetsSection: React.FC = () => {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.25, ...smoothTransition }}
-      className="space-y-2 mt-6"
+      className="space-y-2 mt-6 relative"
     >
       <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
         <FlashcardsStackIcon size={18} className="text-brand-teal-600" />
         Generated flashcards ({flashcardSets.length})
       </h3>
 
+      {/* Backdrop overlay when dropdown is open */}
+      <AnimatePresence>
+        {activeDropdown && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0 }}
+            className="absolute inset-0 bg-transparent z-[400] cursor-default"
+            onClick={() => setActiveDropdown(null)}
+            onMouseMove={(e) => e.stopPropagation()}
+            onMouseEnter={(e) => e.stopPropagation()}
+          />
+        )}
+      </AnimatePresence>
+
       <motion.div
-        className="space-y-2"
+        className="space-y-2 relative"
         variants={{
           hidden: {},
           visible: {
@@ -1385,12 +1440,12 @@ const FlashcardSetsSection: React.FC = () => {
                   }
                 }
               }}
-              whileHover={!prefersReducedMotion && !isGenerating ? {
+              whileHover={!prefersReducedMotion && !isGenerating && !activeDropdown ? {
                 y: -1,
                 scale: 1.01,
                 transition: { duration: 0.15 }
               } : undefined}
-              whileTap={!prefersReducedMotion && !isGenerating ? {
+              whileTap={!prefersReducedMotion && !isGenerating && !activeDropdown ? {
                 scale: 0.98,
                 transition: { duration: 0.08 }
               } : undefined}
