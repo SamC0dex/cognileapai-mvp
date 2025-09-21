@@ -226,6 +226,15 @@
   /* Specific fix for study tools prose code blocks */
   .study-tools-prose pre {
     color: hsl(var(--foreground)) !important;
+    background-color: hsl(var(--muted) / 0.8) !important;
+    border: 1px solid hsl(var(--border)) !important;
+  }
+
+  /* Override prose plugin styling for code blocks in study tools */
+  .study-tools-prose .prose pre {
+    color: hsl(var(--foreground)) !important;
+    background-color: hsl(var(--muted) / 0.8) !important;
+    border: 1px solid hsl(var(--border)) !important;
   }
 
   /* Penseum-inspired components */

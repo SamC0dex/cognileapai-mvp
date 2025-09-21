@@ -348,7 +348,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ content, isFullscreen
         return (
           <div className={cn(
             "flex flex-col h-full",
-            isFullscreen && "fixed inset-0 z-50 bg-background"
+            isFullscreen && "fixed inset-0 z-50 bg-muted/30"
           )}>
             {/* Flashcard-specific toolbar */}
             <motion.div
@@ -450,7 +450,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ content, isFullscreen
     ),
     // Code block styling
     pre: ({ children }: any) => (
-      <pre className="bg-muted p-4 rounded-lg overflow-x-auto mb-4 text-sm border">
+      <pre className="bg-muted/80 p-4 rounded-lg overflow-x-auto mb-4 text-sm border border-border text-foreground">
         {children}
       </pre>
     ),
@@ -584,7 +584,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ content, isFullscreen
             className={cn(
               "study-tools-prose prose prose-base max-w-none dark:prose-invert prose-headings:scroll-m-4",
               isFullscreen && [
-                "bg-background/80 rounded-lg border border-border/50 shadow-lg",
+                "bg-muted/50 rounded-lg border border-border/50 shadow-lg",
                 "px-8 py-6 backdrop-blur-sm",
                 "prose-lg" // Larger text for fullscreen reading
               ]
@@ -685,7 +685,7 @@ export const StudyToolsCanvas: React.FC = React.memo(() => {
           className={cn(
             "h-full bg-background/95 backdrop-blur-sm border-l border-border flex flex-col",
             isCanvasFullscreen
-              ? "shadow-2xl border-2 border-primary/20 bg-background/98"
+              ? "shadow-2xl border-2 border-primary/20 bg-card"
               : "shadow-xl"
           )}
         >

@@ -703,8 +703,27 @@ const FullscreenCanvas: React.FC = () => {
             style={{ transform: `scale(${zoomLevel / 100})` }}
           >
             <div className="bg-background/80 rounded-lg border border-border/50 shadow-lg px-8 py-6 backdrop-blur-sm">
-              <div className="prose prose-lg max-w-none dark:prose-invert">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <div className="prose prose-lg max-w-none dark:prose-invert prose-pre:bg-muted/80 prose-pre:border prose-pre:border-border prose-pre:text-foreground">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    pre: ({ children }: any) => (
+                      <pre className="bg-muted/80 p-4 rounded-lg overflow-x-auto mb-4 text-sm border border-border text-foreground">
+                        {children}
+                      </pre>
+                    ),
+                    code: ({ children, inline }: any) => {
+                      if (inline) {
+                        return (
+                          <code className="bg-muted/60 px-1.5 py-0.5 rounded text-sm font-mono text-foreground">
+                            {children}
+                          </code>
+                        )
+                      }
+                      return <code className="font-mono text-sm text-foreground">{children}</code>
+                    }
+                  }}
+                >
                   {canvasContent.content}
                 </ReactMarkdown>
               </div>
