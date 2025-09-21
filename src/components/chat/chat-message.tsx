@@ -121,7 +121,7 @@ export const ChatMessage: React.FC<ChatMessageProps & {
       
       return (
         <div className="group relative my-4">
-          <pre className="p-4 rounded-lg bg-slate-900 text-slate-100 overflow-x-auto text-sm">
+          <pre className="p-4 rounded-lg bg-muted text-foreground overflow-x-auto text-sm border">
             <code className={className} {...props}>
               {children}
             </code>
@@ -148,7 +148,7 @@ export const ChatMessage: React.FC<ChatMessageProps & {
     // Enhanced blockquote styling
     blockquote({ children }: MarkdownComponentProps) {
       return (
-        <blockquote className="border-l-4 border-primary pl-4 py-2 my-4 bg-muted/30 rounded-r">
+        <blockquote className="border-l-4 border-primary pl-4 py-2 my-4 bg-muted/30 rounded-r text-foreground">
           {children}
         </blockquote>
       )
@@ -180,7 +180,7 @@ export const ChatMessage: React.FC<ChatMessageProps & {
 
     th({ children }: MarkdownComponentProps) {
       return (
-        <th className="border border-border px-3 py-2 bg-muted font-semibold text-left">
+        <th className="border border-border px-3 py-2 bg-muted font-semibold text-left text-foreground">
           {children}
         </th>
       )

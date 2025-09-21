@@ -474,7 +474,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ content, isFullscreen
       </div>
     ),
     th: ({ children }: any) => (
-      <th className="border border-border bg-muted/50 px-4 py-2 text-left font-semibold">
+      <th className="border border-border bg-muted/50 px-4 py-2 text-left font-semibold text-foreground">
         {children}
       </th>
     ),
@@ -582,7 +582,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ content, isFullscreen
             animate={{ opacity: 1 }}
             transition={{ delay: 0.1 }}
             className={cn(
-              "prose prose-base max-w-none dark:prose-invert prose-headings:scroll-m-4",
+              "study-tools-prose prose prose-base max-w-none dark:prose-invert prose-headings:scroll-m-4",
               isFullscreen && [
                 "bg-background/80 rounded-lg border border-border/50 shadow-lg",
                 "px-8 py-6 backdrop-blur-sm",
@@ -605,7 +605,9 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ content, isFullscreen
               '--tw-prose-pre-code': 'hsl(var(--foreground))',
               '--tw-prose-pre-bg': 'hsl(var(--muted))',
               '--tw-prose-th-borders': 'hsl(var(--border))',
-              '--tw-prose-td-borders': 'hsl(var(--border))'
+              '--tw-prose-td-borders': 'hsl(var(--border))',
+              '--tw-prose-thead': 'hsl(var(--foreground))',
+              '--tw-prose-tbody': 'hsl(var(--foreground))'
             } as React.CSSProperties}
           >
             <ReactMarkdown

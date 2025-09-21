@@ -61,7 +61,7 @@ export const MemoizedMarkdown = React.memo<MemoizedMarkdownProps>(
     )
 
     return (
-      <div className="prose prose-sm max-w-none prose-slate dark:prose-invert prose-headings:font-semibold prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-code:text-foreground prose-pre:bg-slate-900 prose-pre:text-slate-100">
+      <div className="chat-prose prose prose-sm max-w-none prose-slate dark:prose-invert prose-headings:font-semibold prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-code:text-foreground prose-pre:bg-muted prose-pre:text-foreground prose-thead:text-foreground prose-tbody:text-foreground">
         {/* Render memoized completed blocks */}
         {completedBlocks.map((block, index) => (
           <MarkdownBlock

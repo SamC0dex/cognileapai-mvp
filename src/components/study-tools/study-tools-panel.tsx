@@ -630,15 +630,18 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
                         >
                           <Sparkles className="w-3 h-3" />
                         </motion.div>
-                        <span>Generating with AI...</span>
+                        <span>{content.title.includes(':') ? content.title.split(':')[1].trim() : 'Generating with AI...'}</span>
                       </div>
-                      <div className="w-full bg-blue-100 dark:bg-blue-800/30 rounded-full h-1">
-                        <motion.div
-                          className="h-1 bg-gradient-to-r from-blue-500 to-teal-500 rounded-full"
-                          initial={{ width: '0%' }}
-                          animate={{ width: `${content.generationProgress || 0}%` }}
-                          transition={{ duration: 0.3, ease: 'easeOut' }}
-                        />
+                      <div className="flex items-center gap-1">
+                        <div className="flex-1 bg-blue-100 dark:bg-blue-800/30 rounded-full h-1">
+                          <motion.div
+                            className="h-1 bg-gradient-to-r from-blue-500 to-teal-500 rounded-full"
+                            initial={{ width: '0%' }}
+                            animate={{ width: `${content.generationProgress || 0}%` }}
+                            transition={{ duration: 0.3, ease: 'easeOut' }}
+                          />
+                        </div>
+                        <span className="text-xs">{Math.round(content.generationProgress || 0)}%</span>
                       </div>
                     </div>
                   ) : (
@@ -647,7 +650,7 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Clock className="w-3 h-3" />
                         <span>
-                          {new Date(content.createdAt).toLocaleDateString()} at {new Date(content.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {new Date(content.createdAt).toLocaleDateString()} at {new Date(content.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
                         </span>
                         <span className="text-xs bg-muted/50 px-1.5 py-0.5 rounded">
                           {Math.round(content.content.length / 1000)}k chars
@@ -899,7 +902,7 @@ const ExpandedPanel: React.FC<{
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />
-                      {new Date(canvasContent.createdAt).toLocaleDateString()} at {new Date(canvasContent.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(canvasContent.createdAt).toLocaleDateString()} at {new Date(canvasContent.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
                     </span>
                   </div>
                 </div>
@@ -1519,7 +1522,9 @@ const FlashcardSetsSection: React.FC = () => {
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     {isGenerating ? (
                       <>
-                        <span className="text-blue-600 dark:text-blue-400 font-medium">Generating...</span>
+                        <span className="text-blue-600 dark:text-blue-400 font-medium">
+                          {flashcardSet.title.includes(':') ? flashcardSet.title.split(':')[1].trim() : 'Generating...'}
+                        </span>
                         <span className="flex items-center gap-1">
                           <div className="w-16 h-1 bg-muted rounded-full overflow-hidden">
                             <div
@@ -1534,10 +1539,23 @@ const FlashcardSetsSection: React.FC = () => {
                       <>
                         <span className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />
-                          {new Date(flashcardSet.createdAt).toLocaleDateString()}
+                          {new Date(flashcardSet.createdAt).toLocaleDateString()} at {new Date(flashcardSet.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
                         </span>
                         <span>{flashcardSet.cards.length} cards</span>
-                        <span className="capitalize">{flashcardSet.options.difficulty || 'medium'}</span>
+                        <span className="capitalize">
+                          {(() => {
+                            // Debug logging for difficulty detection
+                            if (process.env.NODE_ENV === 'development') {
+                              console.log(`[FlashcardDisplay] Difficulty debug for ${flashcardSet.id}:`, {
+                                'options.difficulty': flashcardSet.options?.difficulty,
+                                'metadata.avgDifficulty': flashcardSet.metadata?.avgDifficulty,
+                                'full options': flashcardSet.options,
+                                'full metadata': flashcardSet.metadata
+                              })
+                            }
+                            return flashcardSet.options?.difficulty || flashcardSet.metadata?.avgDifficulty || 'medium'
+                          })()}
+                        </span>
                       </>
                     )}
                   </div>

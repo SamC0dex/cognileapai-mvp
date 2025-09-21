@@ -166,6 +166,68 @@
 }
 
 @layer components {
+  /* Fix for light mode text contrast in chat prose elements only */
+  .chat-prose code:not(pre code) {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .chat-prose th {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .chat-prose blockquote {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  /* Fix for study tools canvas prose elements */
+  .study-tools-prose code {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .study-tools-prose th {
+    color: hsl(var(--foreground)) !important;
+    background-color: hsl(var(--muted)) !important;
+  }
+
+  .study-tools-prose table th {
+    color: hsl(var(--foreground)) !important;
+    background-color: hsl(var(--muted)) !important;
+  }
+
+  .study-tools-prose .prose th {
+    color: hsl(var(--foreground)) !important;
+    background-color: hsl(var(--muted)) !important;
+  }
+
+  .study-tools-prose blockquote {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  /* Fallback: Fix any prose table headers in light mode */
+  .prose th {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  /* Specific fix for table headers with muted background */
+  th[class*="bg-muted"] {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  /* Fix for code blocks with poor contrast in light mode */
+  pre[class*="bg-muted"] {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  /* Fix for any pre elements with muted background */
+  .prose pre {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  /* Specific fix for study tools prose code blocks */
+  .study-tools-prose pre {
+    color: hsl(var(--foreground)) !important;
+  }
+
   /* Penseum-inspired components */
   .penseum-sidebar {
     @apply bg-sidebar border-r border-sidebar-border;

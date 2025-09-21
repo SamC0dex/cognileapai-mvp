@@ -1,8 +1,14 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, FileText } from 'lucide-react'
+
+interface DocumentProgress {
+  percentage: number
+  message: string
+  phase: string
+}
 
 interface SelectedDocumentDisplayProps {
   document?: {
@@ -18,6 +24,38 @@ export const SelectedDocumentDisplay: React.FC<SelectedDocumentDisplayProps> = (
   document,
   onRemove
 }) => {
+  const [progress, setProgress] = useState<DocumentProgress>({ percentage: 0, message: '', phase: '' })
+
+  // Poll for progress when document is processing
+  useEffect(() => {
+    if (!document || document.processing_status !== 'processing') {
+      setProgress({ percentage: 0, message: '', phase: '' })
+      return
+    }
+
+    const fetchProgress = async () => {
+      try {
+        const response = await fetch(`/api/documents/${document.id}/status`)
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && data.progress) {
+            setProgress(data.progress)
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching document progress:', error)
+      }
+    }
+
+    // Initial fetch
+    fetchProgress()
+
+    // Poll every 1 second for smoother progress updates
+    const interval = setInterval(fetchProgress, 1000)
+
+    return () => clearInterval(interval)
+  }, [document?.id, document?.processing_status])
+
   if (!document) return null
 
   const formatFileSize = (bytes?: number) => {
@@ -47,7 +85,9 @@ export const SelectedDocumentDisplay: React.FC<SelectedDocumentDisplayProps> = (
     switch (status) {
       case 'processing':
         return (
-          <div className="w-2 h-2 border border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
+            {Math.round(progress.percentage)}%
+          </span>
         )
       case 'failed':
         return (
@@ -104,13 +144,30 @@ export const SelectedDocumentDisplay: React.FC<SelectedDocumentDisplayProps> = (
                   <span className="text-xs text-muted-foreground">•</span>
                   <span className="text-xs text-muted-foreground capitalize">
                     {document.processing_status === 'completed' ? 'Ready' :
-                     document.processing_status === 'processing' ? 'Processing...' :
+                     document.processing_status === 'processing' ? (progress.message || 'Processing...') :
                      document.processing_status === 'failed' ? 'Failed' :
                      document.processing_status}
                   </span>
                 </>
               )}
             </div>
+
+            {/* Progress Bar for Processing */}
+            {document.processing_status === 'processing' && (
+              <div className="mt-2 space-y-1">
+                <div className="flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400">
+                  <span>{progress.message || 'Processing...'}</span>
+                </div>
+                <div className="w-full bg-blue-100 dark:bg-blue-800/30 rounded-full h-1">
+                  <motion.div
+                    className="h-1 bg-gradient-to-r from-blue-500 to-teal-500 rounded-full"
+                    initial={{ width: '0%' }}
+                    animate={{ width: `${progress.percentage || 0}%` }}
+                    transition={{ duration: 0.3, ease: 'easeOut' }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Remove Button */}

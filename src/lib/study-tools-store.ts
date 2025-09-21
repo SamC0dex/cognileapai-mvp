@@ -200,17 +200,84 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
         useFlashcardStore.getState().addFlashcardSet(placeholderFlashcardSet)
       }
 
-      // Simulate progress updates on the placeholder
+      // Realistic AI generation progress simulation
+      const getRealisticProgress = (elapsedSeconds: number, generationType: StudyToolType) => {
+        // Define realistic AI generation phases based on study tool type
+        const phases = {
+          'study-guide': [
+            { name: 'Analyzing content...', start: 0, end: 20, duration: 3 },
+            { name: 'Creating outline...', start: 20, end: 45, duration: 4 },
+            { name: 'Generating sections...', start: 45, end: 80, duration: 8 },
+            { name: 'Finalizing guide...', start: 80, end: 95, duration: 4 },
+            { name: 'Almost ready...', start: 95, end: 98, duration: Infinity }
+          ],
+          'flashcards': [
+            { name: 'Analyzing content...', start: 0, end: 15, duration: 2 },
+            { name: 'Identifying key concepts...', start: 15, end: 35, duration: 4 },
+            { name: 'Creating questions...', start: 35, end: 70, duration: 6 },
+            { name: 'Generating answers...', start: 70, end: 90, duration: 5 },
+            { name: 'Finalizing cards...', start: 90, end: 98, duration: Infinity }
+          ],
+          'smart-notes': [
+            { name: 'Reading content...', start: 0, end: 25, duration: 3 },
+            { name: 'Extracting key points...', start: 25, end: 60, duration: 5 },
+            { name: 'Organizing notes...', start: 60, end: 85, duration: 4 },
+            { name: 'Adding insights...', start: 85, end: 98, duration: Infinity }
+          ],
+          'smart-summary': [
+            { name: 'Processing content...', start: 0, end: 30, duration: 2 },
+            { name: 'Identifying main points...', start: 30, end: 70, duration: 4 },
+            { name: 'Creating summary...', start: 70, end: 90, duration: 3 },
+            { name: 'Polishing...', start: 90, end: 98, duration: Infinity }
+          ]
+        }
+
+        const toolPhases = phases[generationType]
+        let cumulativeTime = 0
+        let currentPhase = toolPhases[0]
+        let phaseProgress = 0
+
+        // Find current phase and calculate progress within that phase
+        for (const phase of toolPhases) {
+          if (elapsedSeconds <= cumulativeTime + phase.duration) {
+            currentPhase = phase
+            const timeInPhase = elapsedSeconds - cumulativeTime
+
+            // Use easing curve for natural feeling progress
+            const normalizedTime = Math.min(timeInPhase / phase.duration, 1)
+            const easedProgress = phase.duration === Infinity ? 0.7 : (1 - Math.pow(1 - normalizedTime, 2))
+
+            phaseProgress = phase.start + (phase.end - phase.start) * easedProgress
+            break
+          }
+          cumulativeTime += phase.duration
+        }
+
+        // Return clean progress without any random variation that could cause backwards movement
+        return {
+          progress: Math.round(Math.max(0, Math.min(98, phaseProgress))),
+          message: currentPhase.name
+        }
+      }
+
+      const startTime = Date.now()
+      let lastProgress = 0 // Track to ensure never going backwards
       const progressInterval = setInterval(() => {
+        const elapsedSeconds = (Date.now() - startTime) / 1000
+        const { progress: newProgress, message } = getRealisticProgress(elapsedSeconds, type)
+        // Ensure progress never goes backwards
+        const progress = Math.max(lastProgress, newProgress)
+        lastProgress = progress
+
         set(state => {
           const updatedContent = state.generatedContent.map(content =>
             content.id === placeholderContent.id
-              ? { ...content, generationProgress: Math.min((content.generationProgress || 0) + Math.random() * 15, 90) }
+              ? { ...content, generationProgress: progress, title: `${STUDY_TOOLS[type].name}: ${message}` }
               : content
           )
           return {
             generatedContent: updatedContent,
-            generationProgress: Math.min(state.generationProgress + Math.random() * 15, 90)
+            generationProgress: progress
           }
         })
 
@@ -222,9 +289,10 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
             set.id === placeholderContent.id
               ? {
                   ...set,
+                  title: `Flashcards: ${message}`,
                   metadata: {
                     ...set.metadata,
-                    generationProgress: Math.min((set.metadata.generationProgress || 0) + Math.random() * 15, 90)
+                    generationProgress: progress
                   }
                 }
               : set
