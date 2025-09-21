@@ -69,6 +69,11 @@ interface StudyToolsStore {
   collapsePanel: () => void
   togglePanel: () => void
 
+  // Highlighting state for dashboard navigation
+  highlightedTool: StudyToolType | null
+  setHighlightedTool: (tool: StudyToolType | null) => void
+  clearHighlightedTool: () => void
+
   // Canvas state
   isCanvasOpen: boolean
   isCanvasFullscreen: boolean
@@ -108,6 +113,11 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
   expandPanel: () => set({ isPanelExpanded: true }),
   collapsePanel: () => set({ isPanelExpanded: false }),
   togglePanel: () => set(state => ({ isPanelExpanded: !state.isPanelExpanded })),
+
+  // Highlighting state for dashboard navigation
+  highlightedTool: null,
+  setHighlightedTool: (tool: StudyToolType | null) => set({ highlightedTool: tool }),
+  clearHighlightedTool: () => set({ highlightedTool: null }),
 
   // Canvas state
   isCanvasOpen: false,

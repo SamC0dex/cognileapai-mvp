@@ -374,20 +374,20 @@ const ActionCard = React.forwardRef<HTMLDivElement, ActionCardProps>(
       <div
         ref={ref}
         className={cn(
-          "group relative p-6 rounded-2xl border cursor-pointer hover:shadow-lg",
+          "group relative p-4 rounded-2xl border cursor-pointer hover:shadow-lg transition-all duration-200 h-20",
           variantClasses[variant],
           className
         )}
         onClick={onClick}
         {...props}
       >
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10">
+        <div className="flex items-center gap-3 h-full">
+          <div className="flex-shrink-0 p-2 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10">
             {icon}
           </div>
-          <div className="space-y-1">
-            <h3 className="font-semibold text-base">{title}</h3>
-            <p className="text-sm text-muted-foreground">{description}</p>
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <h3 className="font-semibold text-base leading-tight truncate mb-1">{title}</h3>
+            <p className="text-xs text-muted-foreground leading-tight line-clamp-1">{description}</p>
           </div>
         </div>
       </div>

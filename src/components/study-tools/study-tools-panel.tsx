@@ -137,6 +137,28 @@ const StudyToolCard: React.FC<StudyToolCardProps> = React.memo(({
   const IconComponent = iconMap[type]
   const prefersReducedMotion = useReducedMotion()
 
+  // Get highlighting state
+  const { highlightedTool, clearHighlightedTool } = useStudyToolsStore()
+  const isHighlighted = highlightedTool === type
+
+  // Clear highlight after interaction
+  const handleClick = () => {
+    if (!isDisabled) {
+      clearHighlightedTool() // Clear highlight when clicked
+      onClick()
+    }
+  }
+
+  // Auto-clear highlight after 3 seconds
+  React.useEffect(() => {
+    if (isHighlighted) {
+      const timer = setTimeout(() => {
+        clearHighlightedTool()
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [isHighlighted, clearHighlightedTool])
+
   return (
     <motion.div
       variants={cardVariants}
@@ -145,14 +167,15 @@ const StudyToolCard: React.FC<StudyToolCardProps> = React.memo(({
       whileHover={!isDisabled && !prefersReducedMotion ? "hover" : undefined}
       whileTap={!isDisabled && !prefersReducedMotion ? "tap" : undefined}
       className={cn(
-        "relative p-3 rounded-lg border-2 transition-all duration-200 group",
+        "relative p-3 rounded-lg border-2 transition-all duration-500 group",
         !isDisabled && "cursor-pointer hover:shadow-lg hover:shadow-black/5 hover:border-opacity-80",
         isDisabled && "cursor-not-allowed opacity-60",
         tool.color,
         tool.borderColor,
-        isCurrentlyGenerating && "ring-2 ring-brand-teal-500 ring-opacity-50 shadow-lg"
+        isCurrentlyGenerating && "ring-2 ring-brand-teal-500 ring-opacity-50 shadow-lg",
+        isHighlighted && "shadow-2xl shadow-brand-teal-400/40 scale-105 transform"
       )}
-      onClick={!isDisabled ? onClick : undefined}
+      onClick={!isDisabled ? handleClick : undefined}
     >
       {/* Loading overlay */}
       <AnimatePresence>
@@ -170,6 +193,42 @@ const StudyToolCard: React.FC<StudyToolCardProps> = React.memo(({
               <Loader2 className="w-5 h-5 text-brand-teal-600" />
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Elegant highlighting glow effect */}
+      <AnimatePresence>
+        {isHighlighted && (
+          <>
+            {/* Soft gradient overlay */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="absolute inset-0 bg-gradient-to-br from-brand-teal-500/10 via-brand-teal-400/5 to-transparent rounded-lg pointer-events-none"
+            />
+
+            {/* Glowing border effect */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{
+                opacity: [0.3, 0.8, 0.3],
+                scale: [1, 1.02, 1]
+              }}
+              exit={{ opacity: 0 }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
+              className="absolute inset-0 rounded-lg border-2 border-brand-teal-400/50 pointer-events-none"
+              style={{
+                filter: "blur(1px)",
+                boxShadow: "0 0 20px rgba(45, 212, 191, 0.3), inset 0 0 20px rgba(45, 212, 191, 0.1)"
+              }}
+            />
+          </>
         )}
       </AnimatePresence>
 

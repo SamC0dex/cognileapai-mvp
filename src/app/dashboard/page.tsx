@@ -79,17 +79,7 @@ export default function DashboardPage() {
   // Prefetch chat routes to make transitions instant
   useEffect(() => {
     router.prefetch('/chat')
-    router.prefetch('/chat?type=course&title=New%20Course')
-    router.prefetch('/chat?type=lesson&title=New%20Lesson')
   }, [router])
-
-  const handleStartCourse = () => {
-    router.push('/chat?type=course&title=New Course')
-  }
-
-  const handleStartLesson = () => {
-    router.push('/chat?type=lesson&title=New Lesson')
-  }
 
   const handleViewModeChange = (mode: 'grid' | 'list') => {
     // Handle view mode change
@@ -142,11 +132,7 @@ export default function DashboardPage() {
         <DashboardHeader userName="Swami" />
         
         {/* Action Cards */}
-        <DashboardActionCards
-          onStartCourse={handleStartCourse}
-          onStartLesson={handleStartLesson}
-          onUploadDocument={handleUpload}
-        />
+        <DashboardActionCards />
         
         {/* Tabs and Content */}
         <DashboardTabs

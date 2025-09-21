@@ -185,13 +185,44 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange, isDocumentsPan
 
       {/* Workspace Selector removed per request */}
 
-      {/* Primary Action Button */}
+      {/*
+        ====================================
+        🚧 FUTURE FEATURE: New Course/Lesson Creation
+        ====================================
+
+        TEMPORARILY HIDDEN - DO NOT REMOVE FROM CODEBASE
+
+        This "New Course" dropdown button is part of the planned course/lesson
+        creation feature that will be implemented in a future release.
+
+        Features to be implemented:
+        - Course creation and management system
+        - Lesson creation within courses
+        - Structured learning paths
+        - Course content organization
+
+        Once the course creation backend and UI are ready, uncomment this
+        entire section to restore the functionality.
+
+        Related files that will need updates:
+        - Course creation pages/components
+        - Course management API endpoints
+        - Database schema for courses/lessons
+
+        Last hidden: Dashboard navigation refactor
+        Reason: Course creation feature not yet implemented
+
+        ====================================
+      */}
+
+      {/*
+      Primary Action Button - New Course/Lesson Creation
       <div className="px-4 py-2">
         {!isCollapsed ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button 
-                variant="purple" 
+              <Button
+                variant="purple"
                 className="w-full gap-2 penseum-button-primary dark:from-teal-600 dark:to-teal-700 dark:hover:from-teal-700 dark:hover:to-teal-800"
               >
                 <Plus className="h-4 w-4" />
@@ -200,7 +231,7 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange, isDocumentsPan
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-48 penseum-dropdown">
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 onClick={() => {
                   console.log('New Course clicked - direct navigation');
                   window.location.href = '/chat?type=course&title=New%20Course';
@@ -209,7 +240,7 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange, isDocumentsPan
                 <Plus className="h-4 w-4 mr-2" />
                 New Course
               </DropdownMenuItem>
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 onClick={() => {
                   console.log('New Lesson clicked - direct navigation');
                   window.location.href = '/chat?type=lesson&title=New%20Lesson';
@@ -228,6 +259,7 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange, isDocumentsPan
           </div>
         )}
       </div>
+      */}
 
 
       {/* Navigation */}
