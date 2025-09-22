@@ -1,4 +1,4 @@
-import { google } from '@ai-sdk/google'
+// Google GenAI SDK for model configuration only
 
 // Gemini Model Definitions
 export const GEMINI_MODELS = {
@@ -169,26 +169,14 @@ export class GeminiModelSelector {
     return complexPatterns.some(pattern => pattern.test(content))
   }
   
-  /**
-   * Get model instance for AI SDK
-   */
-  static getModelInstance(modelKey: GeminiModelKey) {
-    const config = GEMINI_MODELS[modelKey]
-    // Ensure the provider sees the key under the expected var name
-    if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && process.env.GOOGLE_AI_API_KEY) {
-      process.env.GOOGLE_GENERATIVE_AI_API_KEY = process.env.GOOGLE_AI_API_KEY
-    }
-
-    return google(config.name, {
-      safetySettings: [
-        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' }
-      ]
-    })
-  }
   
+  /**
+   * Get model name string for Google GenAI SDK
+   */
+  static getModelName(modelKey: GeminiModelKey): string {
+    return GEMINI_MODELS[modelKey].name
+  }
+
   /**
    * Get model configuration
    */

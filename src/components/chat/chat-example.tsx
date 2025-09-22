@@ -16,14 +16,11 @@ interface ChatExampleProps {
 export function ChatExample({ documentId, conversationId }: ChatExampleProps) {
   const {
     // Core state
-    messages,
-    isLoading,
     isStreaming,
     error,
     hasMessages,
-    
+
     // Actions
-    sendMessage,
     regenerateLastMessage,
     createConversation
   } = useChat(documentId, conversationId)

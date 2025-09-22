@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { BookOpen, Lightbulb, Upload, FileText, CreditCard, PenTool, Zap } from 'lucide-react'
+import { BookOpen, PenTool, Zap } from 'lucide-react'
 import { ActionCard } from '@/components/ui'
 import { FlashcardsStackIcon } from '@/components/icons/flashcards-stack-icon'
 import { useStudyToolsStore, type StudyToolType } from '@/lib/study-tools-store'
@@ -9,7 +9,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 interface DashboardActionCardsProps {
-  // No props needed - action cards handle their own navigation
+  className?: string
 }
 
 type CardItem = {

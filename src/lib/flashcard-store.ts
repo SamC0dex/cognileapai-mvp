@@ -2,7 +2,7 @@
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { FlashcardSet, FlashcardEntry, FlashcardProgress, FlashcardStudySession } from '@/types/flashcards'
+import { FlashcardSet, FlashcardProgress, FlashcardStudySession } from '@/types/flashcards'
 
 interface FlashcardStore {
   // Viewer state
@@ -60,6 +60,7 @@ export const useFlashcardStore = create<FlashcardStore>()(
 
         // Close canvas when opening flashcards (mutual exclusion)
         try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
           const { useStudyToolsStore } = require('@/lib/study-tools-store')
           const studyToolsStore = useStudyToolsStore.getState()
           if (studyToolsStore.isCanvasOpen) {
