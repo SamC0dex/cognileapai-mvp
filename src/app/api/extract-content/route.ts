@@ -61,25 +61,29 @@ export async function POST(req: NextRequest) {
 
     // Extract text using pdf2json
     try {
-      const PDFParser = require('pdf2json')
+      const PDFParser = (await import('pdf2json')).default
 
       const extractedText = await new Promise<string>((resolve, reject) => {
         const pdfParser = new PDFParser()
 
-        pdfParser.on('pdfParser_dataError', (errData: any) => {
-          reject(new Error(errData.parserError))
+        pdfParser.on('pdfParser_dataError', (errData: Error | { parserError: Error }) => {
+          if (errData instanceof Error) {
+            reject(errData)
+          } else {
+            reject(errData.parserError)
+          }
         })
 
-        pdfParser.on('pdfParser_dataReady', (pdfData: any) => {
+        pdfParser.on('pdfParser_dataReady', (pdfData: { Pages: Array<{ Texts: Array<{ R: Array<{ T: string }> }> }> }) => {
           try {
             let text = ''
             if (pdfData.Pages) {
-              pdfData.Pages.forEach((page: any, pageNum: number) => {
+              pdfData.Pages.forEach((page: { Texts: Array<{ R: Array<{ T: string }> }> }, pageNum: number) => {
                 console.log(`Processing page ${pageNum + 1}/${pdfData.Pages.length}`)
                 if (page.Texts) {
-                  page.Texts.forEach((textItem: any) => {
+                  page.Texts.forEach((textItem: { R: Array<{ T: string }> }) => {
                     if (textItem.R) {
-                      textItem.R.forEach((textRun: any) => {
+                      textItem.R.forEach((textRun: { T: string }) => {
                         if (textRun.T) {
                           // Decode the text and add spaces
                           text += decodeURIComponent(textRun.T) + ' '

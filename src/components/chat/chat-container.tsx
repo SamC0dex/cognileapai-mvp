@@ -12,8 +12,9 @@ import type { GeminiModelKey } from '@/lib/ai-config'
 import type { Citation } from './types'
 import { createClient } from '@supabase/supabase-js'
 import { useDocuments } from '@/contexts/documents-context'
-import { StudyToolsPanel, useStudyToolsStore } from '@/components/study-tools'
-import { FlashcardViewer } from '@/components/study-tools/flashcard-viewer'
+import { useStudyToolsStore } from '@/components/study-tools'
+import { LazyStudyToolsPanel } from '@/components/study-tools/lazy-study-tools-panel'
+import { LazyFlashcardViewer } from '@/components/study-tools/lazy-flashcard-viewer'
 // Fullscreen canvas will be created inline
 import { useFlashcardStore } from '@/lib/flashcard-store'
 import { motion, useReducedMotion } from 'framer-motion'
@@ -342,7 +343,7 @@ export const ChatContainer: React.FC<{
   return (
     <div className="relative h-full flex bg-background">
       {/* Study Tools Panel - Fixed width sidebar */}
-      <StudyToolsPanel
+      <LazyStudyToolsPanel
         documentId={effectiveDocumentId}
         conversationId={conversationId}
         selectedDocuments={selectedDocuments}
@@ -443,7 +444,7 @@ export const ChatContainer: React.FC<{
       {/* Fullscreen Flashcard Viewer - Rendered at this level to respect sidebar layout */}
       {isViewerOpen && currentFlashcardSet && isFullscreen && (
         <div className="absolute inset-0 bg-background z-40">
-          <FlashcardViewer
+          <LazyFlashcardViewer
             flashcards={currentFlashcardSet.cards}
             title={currentFlashcardSet.title}
             onClose={closeViewer}
@@ -510,10 +511,6 @@ const FullscreenCanvas: React.FC = () => {
     setZoomInputValue(`${newZoom}%`)
   }
 
-  const handleResetZoom = () => {
-    setZoomLevel(100)
-    setZoomInputValue('100%')
-  }
 
   // Close menus when clicking outside
   useEffect(() => {
@@ -707,12 +704,12 @@ const FullscreenCanvas: React.FC = () => {
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
-                    pre: ({ children }: any) => (
-                      <pre className="bg-muted/80 p-4 rounded-lg overflow-x-auto mb-4 text-sm border border-border text-foreground">
+                    pre: ({ children, ...props }: any) => (
+                      <pre className="bg-muted/80 p-4 rounded-lg overflow-x-auto mb-4 text-sm border border-border text-foreground" {...props}>
                         {children}
                       </pre>
                     ),
-                    code: ({ children, inline }: any) => {
+                    code: ({ children, inline, ...props }: any) => {
                       if (inline) {
                         return (
                           <code className="bg-muted/60 px-1.5 py-0.5 rounded text-sm font-mono text-foreground">

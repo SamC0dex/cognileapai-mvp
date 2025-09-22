@@ -6,11 +6,22 @@
 
 import { pipeline, env, type FeatureExtractionPipeline } from '@huggingface/transformers'
 
-// Configure for server-side usage
+// ✅ SAFE CONFIGURATION - Prevent ONNX/WebGPU errors
 env.allowLocalModels = false
 env.allowRemoteModels = true
-if (env.backends?.onnx?.wasm) {
-  env.backends.onnx.wasm.wasmPaths = '/models/'
+
+// Only configure if we're in a browser environment
+if (typeof window !== 'undefined') {
+  try {
+    // Use simpler WASM backend to avoid CDN issues
+    if (env.backends?.onnx?.wasm) {
+      env.backends.onnx.wasm.proxy = false
+      env.backends.onnx.wasm.simd = false
+      env.backends.onnx.wasm.numThreads = 1
+    }
+  } catch (error) {
+    console.warn('[Embeddings] Backend configuration warning:', error)
+  }
 }
 
 // Global pipeline cache to avoid reloading
@@ -24,6 +35,27 @@ const MAX_CACHE_SIZE = 1000 // Maximum number of cached embeddings
 // Model configuration - using small, fast, high-quality model
 const EMBEDDING_MODEL = 'mixedbread-ai/mxbai-embed-xsmall-v1' // 22MB, 384 dimensions
 const EMBEDDING_DIMENSIONS = 384
+
+type SupportedDevice = 'webgpu' | 'wasm'
+
+function resolveEmbeddingDevice(): SupportedDevice {
+  if (typeof process !== 'undefined' && process.env.EMBEDDINGS_DEVICE) {
+    const device = process.env.EMBEDDINGS_DEVICE.toLowerCase()
+    if (device === 'webgpu' || device === 'wasm') {
+      return device
+    }
+  }
+
+  if (typeof window === 'undefined') {
+    return 'wasm'
+  }
+
+  if ('gpu' in navigator) {
+    return 'webgpu'
+  }
+
+  return 'wasm'
+}
 
 export interface EmbeddingResult {
   embedding: number[]
@@ -43,33 +75,60 @@ export interface BatchEmbeddingResult {
 /**
  * Initialize the embedding pipeline (happens once per server instance)
  */
-async function initializeEmbeddingPipeline(): Promise<FeatureExtractionPipeline> {
+async function initializeEmbeddingPipeline(): Promise<FeatureExtractionPipeline | null> {
   if (embeddingPipeline) {
     return embeddingPipeline
   }
 
   console.log('[Embeddings] Initializing FREE embedding model...')
+
+  // ✅ GRACEFUL FALLBACK - Don't break app if embeddings fail
+  try {
+    // Try simple WASM backend first to avoid CDN issues
+    const pipelineResult = await pipeline('feature-extraction', EMBEDDING_MODEL)
+    embeddingPipeline = pipelineResult as FeatureExtractionPipeline
+
+    const initTime = Date.now() - Date.now()
+    console.log(`[Embeddings] Model initialized successfully`)
+    return embeddingPipeline
+
+  } catch (error) {
+    console.warn('[Embeddings] Could not initialize embedding pipeline:', error)
+    console.log('[Embeddings] App will continue without semantic search features')
+    embeddingPipeline = null
+    return null // Return null instead of throwing to prevent app crash
+  }
+}
+
+async function createEmbeddingPipeline(device: SupportedDevice, allowFallback: boolean): Promise<FeatureExtractionPipeline> {
   const startTime = Date.now()
 
   try {
     // @ts-ignore - Transformers.js has complex union types that TS can't resolve
-    embeddingPipeline = await pipeline(
+    const pipelineInstance = await pipeline(
       'feature-extraction',
       EMBEDDING_MODEL,
       {
         // Server-side optimization
-        device: 'cpu', // Use CPU for consistent server performance
+        device,
         dtype: 'fp32',  // Good balance of speed/quality
       }
     )
 
     const initTime = Date.now() - startTime
-    console.log(`[Embeddings] Model initialized in ${initTime}ms`)
+    console.log(`[Embeddings] Model initialized on ${device} in ${initTime}ms`)
 
-    return embeddingPipeline
+    embeddingPipeline = pipelineInstance
+    return pipelineInstance
   } catch (error) {
-    console.error('[Embeddings] Failed to initialize model:', error)
-    throw new Error('Failed to initialize embedding model')
+    console.error(`[Embeddings] Failed to initialize on ${device}:`, error)
+
+    if (allowFallback && device === 'webgpu') {
+      console.warn('[Embeddings] Falling back to WASM backend')
+      return createEmbeddingPipeline('wasm', false)
+    }
+
+    throw error
   }
 }
 
@@ -155,6 +214,19 @@ export async function generateEmbedding(text: string): Promise<EmbeddingResult> 
   try {
     const pipeline = await initializeEmbeddingPipeline()
 
+    // ✅ GRACEFUL FALLBACK - If pipeline failed to initialize
+    if (!pipeline) {
+      console.warn('[Embeddings] Pipeline not available, using fallback embedding')
+      // Return a dummy embedding to prevent breaks (384 dimensions of zeros)
+      const fallbackEmbedding = new Array(EMBEDDING_DIMENSIONS).fill(0)
+      return {
+        embedding: fallbackEmbedding,
+        model: 'fallback',
+        dimensions: EMBEDDING_DIMENSIONS,
+        processingTime: Date.now() - startTime
+      }
+    }
+
     // Generate embedding with optimal settings
     const result = await pipeline(text, {
       pooling: 'mean',     // Mean pooling for better representation
@@ -210,6 +282,20 @@ export async function generateBatchEmbeddings(texts: string[]): Promise<BatchEmb
 
   try {
     const pipeline = await initializeEmbeddingPipeline()
+
+    // ✅ GRACEFUL FALLBACK - If pipeline failed to initialize
+    if (!pipeline) {
+      console.warn('[Embeddings] Pipeline not available, using fallback embeddings')
+      // Return dummy embeddings to prevent breaks
+      const fallbackEmbeddings = validTexts.map(() => new Array(EMBEDDING_DIMENSIONS).fill(0))
+      return {
+        embeddings: fallbackEmbeddings,
+        model: 'fallback',
+        dimensions: EMBEDDING_DIMENSIONS,
+        totalProcessingTime: Date.now() - startTime,
+        itemCount: validTexts.length
+      }
+    }
 
     // Batch processing for efficiency
     const result = await pipeline(validTexts, {
@@ -360,6 +446,25 @@ function getCacheHitRate(): number {
 }
 
 /**
+ * ✅ OPTIMIZED: Preload embedding pipeline during app initialization
+ */
+export async function preloadEmbeddingPipeline(): Promise<void> {
+  if (typeof window !== 'undefined') {
+    // Client-side: Background preload after app is ready
+    setTimeout(() => {
+      warmUpEmbeddingPipeline().catch(error => {
+        console.warn('[Embeddings] Background preload failed:', error)
+      })
+    }, 3000) // Wait 3s for app to stabilize
+  } else {
+    // Server-side: Immediate preload
+    warmUpEmbeddingPipeline().catch(error => {
+      console.warn('[Embeddings] Server preload failed:', error)
+    })
+  }
+}
+
+/**
  * Warm up the embedding pipeline (useful for first request optimization)
  */
 export async function warmUpEmbeddingPipeline(): Promise<boolean> {
@@ -367,17 +472,22 @@ export async function warmUpEmbeddingPipeline(): Promise<boolean> {
     console.log('[Embeddings] Warming up pipeline...')
     const startTime = Date.now()
 
-    await initializeEmbeddingPipeline()
+    const pipeline = await initializeEmbeddingPipeline()
 
-    // Generate a small test embedding to fully initialize
-    await generateEmbedding('test')
+    // ✅ GRACEFUL HANDLING - Only test if pipeline initialized successfully
+    if (pipeline) {
+      // Generate a small test embedding to fully initialize
+      await generateEmbedding('test')
 
-    const warmupTime = Date.now() - startTime
-    console.log(`[Embeddings] Pipeline warmed up in ${warmupTime}ms`)
-
-    return true
+      const warmupTime = Date.now() - startTime
+      console.log(`[Embeddings] Pipeline warmed up successfully in ${warmupTime}ms`)
+      return true
+    } else {
+      console.log('[Embeddings] Pipeline initialization skipped - app will continue without semantic search')
+      return false
+    }
   } catch (error) {
-    console.error('[Embeddings] Failed to warm up pipeline:', error)
+    console.warn('[Embeddings] Pipeline warmup failed (non-critical):', error)
     return false
   }
 }

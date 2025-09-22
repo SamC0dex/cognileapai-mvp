@@ -289,30 +289,41 @@ export function useChatStore(): StoreShape {
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
 
-      // Smooth text streaming at consistent pace
-      const STREAM_SPEED = 25 // ms per character for smooth flow
+      // ✅ OPTIMIZED streaming: Better performance with batching
+      const STREAM_SPEED = 50 // Increased to 50ms for better performance
+      const BATCH_SIZE = 2 // Stream 2 characters at once for smoother flow
       let streamInterval: NodeJS.Timeout
+      let lastUpdateTime = 0
 
       const startSmoothStreaming = () => {
         streamInterval = setInterval(() => {
           if (displayedText.length < serverBuffer.length && isStreamingActive) {
-            // Stream one character at a time for ultra-smooth effect
-            displayedText = serverBuffer.slice(0, displayedText.length + 1)
+            // ✅ BATCH CHARACTERS for better performance
+            const nextText = serverBuffer.slice(0, displayedText.length + BATCH_SIZE)
+            displayedText = nextText
 
-            // Update UI with smooth transition
-            setMessages(prev => prev.map(msg =>
-              msg.id === assistantId
-                ? { ...msg, content: displayedText, isStreaming: true }
-                : msg
-            ))
+            // ✅ THROTTLE UI updates using requestAnimationFrame
+            const now = Date.now()
+            if (now - lastUpdateTime > 16) { // ~60fps throttling
+              lastUpdateTime = now
+              requestAnimationFrame(() => {
+                setMessages(prev => prev.map(msg =>
+                  msg.id === assistantId
+                    ? { ...msg, content: displayedText, isStreaming: true }
+                    : msg
+                ))
+              })
+            }
           } else if (displayedText.length >= serverBuffer.length && !isStreamingActive) {
             // Streaming complete - stop interval and mark as done
             clearInterval(streamInterval)
-            setMessages(prev => prev.map(msg =>
-              msg.id === assistantId
-                ? { ...msg, content: displayedText, isStreaming: false }
-                : msg
-            ))
+            requestAnimationFrame(() => {
+              setMessages(prev => prev.map(msg =>
+                msg.id === assistantId
+                  ? { ...msg, content: displayedText, isStreaming: false }
+                  : msg
+              ))
+            })
           }
         }, STREAM_SPEED)
       }

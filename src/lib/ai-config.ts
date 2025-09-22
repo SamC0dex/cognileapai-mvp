@@ -1,4 +1,4 @@
-import { google } from '@ai-sdk/google'
+// Pure configuration - no external dependencies needed
 
 // Gemini Model Definitions
 export const GEMINI_MODELS = {
@@ -170,23 +170,23 @@ export class GeminiModelSelector {
   }
   
   /**
-   * Get model instance for AI SDK
+   * Get model name for Google GenAI SDK
    */
-  static getModelInstance(modelKey: GeminiModelKey) {
+  static getModelInstance(modelKey: GeminiModelKey): string {
     const config = GEMINI_MODELS[modelKey]
-    // Ensure the provider sees the key under the expected var name
-    if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && process.env.GOOGLE_AI_API_KEY) {
-      process.env.GOOGLE_GENERATIVE_AI_API_KEY = process.env.GOOGLE_AI_API_KEY
-    }
+    return config.name
+  }
 
-    return google(config.name, {
-      safetySettings: [
-        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' }
-      ]
-    })
+  /**
+   * Get safety settings for Google GenAI SDK
+   */
+  static getSafetySettings() {
+    return [
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' }
+    ]
   }
   
   /**

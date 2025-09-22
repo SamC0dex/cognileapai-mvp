@@ -2,7 +2,9 @@
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { FlashcardOptions } from '@/types/flashcards'
+import type { FlashcardOptions, FlashcardSet } from '@/types/flashcards'
+
+type FlashcardStoreModule = typeof import('@/lib/flashcard-store')
 
 export type StudyToolType = 'study-guide' | 'flashcards' | 'smart-notes' | 'smart-summary'
 
@@ -90,7 +92,7 @@ interface StudyToolsStore {
   isCanvasOpen: boolean
   isCanvasFullscreen: boolean
   canvasContent: StudyToolContent | null
-  openCanvas: (content: StudyToolContent) => void
+  openCanvas: (content: StudyToolContent) => Promise<void>
   closeCanvas: () => void
   toggleCanvasFullscreen: () => void
 
@@ -140,12 +142,12 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
   isCanvasOpen: false,
   isCanvasFullscreen: false,
   canvasContent: null,
-  openCanvas: (content: StudyToolContent) => {
+  openCanvas: async (content: StudyToolContent) => {
     console.log('[StudyToolsStore] Opening canvas with content:', content)
 
     // Close flashcard viewer when opening canvas (mutual exclusion)
     try {
-      const { useFlashcardStore } = require('@/lib/flashcard-store')
+      const { useFlashcardStore } = await import('@/lib/flashcard-store')
       const flashcardStore = useFlashcardStore.getState()
       if (flashcardStore.isViewerOpen) {
         flashcardStore.closeViewer()
@@ -206,6 +208,17 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
       return
     }
 
+    let useFlashcardStoreRef: FlashcardStoreModule['useFlashcardStore'] | null = null
+    const loadFlashcardStore = async () => {
+      if (useFlashcardStoreRef) {
+        return useFlashcardStoreRef
+      }
+
+      const module = await import('@/lib/flashcard-store')
+      useFlashcardStoreRef = module.useFlashcardStore
+      return useFlashcardStoreRef
+    }
+
     try {
 
       // Create placeholder content immediately for smooth UX
@@ -249,7 +262,7 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
 
       // For flashcards, add placeholder to flashcard store instead
       if (type === 'flashcards') {
-        const { useFlashcardStore } = require('@/lib/flashcard-store')
+        const flashcardStoreHook = await loadFlashcardStore()
         const placeholderFlashcardSet = {
           id: placeholderContent.id,
           title: placeholderContent.title,
@@ -268,7 +281,7 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
             generationProgress: 0
           }
         }
-        useFlashcardStore.getState().addFlashcardSet(placeholderFlashcardSet)
+        flashcardStoreHook.getState().addFlashcardSet(placeholderFlashcardSet)
       }
 
       // Realistic AI generation progress simulation
@@ -378,10 +391,9 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
         get()._updateGenerationState()
 
         // Also update flashcard placeholder if it's a flashcard generation
-        if (type === 'flashcards') {
-          const { useFlashcardStore } = require('@/lib/flashcard-store')
-          const flashcardStore = useFlashcardStore.getState()
-          const updatedSets = flashcardStore.flashcardSets.map((set: any) =>
+        if (type === 'flashcards' && useFlashcardStoreRef) {
+          const flashcardStore = useFlashcardStoreRef.getState()
+          const updatedSets = flashcardStore.flashcardSets.map((set: FlashcardSet) =>
             set.id === placeholderContent.id
               ? {
                   ...set,
@@ -393,7 +405,7 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
                 }
               : set
           )
-          useFlashcardStore.setState({ flashcardSets: updatedSets })
+          useFlashcardStoreRef.setState({ flashcardSets: updatedSets })
         }
       }, 300)
 
@@ -426,7 +438,19 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
       })
 
       if (!response.ok) {
-        throw new Error(`Failed to generate ${STUDY_TOOLS[type].name}`)
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('[StudyToolsStore] API Error:', errorData)
+
+        // Handle specific error cases
+        if (response.status === 503 || errorData.error?.includes('overloaded')) {
+          throw new Error(`${STUDY_TOOLS[type].name} service is temporarily overloaded. Please try again in a few minutes.`)
+        } else if (response.status === 429) {
+          throw new Error(`Rate limit exceeded. Please wait a moment before trying again.`)
+        } else if (response.status === 422) {
+          throw new Error(errorData.error || `Cannot generate ${STUDY_TOOLS[type].name} - insufficient content or document still processing.`)
+        } else {
+          throw new Error(errorData.error || `Failed to generate ${STUDY_TOOLS[type].name}. Please try again.`)
+        }
       }
 
       const result = await response.json()
@@ -484,10 +508,9 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
             get()._updateGenerationState()
 
             // Also update flashcard placeholder if it's a flashcard generation
-            if (type === 'flashcards') {
-              const { useFlashcardStore } = require('@/lib/flashcard-store')
-              const flashcardStore = useFlashcardStore.getState()
-              const updatedSets = flashcardStore.flashcardSets.map((set: any) =>
+            if (type === 'flashcards' && useFlashcardStoreRef) {
+              const flashcardStore = useFlashcardStoreRef.getState()
+              const updatedSets = flashcardStore.flashcardSets.map((set: FlashcardSet) =>
                 set.id === placeholderContent.id
                   ? {
                       ...set,
@@ -499,7 +522,7 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
                     }
                   : set
               )
-              useFlashcardStore.setState({ flashcardSets: updatedSets })
+              useFlashcardStoreRef.setState({ flashcardSets: updatedSets })
             }
           }, 150) // Fast completion animation
         })
@@ -511,7 +534,7 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
       // Handle flashcards specially
       if (type === 'flashcards' && result.cards) {
         // Import flashcard store dynamically to avoid circular deps
-        const { useFlashcardStore } = await import('@/lib/flashcard-store')
+        const flashcardStoreHook = useFlashcardStoreRef ?? await loadFlashcardStore()
 
         // Create flashcard set
         const flashcardSet = {
@@ -532,11 +555,11 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
         }
 
         // Replace placeholder with final flashcard set in flashcard store
-        const flashcardStore = useFlashcardStore.getState()
+        const flashcardStore = flashcardStoreHook.getState()
         const updatedSets = flashcardStore.flashcardSets.map(set =>
           set.id === placeholderContent.id ? flashcardSet : set
         )
-        useFlashcardStore.setState({ flashcardSets: updatedSets })
+        flashcardStoreHook.setState({ flashcardSets: updatedSets })
 
         // Remove from active generations
         set(state => {
@@ -555,7 +578,7 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
           console.log('[StudyToolsStore] Opening flashcard viewer')
 
           // Open in proper flashcard viewer instead of canvas
-          useFlashcardStore.getState().openViewer(flashcardSet)
+          flashcardStoreHook.getState().openViewer(flashcardSet)
         }, 500)
 
       } else {
@@ -626,10 +649,10 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
 
       // Also handle flashcard error cleanup
       if (type === 'flashcards') {
-        const { useFlashcardStore } = require('@/lib/flashcard-store')
-        const flashcardStore = useFlashcardStore.getState()
-        const updatedSets = flashcardStore.flashcardSets.filter((set: any) => set.id !== generationId)
-        useFlashcardStore.setState({ flashcardSets: updatedSets })
+        const flashcardStoreHook = useFlashcardStoreRef ?? await loadFlashcardStore()
+        const flashcardStore = flashcardStoreHook.getState()
+        const updatedSets = flashcardStore.flashcardSets.filter((set: FlashcardSet) => set.id !== generationId)
+        flashcardStoreHook.setState({ flashcardSets: updatedSets })
       }
     }
     // No finally block needed - cleanup is handled in try/catch

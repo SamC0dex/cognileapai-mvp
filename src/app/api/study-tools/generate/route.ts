@@ -1,15 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateText } from 'ai'
-import { google } from '@ai-sdk/google'
+import { GoogleGenAI } from '@google/genai'
 import { createClient } from '@supabase/supabase-js'
 import { getStudyToolPrompt, generateStudyToolTitle, type StudyToolPromptType } from '@/lib/study-tools-prompts'
-// import { addRetryAttempt, classifyError } from '@/lib/retry-manager'
 
 // Initialize Supabase client with service role key for server-side operations
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
+
+// Initialize Google GenAI client
+function getGenAIClient(): GoogleGenAI {
+  return new GoogleGenAI({
+    apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY!
+  })
+}
 
 // Allow longer execution time for comprehensive generation
 export const maxDuration = 60
@@ -209,17 +214,83 @@ export async function POST(req: NextRequest) {
 
     console.log(`[StudyTools] Generating ${type} for "${documentTitle}" (${documentContent.length} chars)`)
 
-    // Generate study tool using Gemini 2.5 Pro
+    // Generate study tool using Gemini with 3 retries and fallback
     const startTime = Date.now()
+    let result
+    let modelUsed = 'gemini-2.5-pro'
+    const maxRetries = 3
 
-    const result = await generateText({
-      model: google('gemini-2.5-pro'),
-      system: systemPrompt,
-      prompt: userPrompt,
-      maxTokens: undefined, // No limit for comprehensive generation
-      topK: 40,
-      temperature: 0.7,
-    })
+    // Helper function to generate with Google GenAI
+    async function generateWithModel(modelName: string, attempt: number = 1): Promise<any> {
+      const client = getGenAIClient()
+
+      try {
+        console.log(`[StudyTools] Attempt ${attempt} with ${modelName}`)
+
+        // Use the same API pattern as the working chat system
+        const response = await client.models.generateContentStream({
+          model: modelName,
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }]
+            }
+          ],
+          config: {
+            temperature: 0.7,
+            topK: 40,
+          }
+        })
+
+        // Collect the streamed response
+        let accumulatedText = ''
+        for await (const chunk of response) {
+          const chunkText = chunk.text || ''
+          accumulatedText += chunkText
+        }
+
+        return {
+          text: accumulatedText
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        console.warn(`[StudyTools] ${modelName} attempt ${attempt} failed:`, errorMessage)
+
+        // Check if it's an overload/rate limit error and we haven't reached max retries
+        if ((errorMessage.includes('overloaded') || errorMessage.includes('503') || errorMessage.includes('429')) && attempt < maxRetries) {
+          console.log(`[StudyTools] Retrying ${modelName} in 2 seconds... (${attempt + 1}/${maxRetries})`)
+          await new Promise(resolve => setTimeout(resolve, 2000)) // Wait 2 seconds before retry
+          return generateWithModel(modelName, attempt + 1)
+        }
+
+        throw error
+      }
+    }
+
+    try {
+      // Try Gemini Pro with 3 retries
+      result = await generateWithModel('gemini-2.5-pro')
+      modelUsed = 'gemini-2.5-pro'
+    } catch (proError) {
+      // After 3 failed attempts with Pro, try Flash as fallback
+      const errorMessage = proError instanceof Error ? proError.message : String(proError)
+      console.warn('[StudyTools] Gemini Pro failed after 3 attempts, trying Flash fallback:', errorMessage)
+
+      if (errorMessage.includes('overloaded') || errorMessage.includes('503') || errorMessage.includes('429')) {
+        console.log('[StudyTools] Using Gemini Flash as fallback model')
+        modelUsed = 'gemini-2.5-flash'
+
+        try {
+          result = await generateWithModel('gemini-2.5-flash')
+        } catch (flashError) {
+          console.error('[StudyTools] Both Pro and Flash failed:', flashError)
+          throw new Error('AI service is temporarily unavailable. Please try again later.')
+        }
+      } else {
+        // Re-throw non-overload errors
+        throw proError
+      }
+    }
 
     const duration = Date.now() - startTime
     console.log(`[StudyTools] Generated ${type} in ${duration}ms (${result.text.length} chars)`)
@@ -299,7 +370,7 @@ export async function POST(req: NextRequest) {
             cards: flashcardData,
             options: flashcardOptions,
             metadata: {
-              model: 'gemini-2.5-pro',
+              model: modelUsed,
               duration,
               contentLength: processedContent.length,
               sourceContentLength: documentContent.length,
@@ -308,7 +379,7 @@ export async function POST(req: NextRequest) {
             }
           } : {
             metadata: {
-              model: 'gemini-2.5-pro',
+              model: modelUsed,
               duration,
               contentLength: processedContent.length,
               sourceContentLength: documentContent.length
@@ -360,7 +431,7 @@ export async function POST(req: NextRequest) {
       } : {}),
       metadata: {
         generatedAt: new Date().toISOString(),
-        model: 'gemini-2.5-pro',
+        model: modelUsed,
         duration,
         contentLength: processedContent.length,
         sourceContentLength: documentContent.length,
