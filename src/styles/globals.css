@@ -31,7 +31,7 @@
     /* Core Design Tokens */
     --radius: 0.75rem;
     
-    /* Light Theme - Purple Primary (Penseum-inspired) with Amber Accents */
+    /* Light Theme - Purple Primary with Amber Accents */
     --background: 0 0% 100%;
     --foreground: 224 71.4% 4.1%;
     
@@ -48,7 +48,7 @@
     --input: 220 13% 91%;
     --ring: 262.1 83.3% 57.8%;
     
-    /* Primary Brand - Purple (Penseum-style) */
+    /* Primary Brand - Purple */
     --primary: 262.1 83.3% 57.8%;
     --primary-foreground: 210 20% 98%;
     --primary-50: 270 100% 98%;
@@ -79,7 +79,7 @@
     --destructive-foreground: 210 20% 98%;
     
     /* Sidebar Variables */
-    --sidebar: 0 0% 100%;
+    --sidebar: 220 13% 96%;
     --sidebar-foreground: 224 71.4% 4.1%;
     --sidebar-border: 220 13% 91%;
     --sidebar-accent: 220 14.3% 95.9%;
@@ -237,45 +237,45 @@
     border: 1px solid hsl(var(--border)) !important;
   }
 
-  /* Penseum-inspired components */
-  .penseum-sidebar {
+  /* Application components */
+  .app-sidebar {
     @apply bg-sidebar border-r border-sidebar-border;
   }
   
-  .penseum-nav-item {
+  .nav-item {
     @apply flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200;
     @apply text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground;
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
   }
   
-  .penseum-nav-item.active {
+  .nav-item.active {
     @apply bg-primary text-primary-foreground shadow-sm;
   }
   
-  .dark .penseum-nav-item.active {
+  .dark .nav-item.active {
     @apply bg-gradient-to-r from-teal-600 to-teal-700 text-white shadow-sm;
   }
   
-  .penseum-card {
+  .app-card {
     @apply rounded-2xl border bg-card text-card-foreground shadow-soft;
     @apply transition-all duration-300 hover:shadow-hover;
   }
   
-  .penseum-button-primary {
+  .button-primary {
     @apply bg-gradient-to-r from-primary to-primary/90 text-primary-foreground;
     @apply shadow-lg hover:shadow-xl transition-all duration-200;
     @apply hover:scale-[1.02] active:scale-[0.98];
   }
   
-  .penseum-dropdown {
+  .app-dropdown {
     @apply rounded-lg border bg-popover p-1 text-popover-foreground shadow-dropdown;
     /* Ultra-fast, smooth fade — no sliding */
     opacity: 0;
     will-change: opacity;
     transition: opacity 80ms ease-out;
   }
-  .penseum-dropdown[data-state='open'] { opacity: 1; }
-  .penseum-dropdown[data-state='closed'] { opacity: 0; }
+  .app-dropdown[data-state='open'] { opacity: 1; }
+  .app-dropdown[data-state='closed'] { opacity: 0; }
 
   /* Prevent Popper wrapper from animating its transform (kills the slide). */
   [data-radix-popper-content-wrapper] {
@@ -283,7 +283,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .penseum-dropdown { transition: none !important; }
+    .app-dropdown { transition: none !important; }
   }
 
 /* Theme switching helper: momentarily disables all transitions */

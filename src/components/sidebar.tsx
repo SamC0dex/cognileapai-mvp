@@ -108,7 +108,7 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange, isDocumentsPan
   return (
     <motion.div
       className={cn(
-        "relative z-[200] flex flex-col h-screen penseum-sidebar pointer-events-auto",
+        "relative z-[200] flex flex-col h-screen app-sidebar pointer-events-auto",
         isCollapsed ? "w-16" : "w-64"
       )}
       initial={false}
@@ -223,14 +223,14 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange, isDocumentsPan
             <DropdownMenuTrigger asChild>
               <Button
                 variant="purple"
-                className="w-full gap-2 penseum-button-primary dark:from-teal-600 dark:to-teal-700 dark:hover:from-teal-700 dark:hover:to-teal-800"
+                className="w-full gap-2 button-primary dark:from-teal-600 dark:to-teal-700 dark:hover:from-teal-700 dark:hover:to-teal-800"
               >
                 <Plus className="h-4 w-4" />
                 New Course
                 <ChevronDown className="h-4 w-4 ml-auto" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-48 penseum-dropdown">
+            <DropdownMenuContent align="start" className="w-48 app-dropdown">
               <DropdownMenuItem
                 onClick={() => {
                   console.log('New Course clicked - direct navigation');
@@ -278,7 +278,7 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange, isDocumentsPan
                 }
               }}
               className={cn(
-                "penseum-nav-item group w-full",
+                "nav-item group w-full",
                 item.current && "active",
                 isCollapsed && "justify-center"
               )}
@@ -321,7 +321,7 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange, isDocumentsPan
                 <MoreHorizontal className="h-4 w-4 text-sidebar-foreground/60" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56 penseum-dropdown">
+            <DropdownMenuContent align="start" className="w-56 app-dropdown">
               <DropdownMenuItem>
                 <User className="h-4 w-4 mr-2" />
                 Profile Settings

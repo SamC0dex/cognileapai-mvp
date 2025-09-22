@@ -2,6 +2,7 @@
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
+import type { FlashcardOptions } from '@/types/flashcards'
 
 export type StudyToolType = 'study-guide' | 'flashcards' | 'smart-notes' | 'smart-summary'
 
@@ -15,6 +16,17 @@ export interface StudyToolContent {
   conversationId?: string
   isGenerating?: boolean
   generationProgress?: number
+}
+
+export interface ActiveGeneration {
+  id: string
+  type: StudyToolType
+  startTime: number
+  progress: number
+  status: 'starting' | 'generating' | 'finalizing'
+  documentId?: string
+  conversationId?: string
+  flashcardOptions?: FlashcardOptions
 }
 
 export interface StudyTool {
@@ -82,12 +94,17 @@ interface StudyToolsStore {
   closeCanvas: () => void
   toggleCanvasFullscreen: () => void
 
-  // Generation state
-  isGenerating: boolean
-  generatingType: StudyToolType | null
-  generationProgress: number
+  // Generation state - Fixed for concurrent generations
+  activeGenerations: Map<string, ActiveGeneration>
+  activeIntervals: Map<string, NodeJS.Timeout>
+  getActiveGenerations: () => ActiveGeneration[]
+  isGenerating: boolean // Proper reactive state, not computed
+  isGeneratingType: (type: StudyToolType) => boolean
+  generatingType: StudyToolType | null // Proper reactive state, not computed
+  generationProgress: number // Proper reactive state, not computed
   error: string | null
-  generateStudyTool: (type: StudyToolType, documentId?: string, conversationId?: string, flashcardOptions?: any) => Promise<void>
+  generateStudyTool: (type: StudyToolType, documentId?: string, conversationId?: string, flashcardOptions?: FlashcardOptions) => Promise<void>
+  _updateGenerationState: () => void // Internal helper
 
   // Content management
   generatedContent: StudyToolContent[]
@@ -150,23 +167,50 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
     }))
   },
 
-  // Generation state
-  isGenerating: false,
-  generatingType: null,
-  generationProgress: 0,
+  // Generation state - Fixed for concurrent generations
+  activeGenerations: new Map(),
+  activeIntervals: new Map(),
+  getActiveGenerations: () => Array.from(get().activeGenerations.values()),
+  isGenerating: false, // Proper reactive state
+  isGeneratingType: (type: StudyToolType) => {
+    const generations = get().activeGenerations
+    return Array.from(generations.values()).some(gen => gen.type === type)
+  },
+  generatingType: null, // Proper reactive state
+  generationProgress: 0, // Proper reactive state
   error: null,
+
+  _updateGenerationState: () => {
+    const generations = Array.from(get().activeGenerations.values())
+    const isGenerating = generations.length > 0
+    const generatingType = generations.length > 0 ? generations[0].type : null
+    const generationProgress = generations.length === 0 ? 0 :
+      Math.round(generations.reduce((sum, gen) => sum + gen.progress, 0) / generations.length)
+
+    set({ isGenerating, generatingType, generationProgress })
+  },
   generateStudyTool: async (
     type: StudyToolType,
     documentId?: string,
     conversationId?: string,
-    flashcardOptions?: any
+    flashcardOptions?: FlashcardOptions
   ) => {
+    console.log('[StudyToolsStore] Starting generation:', { type, documentId, conversationId })
+
+    // Create unique generation ID and track it
+    const generationId = crypto.randomUUID()
+
+    // Prevent duplicate generations of the same type
+    if (get().isGeneratingType(type)) {
+      console.warn(`[StudyToolsStore] Already generating ${type}, skipping duplicate request`)
+      return
+    }
+
     try {
-      console.log('[StudyToolsStore] Starting generation:', { type, documentId, conversationId })
 
       // Create placeholder content immediately for smooth UX
       const placeholderContent: StudyToolContent = {
-        id: crypto.randomUUID(),
+        id: generationId,
         type,
         title: `Generating ${STUDY_TOOLS[type].name}...`,
         content: '',
@@ -177,14 +221,31 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
         generationProgress: 0
       }
 
-      // Add placeholder to list immediately (except for flashcards which go to flashcard store)
-      set(state => ({
-        isGenerating: true,
-        generatingType: type,
-        generationProgress: 0,
-        error: null,
-        generatedContent: type !== 'flashcards' ? [placeholderContent, ...state.generatedContent] : state.generatedContent
-      }))
+      // Add to active generations tracking
+      const activeGeneration: ActiveGeneration = {
+        id: generationId,
+        type,
+        startTime: Date.now(),
+        progress: 0,
+        status: 'starting',
+        documentId,
+        conversationId,
+        flashcardOptions
+      }
+
+      // Update state with new generation
+      set(state => {
+        const newActiveGenerations = new Map(state.activeGenerations)
+        newActiveGenerations.set(generationId, activeGeneration)
+        return {
+          activeGenerations: newActiveGenerations,
+          error: null,
+          generatedContent: type !== 'flashcards' ? [placeholderContent, ...state.generatedContent] : state.generatedContent
+        }
+      })
+
+      // Update reactive state
+      get()._updateGenerationState()
 
       // For flashcards, add placeholder to flashcard store instead
       if (type === 'flashcards') {
@@ -212,61 +273,70 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
 
       // Realistic AI generation progress simulation
       const getRealisticProgress = (elapsedSeconds: number, generationType: StudyToolType) => {
-        // Define realistic AI generation phases based on study tool type
-        const phases = {
+        // Simple, reliable progress calculation designed for 30-45 second generations
+        // Phase messages based on study tool type
+        const messages = {
           'study-guide': [
-            { name: 'Analyzing content...', start: 0, end: 20, duration: 3 },
-            { name: 'Creating outline...', start: 20, end: 45, duration: 4 },
-            { name: 'Generating sections...', start: 45, end: 80, duration: 8 },
-            { name: 'Finalizing guide...', start: 80, end: 95, duration: 4 },
-            { name: 'Almost ready...', start: 95, end: 98, duration: Infinity }
+            { threshold: 0, message: 'Analyzing content...' },
+            { threshold: 20, message: 'Creating outline...' },
+            { threshold: 40, message: 'Generating sections...' },
+            { threshold: 70, message: 'Adding details...' },
+            { threshold: 100, message: 'Finalizing guide...' }
           ],
           'flashcards': [
-            { name: 'Analyzing content...', start: 0, end: 15, duration: 2 },
-            { name: 'Identifying key concepts...', start: 15, end: 35, duration: 4 },
-            { name: 'Creating questions...', start: 35, end: 70, duration: 6 },
-            { name: 'Generating answers...', start: 70, end: 90, duration: 5 },
-            { name: 'Finalizing cards...', start: 90, end: 98, duration: Infinity }
+            { threshold: 0, message: 'Analyzing content...' },
+            { threshold: 15, message: 'Identifying key concepts...' },
+            { threshold: 35, message: 'Creating questions...' },
+            { threshold: 65, message: 'Generating answers...' },
+            { threshold: 100, message: 'Finalizing cards...' }
           ],
           'smart-notes': [
-            { name: 'Reading content...', start: 0, end: 25, duration: 3 },
-            { name: 'Extracting key points...', start: 25, end: 60, duration: 5 },
-            { name: 'Organizing notes...', start: 60, end: 85, duration: 4 },
-            { name: 'Adding insights...', start: 85, end: 98, duration: Infinity }
+            { threshold: 0, message: 'Reading content...' },
+            { threshold: 18, message: 'Extracting key points...' },
+            { threshold: 45, message: 'Organizing notes...' },
+            { threshold: 80, message: 'Adding insights...' }
           ],
           'smart-summary': [
-            { name: 'Processing content...', start: 0, end: 30, duration: 2 },
-            { name: 'Identifying main points...', start: 30, end: 70, duration: 4 },
-            { name: 'Creating summary...', start: 70, end: 90, duration: 3 },
-            { name: 'Polishing...', start: 90, end: 98, duration: Infinity }
+            { threshold: 0, message: 'Processing content...' },
+            { threshold: 25, message: 'Identifying main points...' },
+            { threshold: 55, message: 'Creating summary...' },
+            { threshold: 85, message: 'Polishing...' }
           ]
         }
 
-        const toolPhases = phases[generationType]
-        let cumulativeTime = 0
-        let currentPhase = toolPhases[0]
-        let phaseProgress = 0
+        // Calculate progress linearly with easing
+        // Target: reach 90% at 100 seconds, then very slow progression to 97%
+        let progress: number
+        let currentMessage = messages[generationType][0].message
 
-        // Find current phase and calculate progress within that phase
-        for (const phase of toolPhases) {
-          if (elapsedSeconds <= cumulativeTime + phase.duration) {
-            currentPhase = phase
-            const timeInPhase = elapsedSeconds - cumulativeTime
-
-            // Use easing curve for natural feeling progress
-            const normalizedTime = Math.min(timeInPhase / phase.duration, 1)
-            const easedProgress = phase.duration === Infinity ? 0.7 : (1 - Math.pow(1 - normalizedTime, 2))
-
-            phaseProgress = phase.start + (phase.end - phase.start) * easedProgress
-            break
-          }
-          cumulativeTime += phase.duration
+        if (elapsedSeconds <= 100) {
+          // Smooth progression to 90% over 100 seconds with subtle easing
+          const linearProgress = (elapsedSeconds / 100) * 90
+          // Apply gentle easing to make it feel natural
+          const easingFactor = 1 - Math.pow(1 - (elapsedSeconds / 100), 1.2)
+          progress = easingFactor * 90
+        } else {
+          // Very slow progression from 90% to 97% after 100 seconds
+          const overtime = elapsedSeconds - 100
+          const overtimeProgress = Math.min(overtime / 50, 1) // 50 second window for final 7%
+          progress = 90 + (overtimeProgress * 7)
         }
 
-        // Return clean progress without any random variation that could cause backwards movement
+        // Find current message based on elapsed time
+        const toolMessages = messages[generationType]
+        for (let i = toolMessages.length - 1; i >= 0; i--) {
+          if (elapsedSeconds >= toolMessages[i].threshold) {
+            currentMessage = toolMessages[i].message
+            break
+          }
+        }
+
+        // Ensure progress never exceeds 97% during generation
+        progress = Math.min(progress, 97)
+
         return {
-          progress: Math.round(Math.max(0, Math.min(98, phaseProgress))),
-          message: currentPhase.name
+          progress: Math.round(Math.max(0, progress)),
+          message: currentMessage
         }
       }
 
@@ -280,16 +350,32 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
         lastProgress = progress
 
         set(state => {
+          // Update active generation progress
+          const newActiveGenerations = new Map(state.activeGenerations)
+          const currentGeneration = newActiveGenerations.get(generationId)
+          if (currentGeneration) {
+            newActiveGenerations.set(generationId, {
+              ...currentGeneration,
+              progress,
+              status: progress < 95 ? 'generating' : 'finalizing'
+            })
+          }
+
+          // Update placeholder content
           const updatedContent = state.generatedContent.map(content =>
             content.id === placeholderContent.id
               ? { ...content, generationProgress: progress, title: `${STUDY_TOOLS[type].name}: ${message}` }
               : content
           )
+
           return {
-            generatedContent: updatedContent,
-            generationProgress: progress
+            activeGenerations: newActiveGenerations,
+            generatedContent: updatedContent
           }
         })
+
+        // Update reactive state
+        get()._updateGenerationState()
 
         // Also update flashcard placeholder if it's a flashcard generation
         if (type === 'flashcards') {
@@ -311,6 +397,13 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
         }
       }, 300)
 
+      // Track interval for cleanup
+      set(state => {
+        const newActiveIntervals = new Map(state.activeIntervals)
+        newActiveIntervals.set(generationId, progressInterval)
+        return { activeIntervals: newActiveIntervals }
+      })
+
       const response = await fetch('/api/study-tools/generate', {
         method: 'POST',
         headers: {
@@ -324,7 +417,13 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
         }),
       })
 
+      // Clean up interval
       clearInterval(progressInterval)
+      set(state => {
+        const newActiveIntervals = new Map(state.activeIntervals)
+        newActiveIntervals.delete(generationId)
+        return { activeIntervals: newActiveIntervals }
+      })
 
       if (!response.ok) {
         throw new Error(`Failed to generate ${STUDY_TOOLS[type].name}`)
@@ -332,6 +431,82 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
 
       const result = await response.json()
       console.log('[StudyToolsStore] Generation successful:', result)
+
+      // Get current progress before completion animation
+      const currentState = get()
+      const currentGeneration = currentState.activeGenerations.get(generationId)
+      const currentProgress = currentGeneration?.progress || 0
+
+      // Animate progress to 100% before opening content (completion animation)
+      const completeProgress = () => {
+        return new Promise<void>((resolve) => {
+          if (currentProgress >= 97) {
+            // If already very close, just finish quickly
+            setTimeout(resolve, 200)
+            return
+          }
+
+          const completionInterval = setInterval(() => {
+            set(state => {
+              const newActiveGenerations = new Map(state.activeGenerations)
+              const generation = newActiveGenerations.get(generationId)
+              if (generation) {
+                const progressStep = Math.min(5, 100 - generation.progress) // Speed up by 5% per step
+                const newProgress = Math.min(100, generation.progress + progressStep)
+
+                newActiveGenerations.set(generationId, {
+                  ...generation,
+                  progress: newProgress,
+                  status: 'finalizing'
+                })
+
+                // Update placeholder content progress
+                const updatedContent = state.generatedContent.map(content =>
+                  content.id === placeholderContent.id
+                    ? { ...content, generationProgress: newProgress, title: `${STUDY_TOOLS[type].name}: Complete!` }
+                    : content
+                )
+
+                if (newProgress >= 100) {
+                  clearInterval(completionInterval)
+                  setTimeout(resolve, 100) // Small delay after reaching 100%
+                }
+
+                return {
+                  activeGenerations: newActiveGenerations,
+                  generatedContent: updatedContent
+                }
+              }
+              return state
+            })
+
+            // Update reactive state
+            get()._updateGenerationState()
+
+            // Also update flashcard placeholder if it's a flashcard generation
+            if (type === 'flashcards') {
+              const { useFlashcardStore } = require('@/lib/flashcard-store')
+              const flashcardStore = useFlashcardStore.getState()
+              const updatedSets = flashcardStore.flashcardSets.map((set: any) =>
+                set.id === placeholderContent.id
+                  ? {
+                      ...set,
+                      title: `Flashcards: Complete!`,
+                      metadata: {
+                        ...set.metadata,
+                        generationProgress: Math.min(100, (currentState.activeGenerations.get(generationId)?.progress || 0) + 5)
+                      }
+                    }
+                  : set
+              )
+              useFlashcardStore.setState({ flashcardSets: updatedSets })
+            }
+          }, 150) // Fast completion animation
+        })
+      }
+
+      // Wait for completion animation to finish
+      await completeProgress()
 
       // Handle flashcards specially
       if (type === 'flashcards' && result.cards) {
@@ -363,10 +538,17 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
         )
         useFlashcardStore.setState({ flashcardSets: updatedSets })
 
-        // Mark generation as completed
-        set(state => ({
-          generationProgress: 100
-        }))
+        // Remove from active generations
+        set(state => {
+          const newActiveGenerations = new Map(state.activeGenerations)
+          newActiveGenerations.delete(generationId)
+          return {
+            activeGenerations: newActiveGenerations
+          }
+        })
+
+        // Update reactive state
+        get()._updateGenerationState()
 
         // Brief delay then open flashcard viewer (not canvas)
         setTimeout(() => {
@@ -387,13 +569,20 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
           generationProgress: 100
         }
 
-        // Update placeholder with final content
-        set(state => ({
-          generationProgress: 100,
-          generatedContent: state.generatedContent.map(content =>
-            content.id === placeholderContent.id ? finalContent : content
-          )
-        }))
+        // Update placeholder with final content and remove from active generations
+        set(state => {
+          const newActiveGenerations = new Map(state.activeGenerations)
+          newActiveGenerations.delete(generationId)
+          return {
+            activeGenerations: newActiveGenerations,
+            generatedContent: state.generatedContent.map(content =>
+              content.id === placeholderContent.id ? finalContent : content
+            )
+          }
+        })
+
+        // Update reactive state
+        get()._updateGenerationState()
 
         // Brief delay for smooth transition, then open canvas
         setTimeout(() => {
@@ -405,23 +594,45 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
     } catch (error) {
       console.error('[StudyToolsStore] Generation failed:', error)
 
-      // Update placeholder to show error
-      const { placeholderContent } = get() as any
-      set(state => ({
-        error: error instanceof Error ? error.message : 'Generation failed',
-        generatedContent: state.generatedContent.map(content =>
-          content.isGenerating && content.type === type
-            ? { ...content, isGenerating: false, title: `Failed: ${STUDY_TOOLS[type].name}` }
-            : content
-        )
-      }))
-    } finally {
-      set({
-        isGenerating: false,
-        generatingType: null,
-        generationProgress: 0
+      // Clean up interval if it exists
+      const currentState = get()
+      const progressInterval = currentState.activeIntervals.get(generationId)
+      if (progressInterval) {
+        clearInterval(progressInterval)
+        set(state => {
+          const newActiveIntervals = new Map(state.activeIntervals)
+          newActiveIntervals.delete(generationId)
+          return { activeIntervals: newActiveIntervals }
+        })
+      }
+
+      // Update placeholder to show error and remove from active generations
+      set(state => {
+        const newActiveGenerations = new Map(state.activeGenerations)
+        newActiveGenerations.delete(generationId)
+        return {
+          activeGenerations: newActiveGenerations,
+          error: error instanceof Error ? error.message : 'Generation failed',
+          generatedContent: state.generatedContent.map(content =>
+            content.id === generationId
+              ? { ...content, isGenerating: false, title: `Failed: ${STUDY_TOOLS[type].name}` }
+              : content
+          )
+        }
       })
+
+      // Update reactive state
+      get()._updateGenerationState()
+
+      // Also handle flashcard error cleanup
+      if (type === 'flashcards') {
+        const { useFlashcardStore } = require('@/lib/flashcard-store')
+        const flashcardStore = useFlashcardStore.getState()
+        const updatedSets = flashcardStore.flashcardSets.filter((set: any) => set.id !== generationId)
+        useFlashcardStore.setState({ flashcardSets: updatedSets })
+      }
     }
+    // No finally block needed - cleanup is handled in try/catch
   },
 
   // Content management

@@ -119,7 +119,6 @@ const iconMap = {
 interface StudyToolCardProps {
   type: StudyToolType
   onClick: () => void
-  isGenerating: boolean
   isCurrentlyGenerating: boolean
   hasContext: boolean
 }
@@ -127,7 +126,6 @@ interface StudyToolCardProps {
 const StudyToolCard: React.FC<StudyToolCardProps> = React.memo(({
   type,
   onClick,
-  isGenerating,
   isCurrentlyGenerating,
   hasContext
 }) => {
@@ -177,24 +175,7 @@ const StudyToolCard: React.FC<StudyToolCardProps> = React.memo(({
       )}
       onClick={!isDisabled ? handleClick : undefined}
     >
-      {/* Loading overlay */}
-      <AnimatePresence>
-        {isCurrentlyGenerating && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-xl flex items-center justify-center z-10"
-          >
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            >
-              <Loader2 className="w-5 h-5 text-brand-teal-600" />
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Removed loading overlay - cards should remain interactive during generation */}
 
       {/* Elegant highlighting glow effect */}
       <AnimatePresence>
@@ -258,12 +239,8 @@ const StudyToolCard: React.FC<StudyToolCardProps> = React.memo(({
       <div className="mt-2 flex items-center justify-between">
         <motion.span
           className="text-xs font-medium text-muted-foreground"
-          animate={isCurrentlyGenerating ? { opacity: [0.5, 1, 0.5] } : { opacity: 1 }}
-          transition={{ duration: 1.5, repeat: isCurrentlyGenerating ? Infinity : 0 }}
         >
-          {isCurrentlyGenerating
-            ? 'Generating...'
-            : isPlaceholder
+          {isPlaceholder
             ? 'Coming Soon'
             : !hasContext && type !== 'flashcards'
             ? 'Needs Document'
@@ -280,7 +257,7 @@ const StudyToolCard: React.FC<StudyToolCardProps> = React.memo(({
           >
             <Sparkles className={cn(
               "w-4 h-4 transition-colors",
-              isCurrentlyGenerating ? "text-brand-teal-600" : tool.textColor
+              tool.textColor
             )} />
           </motion.div>
         )}
@@ -412,13 +389,13 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
     const isActive = activeDropdown === content.id
 
     return (
-      <div className="relative" data-dropdown="true">
+      <div className={cn("relative", isActive && "z-[9999]")} data-dropdown="true">
         <motion.button
           className={cn(
             "p-1.5 rounded-md transition-colors duration-200",
             "hover:bg-muted/70 focus:outline-none focus:bg-muted/70",
             "opacity-0 group-hover:opacity-100 transition-opacity",
-            "pointer-events-auto relative z-10",
+            "pointer-events-auto relative z-[9998]",
             isActive && "opacity-100 bg-muted/70"
           )}
           onClick={(e) => {
@@ -434,11 +411,13 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
         <AnimatePresence>
           {isActive && (
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: -5 }}
+              initial={{ opacity: 0, scale: 0.98, y: -3 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: -5 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              className="absolute right-0 top-full mt-1 w-48 bg-popover border border-border rounded-lg shadow-xl z-[500] overflow-hidden" data-dropdown="true"
+              exit={{ opacity: 0, scale: 0.98, y: -3 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 40, mass: 0.8 }}
+              className="absolute right-0 top-full mt-1 w-48 bg-popover border border-border rounded-lg shadow-xl z-[9999] overflow-hidden"
+              data-dropdown="true"
+              style={{ zIndex: 9999 }}
               onMouseEnter={(e) => e.stopPropagation()}
               onMouseMove={(e) => e.stopPropagation()}
             >
@@ -542,7 +521,7 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0 }}
-            className="absolute inset-0 bg-transparent z-[400] cursor-default"
+            className="absolute inset-0 bg-transparent z-[9997] cursor-default"
             onClick={() => setActiveDropdown(null)}
             onMouseMove={(e) => e.stopPropagation()}
             onMouseEnter={(e) => e.stopPropagation()}
@@ -805,12 +784,10 @@ const CollapsedPanel: React.FC<{ onExpand: () => void }> = ({ onExpand }) => {
 const ExpandedPanel: React.FC<{
   onCollapse: () => void
   onGenerateStudyTool: (type: StudyToolType) => void
-  isGenerating: boolean
-  generatingType: StudyToolType | null
   hasContext: boolean
-}> = ({ onCollapse, onGenerateStudyTool, isGenerating, generatingType, hasContext }) => {
+}> = ({ onCollapse, onGenerateStudyTool, hasContext }) => {
   const prefersReducedMotion = useReducedMotion()
-  const { isCanvasOpen, isCanvasFullscreen, canvasContent, closeCanvas, toggleCanvasFullscreen, copyToClipboard, downloadAsPDF, downloadAsDOCX } = useStudyToolsStore()
+  const { isCanvasOpen, isCanvasFullscreen, canvasContent, closeCanvas, toggleCanvasFullscreen, copyToClipboard, downloadAsPDF, downloadAsDOCX, isGeneratingType } = useStudyToolsStore()
   const { isViewerOpen, currentFlashcardSet, isFullscreen, closeViewer, toggleFullscreen } = useFlashcardStore()
   const [isCopied, setIsCopied] = React.useState(false)
   const [showExportMenu, setShowExportMenu] = React.useState(false)
@@ -1269,8 +1246,7 @@ const ExpandedPanel: React.FC<{
                   key={type}
                   type={type as StudyToolType}
                   onClick={() => onGenerateStudyTool(type as StudyToolType)}
-                  isGenerating={isGenerating}
-                  isCurrentlyGenerating={generatingType === type}
+                  isCurrentlyGenerating={isGeneratingType(type as StudyToolType)}
                   hasContext={hasContext}
                 />
               ))}
@@ -1373,7 +1349,7 @@ const FlashcardSetsSection: React.FC = () => {
     const isOpen = activeDropdown === flashcardSet.id
 
     return (
-      <div className="relative">
+      <div className={cn("relative", isOpen && "z-[9999]")}>
         <motion.button
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
@@ -1381,7 +1357,7 @@ const FlashcardSetsSection: React.FC = () => {
             e.stopPropagation()
             setActiveDropdown(isOpen ? null : flashcardSet.id)
           }}
-          className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-accent transition-colors pointer-events-auto relative z-10"
+          className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-accent transition-colors pointer-events-auto relative z-[9998]"
           data-flashcard-dropdown="true"
         >
           <MoreVertical className="w-3 h-3 text-muted-foreground" />
@@ -1390,12 +1366,13 @@ const FlashcardSetsSection: React.FC = () => {
         <AnimatePresence>
           {isOpen && (
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: -5 }}
+              initial={{ opacity: 0, scale: 0.98, y: -3 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: -5 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              className="absolute right-0 top-full mt-1 w-36 bg-popover border border-border rounded-lg shadow-xl z-[500] overflow-hidden"
+              exit={{ opacity: 0, scale: 0.98, y: -3 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 40, mass: 0.8 }}
+              className="absolute right-0 top-full mt-1 w-36 bg-popover border border-border rounded-lg shadow-xl z-[9999] overflow-hidden"
               data-flashcard-dropdown="true"
+              style={{ zIndex: 9999 }}
               onMouseEnter={(e) => e.stopPropagation()}
               onMouseMove={(e) => e.stopPropagation()}
             >
@@ -1460,7 +1437,7 @@ const FlashcardSetsSection: React.FC = () => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0 }}
-            className="absolute inset-0 bg-transparent z-[400] cursor-default"
+            className="absolute inset-0 bg-transparent z-[9997] cursor-default"
             onClick={() => setActiveDropdown(null)}
             onMouseMove={(e) => e.stopPropagation()}
             onMouseEnter={(e) => e.stopPropagation()}
@@ -1645,7 +1622,7 @@ export const StudyToolsPanel: React.FC<{
   const {
     isPanelExpanded,
     isGenerating,
-    generatingType,
+    isGeneratingType,
     expandPanel,
     collapsePanel,
     generateStudyTool,
@@ -1680,7 +1657,8 @@ export const StudyToolsPanel: React.FC<{
   }, [documentId, conversationId, hasContext, loadStudyToolsFromDatabase])
 
   const handleGenerateStudyTool = React.useCallback((type: StudyToolType) => {
-    if (isGenerating) return
+    // Remove the global blocking check - allow concurrent generations
+    // The store will handle individual generation tracking
 
     // Special handling for flashcards - always show customization dialog
     if (type === 'flashcards') {
@@ -1719,7 +1697,7 @@ export const StudyToolsPanel: React.FC<{
       isOpen: true,
       studyToolType: type
     })
-  }, [isGenerating, generateStudyTool, documentId, conversationId, hasDocumentSelected, hasMessages, hasContext])
+  }, [generateStudyTool, documentId, conversationId, hasDocumentSelected, hasMessages, hasContext])
 
   const handleConfirmConversationGeneration = React.useCallback(() => {
     if (confirmationDialog.studyToolType) {
@@ -1760,8 +1738,6 @@ export const StudyToolsPanel: React.FC<{
             key="expanded"
             onCollapse={collapsePanel}
             onGenerateStudyTool={handleGenerateStudyTool}
-            isGenerating={isGenerating}
-            generatingType={generatingType}
             hasContext={hasContext}
           />
         ) : (
@@ -1789,7 +1765,7 @@ export const StudyToolsPanel: React.FC<{
         isOpen={flashcardDialog.isOpen}
         onClose={handleCloseFlashcardDialog}
         onGenerate={handleFlashcardGenerate}
-        isGenerating={isGenerating && generatingType === 'flashcards'}
+        isGenerating={isGeneratingType('flashcards')} // Properly check if flashcards are being generated
       />
 
       {/* Fullscreen Flashcard Viewer - This should be rendered at app level, not here */}
