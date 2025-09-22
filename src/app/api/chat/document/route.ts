@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { streamText, convertToCoreMessages } from 'ai'
+import { GoogleGenAI } from '@google/genai'
 import { GeminiModelSelector, validateGeminiConfig } from '@/lib/ai-config'
 import { createClient } from '@supabase/supabase-js'
 
@@ -111,56 +111,61 @@ export async function POST(req: NextRequest) {
 
     // Build AI prompt with document context
     const systemPrompt = buildSystemPrompt(documentContext)
-    const contextualMessage = buildContextualMessage(message, documentContext, messageHistory)
+    const contextualMessage = buildContextualMessage(message, documentContext)
+
+    // Initialize Google GenAI client
+    const client = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY! })
 
     // Use Flash-Lite model for chat responses
-    const model = GeminiModelSelector.getModelInstance('FLASH_LITE')
+    const modelName = GeminiModelSelector.getModelName('FLASH_LITE')
     const modelConfig = GeminiModelSelector.getModelConfig('FLASH_LITE')
 
     console.log(`[AI] Using ${modelConfig.displayName} for document chat (${Date.now() - startTime}ms to start streaming)`)
 
-    // Convert message history to core messages
-    const coreMessages = convertToCoreMessages([
-      ...messageHistory,
-      { role: 'user' as const, content: contextualMessage }
-    ])
+    // Prepare conversation history for Google GenAI SDK
+    const contents = [
+      {
+        role: 'user' as const,
+        parts: [{ text: systemPrompt + '\n\n' + contextualMessage }]
+      }
+    ]
 
-    // Create streaming response
-    const result = await streamText({
-      model,
-      messages: [
-        {
-          role: 'system',
-          content: systemPrompt
-        },
-        ...coreMessages
-      ],
-      temperature: 0.7,
-      maxTokens: 2048,
-      onFinish: async (result) => {
-        // Save messages to database after completion
-        try {
-          await saveMessagesToDatabase({
-            conversationId,
-            documentId,
-            userMessage: message,
-            aiResponse: result.text,
-            modelUsed: 'FLASH_LITE',
-            tokenUsage: result.usage?.totalTokens || 0,
-            responseTime: Date.now() - startTime
-          })
-        } catch (error) {
-          console.error('[DB] Failed to save messages:', error)
-        }
+    // Generate response using Google GenAI SDK
+    const response = await client.models.generateContent({
+      model: modelName,
+      contents,
+      config: {
+        temperature: 0.7,
+        maxOutputTokens: 2048,
       }
     })
 
-    // Return streaming response with proper headers
-    return result.toDataStreamResponse({
+    const aiResponseText = response.text || 'No response generated'
+
+    // Save messages to database
+    try {
+      await saveMessagesToDatabase({
+        conversationId,
+        documentId,
+        userMessage: message,
+        aiResponse: aiResponseText,
+        modelUsed: 'FLASH_LITE',
+        tokenUsage: response.usageMetadata?.totalTokenCount || 0,
+        responseTime: Date.now() - startTime
+      })
+    } catch (error) {
+      console.error('[DB] Failed to save messages:', error)
+    }
+
+    // Return response with proper headers
+    return NextResponse.json({
+      content: aiResponseText,
+      model: 'FLASH_LITE',
+      usage: response.usageMetadata
+    }, {
       headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
+        'Content-Type': 'application/json',
         'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
         'X-Response-Time': `${Date.now() - startTime}ms`
       }
     })
@@ -325,7 +330,7 @@ ${tableOfContents}
 Remember: Only answer based on the document content provided. Do not add external knowledge.`
 }
 
-function buildContextualMessage(message: string, documentContext: DocumentContext, _messageHistory: Array<{ role: 'user' | 'assistant', content: string }>): string {
+function buildContextualMessage(message: string, documentContext: DocumentContext): string {
   // Build context with token limit consideration (~4000 tokens = ~16000 characters)
   let context = `DOCUMENT: "${documentContext.title}"\n\n`
   

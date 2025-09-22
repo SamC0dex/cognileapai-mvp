@@ -168,7 +168,7 @@ export class GeminiModelSelector {
     
     return complexPatterns.some(pattern => pattern.test(content))
   }
-  
+
   /**
    * Get model name for Google GenAI SDK
    */
@@ -189,6 +189,13 @@ export class GeminiModelSelector {
     ]
   }
   
+  /**
+   * Get model name string for Google GenAI SDK
+   */
+  static getModelName(modelKey: GeminiModelKey): string {
+    return GEMINI_MODELS[modelKey].name
+  }
+
   /**
    * Get model configuration
    */

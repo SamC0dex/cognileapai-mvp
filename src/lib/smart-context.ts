@@ -4,7 +4,7 @@
  * Uses FREE Transformers.js - no API costs!
  */
 
-import { generateEmbedding, cosineSimilarity, type EmbeddingResult, getCacheStats } from './embeddings'
+import { generateEmbedding, cosineSimilarity, getCacheStats } from './embeddings'
 
 // Context-level caching for document chunks and search results
 const contextCache = new Map<string, { result: SearchResult, timestamp: number }>()
@@ -14,7 +14,6 @@ const MAX_CONTEXT_CACHE_SIZE = 100
 // Intelligent embedding caching with document-level batching
 const documentEmbeddingCache = new Map<string, { chunks: DocumentChunk[], timestamp: number }>()
 const EMBEDDING_CACHE_TTL = 2 * 60 * 60 * 1000 // 2 hours TTL for embeddings
-const MAX_EMBEDDING_CACHE_SIZE = 50
 
 // Smart chunk reuse for identical document content
 const chunkCache = new Map<string, { chunks: DocumentChunk[], timestamp: number }>()
@@ -675,13 +674,6 @@ function analyzeQuery(query: string): QueryAnalysis {
   return analysis
 }
 
-/**
- * Legacy function for backward compatibility
- */
-function detectOverviewQuery(query: string): boolean {
-  const analysis = analyzeQuery(query)
-  return analysis.type === 'overview'
-}
 
 /**
  * Extract key topics and concepts from document content for better chunking
@@ -844,7 +836,7 @@ export async function getSmartContext(
 
     // Combine chunks into context with enhanced formatting
     const context = relevantChunks
-      .map((chunk, index) => {
+      .map((chunk) => {
         let chunkText = chunk.content
 
         // Add section title if available
