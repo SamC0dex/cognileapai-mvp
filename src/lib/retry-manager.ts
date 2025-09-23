@@ -3,10 +3,49 @@
  * Handles API failures with intelligent retry logic and beautiful UI feedback
  */
 
+import type { FlashcardOptions } from '@/types/flashcards'
+
+// Payload interfaces for different task types
+export interface ChatTaskPayload {
+  message: string
+  documentId?: string
+  conversationId?: string
+  context?: string
+}
+
+export interface StudyToolTaskPayload {
+  type: 'study-guide' | 'smart-summary' | 'smart-notes' | 'flashcards'
+  documentId?: string
+  conversationId?: string
+  flashcardOptions?: Partial<FlashcardOptions>
+  // Allow additional fields for retry tracking
+  timestamp?: number
+  requestId?: string
+  [key: string]: unknown
+}
+
+export interface DocumentTaskPayload {
+  documentId: string
+  title?: string
+  fileSize?: number
+  [key: string]: unknown // Allow additional properties for flexibility
+}
+
+// Error payload for cases where payload structure is invalid
+export interface ErrorTaskPayload {
+  error: string
+  timestamp?: number
+  requestId?: string
+  [key: string]: unknown
+}
+
+// Union type for all possible payloads
+export type RetryPayload = ChatTaskPayload | StudyToolTaskPayload | DocumentTaskPayload | ErrorTaskPayload
+
 export interface RetryAttempt {
   id: string
   taskType: 'chat' | 'study-tool-generation' | 'document-processing'
-  originalPayload: any
+  originalPayload: RetryPayload
   maxRetries: number
   currentAttempt: number
   nextRetryAt: Date
@@ -67,7 +106,7 @@ class BackgroundRetryManager {
    */
   addRetryAttempt(
     taskType: RetryAttempt['taskType'],
-    originalPayload: any,
+    originalPayload: RetryPayload,
     error: Error,
     options?: Partial<RetryManagerOptions>
   ): string {
@@ -278,13 +317,13 @@ class BackgroundRetryManager {
       // Execute the appropriate retry function based on task type
       switch (attempt.taskType) {
         case 'chat':
-          success = await this.retryChatTask(attempt.originalPayload)
+          success = await this.retryChatTask(attempt.originalPayload as ChatTaskPayload)
           break
         case 'study-tool-generation':
-          success = await this.retryStudyToolTask(attempt.originalPayload)
+          success = await this.retryStudyToolTask(attempt.originalPayload as StudyToolTaskPayload)
           break
         case 'document-processing':
-          success = await this.retryDocumentTask(attempt.originalPayload)
+          success = await this.retryDocumentTask(attempt.originalPayload as DocumentTaskPayload)
           break
       }
 
@@ -332,24 +371,31 @@ class BackgroundRetryManager {
     return new Date(Date.now() + delay)
   }
 
-  private async retryChatTask(payload: any): Promise<boolean> {
+  private async retryChatTask(payload: ChatTaskPayload): Promise<boolean> {
     // TODO: Implement proper chat retry mechanism
     // Note: This requires refactoring to use the actual store instance
     console.warn('[RetryManager] Chat retry not implemented - requires store instance')
     return false
   }
 
-  private async retryStudyToolTask(payload: any): Promise<boolean> {
+  private async retryStudyToolTask(payload: StudyToolTaskPayload): Promise<boolean> {
     // Import study tools functionality dynamically
     const { useStudyToolsStore } = await import('./study-tools-store')
 
     try {
       const store = useStudyToolsStore.getState()
+      // Convert partial flashcard options to full options with defaults
+      const fullFlashcardOptions = payload.flashcardOptions ? {
+        numberOfCards: payload.flashcardOptions.numberOfCards || 'standard',
+        difficulty: payload.flashcardOptions.difficulty || 'medium',
+        customInstructions: payload.flashcardOptions.customInstructions
+      } as FlashcardOptions : undefined
+
       await store.generateStudyTool(
         payload.type,
         payload.documentId,
         payload.conversationId,
-        payload.options
+        fullFlashcardOptions
       )
       return true
     } catch (error) {
@@ -358,7 +404,7 @@ class BackgroundRetryManager {
     }
   }
 
-  private async retryDocumentTask(payload: any): Promise<boolean> {
+  private async retryDocumentTask(payload: DocumentTaskPayload): Promise<boolean> {
     try {
       // Retry document processing by calling the API again
       const response = await fetch('/api/extract-content', {
@@ -391,7 +437,7 @@ class BackgroundRetryManager {
     try {
       const stored = localStorage.getItem('retry_attempts')
       if (stored) {
-        const attempts: [string, any][] = JSON.parse(stored)
+        const attempts: [string, Partial<RetryAttempt> & { nextRetryAt: string | Date; createdAt: string | Date; updatedAt: string | Date }][] = JSON.parse(stored)
 
         for (const [id, attemptData] of attempts) {
           // Convert date strings back to Date objects
@@ -400,7 +446,7 @@ class BackgroundRetryManager {
             nextRetryAt: new Date(attemptData.nextRetryAt),
             createdAt: new Date(attemptData.createdAt),
             updatedAt: new Date(attemptData.updatedAt)
-          }
+          } as RetryAttempt
 
           this.retryQueue.set(id, attempt)
 
@@ -435,7 +481,7 @@ export const retryManager = BackgroundRetryManager.getInstance()
 // Export helper functions
 export const addRetryAttempt = (
   taskType: RetryAttempt['taskType'],
-  payload: any,
+  payload: RetryPayload,
   error: Error,
   options?: Partial<RetryManagerOptions>
 ) => retryManager.addRetryAttempt(taskType, payload, error, options)

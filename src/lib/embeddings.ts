@@ -356,10 +356,10 @@ export function cosineSimilarity(a: number[], b: number[]): number {
  */
 export function findMostSimilar(
   queryEmbedding: number[],
-  candidateEmbeddings: { id: string; embedding: number[]; metadata?: any }[],
+  candidateEmbeddings: { id: string; embedding: number[]; metadata?: Record<string, unknown> }[],
   limit: number = 5,
   threshold: number = 0.1
-): Array<{ id: string; similarity: number; metadata?: any }> {
+): Array<{ id: string; similarity: number; metadata?: Record<string, unknown> }> {
   const similarities = candidateEmbeddings.map(candidate => ({
     id: candidate.id,
     similarity: cosineSimilarity(queryEmbedding, candidate.embedding),

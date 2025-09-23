@@ -32,11 +32,11 @@ declare module 'html2pdf.js' {
     set(options: Html2PdfOptions): Html2PdfWorker
     save(filename?: string): Promise<void>
     toPdf(): Html2PdfWorker
-    output(type?: string, options?: any): Promise<any>
+    output(type?: 'pdf' | 'blob' | 'dataurlnewwindow' | 'dataurl' | 'datauristring' | 'arraybuffer', options?: Record<string, unknown>): Promise<Blob | string | ArrayBuffer | HTMLCanvasElement>
     toCanvas(): Html2PdfWorker
     toImg(): Html2PdfWorker
-    then(onFulfilled?: (value: any) => any, onRejected?: (reason: any) => any): Html2PdfWorker
-    catch(onRejected?: (reason: any) => any): Html2PdfWorker
+    then(onFulfilled?: (value: unknown) => unknown, onRejected?: (reason: unknown) => unknown): Html2PdfWorker
+    catch(onRejected?: (reason: unknown) => unknown): Html2PdfWorker
   }
 
   interface Html2Pdf {

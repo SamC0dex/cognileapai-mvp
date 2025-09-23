@@ -102,7 +102,12 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
     input.onchange = async (e) => {
       const files = Array.from((e.target as HTMLInputElement).files || [])
       if (files.length > 0) {
-        await handleFileChange({ target: { files, value: '' } } as any)
+        // Create a synthetic event that matches React.ChangeEvent<HTMLInputElement>
+        const syntheticEvent = {
+          target: e.target,
+          currentTarget: e.target
+        } as React.ChangeEvent<HTMLInputElement>
+        await handleFileChange(syntheticEvent)
       }
     }
     input.click()

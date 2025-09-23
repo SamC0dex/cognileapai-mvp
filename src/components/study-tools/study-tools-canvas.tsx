@@ -25,6 +25,7 @@ import {
   Minimize2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { FlashcardEntry } from '@/types/flashcards'
 
 // Enhanced canvas animation variants with proper width
 const canvasVariants = {
@@ -325,7 +326,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ content, isFullscreen
     try {
       console.log('[FlashcardViewer] Raw flashcard content:', content.content.substring(0, 200) + '...')
 
-      let parsedContent: any[] = []
+      let parsedContent: FlashcardEntry[] = []
 
       // Try to parse as JSON directly first (for database-stored content)
       try {
@@ -403,59 +404,68 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ content, isFullscreen
     }
   }
 
+  // Type definitions for markdown components
+  interface MarkdownComponentProps {
+    children?: React.ReactNode
+  }
+
+  interface CodeComponentProps extends MarkdownComponentProps {
+    inline?: boolean
+  }
+
   const markdownComponents = {
     // Enhanced heading styles with better typography
-    h1: ({ children }: any) => (
+    h1: ({ children }: MarkdownComponentProps) => (
       <h1 className="text-2xl font-bold text-foreground border-b border-border pb-2 mb-4 mt-8 first:mt-0">
         {children}
       </h1>
     ),
-    h2: ({ children }: any) => (
+    h2: ({ children }: MarkdownComponentProps) => (
       <h2 className="text-xl font-semibold text-foreground mb-3 mt-6 first:mt-0">
         {children}
       </h2>
     ),
-    h3: ({ children }: any) => (
+    h3: ({ children }: MarkdownComponentProps) => (
       <h3 className="text-lg font-semibold text-foreground mb-2 mt-4">
         {children}
       </h3>
     ),
-    h4: ({ children }: any) => (
+    h4: ({ children }: MarkdownComponentProps) => (
       <h4 className="text-base font-semibold text-foreground mb-2 mt-3">
         {children}
       </h4>
     ),
     // Enhanced list styles
-    ul: ({ children }: any) => (
+    ul: ({ children }: MarkdownComponentProps) => (
       <ul className="list-disc list-inside space-y-1 mb-4 text-foreground">
         {children}
       </ul>
     ),
-    ol: ({ children }: any) => (
+    ol: ({ children }: MarkdownComponentProps) => (
       <ol className="list-decimal list-inside space-y-1 mb-4 text-foreground">
         {children}
       </ol>
     ),
     // Enhanced paragraph spacing
-    p: ({ children }: any) => (
+    p: ({ children }: MarkdownComponentProps) => (
       <p className="mb-4 text-foreground leading-relaxed last:mb-0">
         {children}
       </p>
     ),
     // Enhanced blockquote styling
-    blockquote: ({ children }: any) => (
+    blockquote: ({ children }: MarkdownComponentProps) => (
       <blockquote className="border-l-4 border-blue-500 pl-4 italic bg-muted/30 py-2 mb-4 text-muted-foreground">
         {children}
       </blockquote>
     ),
     // Code block styling
-    pre: ({ children }: any) => (
+    pre: ({ children }: MarkdownComponentProps) => (
       <pre className="bg-muted/80 p-4 rounded-lg overflow-x-auto mb-4 text-sm border border-border text-foreground">
         {children}
       </pre>
     ),
     // Inline code styling
-    code: ({ children, inline }: any) => {
+    code: ({ children, inline }: CodeComponentProps) => {
       if (inline) {
         return (
           <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono text-foreground">
@@ -466,30 +476,30 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ content, isFullscreen
       return <code className="font-mono text-sm">{children}</code>
     },
     // Enhanced table styling
-    table: ({ children }: any) => (
+    table: ({ children }: MarkdownComponentProps) => (
       <div className="overflow-x-auto mb-4">
         <table className="min-w-full border-collapse border border-border">
           {children}
         </table>
       </div>
     ),
-    th: ({ children }: any) => (
+    th: ({ children }: MarkdownComponentProps) => (
       <th className="border border-border bg-muted/50 px-4 py-2 text-left font-semibold text-foreground">
         {children}
       </th>
     ),
-    td: ({ children }: any) => (
+    td: ({ children }: MarkdownComponentProps) => (
       <td className="border border-border px-4 py-2">
         {children}
       </td>
     ),
     // Strong and emphasis
-    strong: ({ children }: any) => (
+    strong: ({ children }: MarkdownComponentProps) => (
       <strong className="font-semibold text-foreground">
         {children}
       </strong>
     ),
-    em: ({ children }: any) => (
+    em: ({ children }: MarkdownComponentProps) => (
       <em className="italic text-muted-foreground">
         {children}
       </em>

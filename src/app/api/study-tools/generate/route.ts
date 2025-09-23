@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenAI } from '@google/genai'
 import { createClient } from '@supabase/supabase-js'
 import { getStudyToolPrompt, generateStudyToolTitle, type StudyToolPromptType } from '@/lib/study-tools-prompts'
+import { classifyError, addRetryAttempt } from '@/lib/retry-manager'
 
 // Initialize Supabase client with service role key for server-side operations
 const supabase = createClient(
@@ -9,12 +10,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// Initialize Google GenAI client
-function getGenAIClient(): GoogleGenAI {
-  return new GoogleGenAI({
-    apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY!
-  })
-}
 
 // Allow longer execution time for comprehensive generation
 export const maxDuration = 60
@@ -172,8 +167,7 @@ function isContentComplete(content: string, toolType: string): boolean {
 async function generateWithFallback(
   systemPrompt: string,
   userPrompt: string,
-  type: string,
-  contentLength: number
+  type: string
 ): Promise<FallbackResult> {
   const client = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY! })
 
@@ -187,37 +181,15 @@ async function generateWithFallback(
 
     console.log(`[Fallback] Attempting generation with ${modelConfig.name} (tokens: ${estimatedTokens}/${modelConfig.maxInputTokens})`)
 
-    // Check if content fits within model limits
+    // Check if content fits within model limits - if too large, skip to next model
     if (estimatedTokens > modelConfig.maxInputTokens) {
-      console.log(`[Fallback] Content too large for ${modelConfig.name}, trying content chunking...`)
-
-      // Try content chunking strategy
-      const chunkResult = await generateWithChunking(
-        client,
-        modelConfig,
-        systemPrompt,
-        userPrompt,
-        type
-      )
-
-      if (chunkResult) {
-        return {
-          ...chunkResult,
-          modelUsed: `${modelConfig.name} (chunked)`,
-          duration: Date.now() - modelStartTime,
-          fallbackReason: `Content chunked for ${modelConfig.name} due to size`
-        }
-      }
-
-      // If chunking fails, continue to next model
-      console.log(`[Fallback] Chunking failed for ${modelConfig.name}, trying next model...`)
+      console.log(`[Fallback] Content too large for ${modelConfig.name} (${estimatedTokens} > ${modelConfig.maxInputTokens}), trying next model...`)
       continue
     }
 
     // Per-model retry loop
     let lastError: Error | null = null
     for (let attempt = 1; attempt <= modelConfig.maxRetries; attempt++) {
-      const attemptStartTime = Date.now()
       console.log(`[Fallback] ${modelConfig.name} attempt ${attempt}/${modelConfig.maxRetries}`)
 
       try {
@@ -298,259 +270,6 @@ async function generateWithFallback(
   throw new Error('All fallback models failed')
 }
 
-/**
- * Content Chunking Strategy for Large Documents
- */
-async function generateWithChunking(
-  client: GoogleGenAI,
-  modelConfig: ModelConfig,
-  systemPrompt: string,
-  userPrompt: string,
-  type: string
-): Promise<{ resultText: string; chunksUsed: number } | null> {
-  try {
-    console.log(`[Chunking] Attempting chunked generation for ${type}`)
-
-    // Extract document content from userPrompt (it's embedded in the prompt)
-    const documentContentMatch = userPrompt.match(/Source Material:\s*([\s\S]*?)(?=\n\n##|$)/)
-    if (!documentContentMatch) {
-      console.error('[Chunking] Could not extract document content from prompt')
-      return null
-    }
-
-    const documentContent = documentContentMatch[1].trim()
-    const maxContentTokens = Math.floor(modelConfig.maxInputTokens * 0.6) // Reserve 40% for prompts
-    const chunkSize = Math.floor(maxContentTokens * 4) // Convert tokens to characters
-
-    // Split content into manageable chunks
-    const chunks = splitIntoChunks(documentContent, chunkSize)
-    console.log(`[Chunking] Split content into ${chunks.length} chunks`)
-
-    if (chunks.length === 1) {
-      // Single chunk - try with simplified prompt
-      return await generateWithSimplifiedPrompt(client, modelConfig, systemPrompt, userPrompt, type)
-    }
-
-    // Multi-chunk strategy: generate for each chunk and combine
-    const chunkResults: string[] = []
-
-    for (let i = 0; i < Math.min(chunks.length, 3); i++) { // Limit to 3 chunks for performance
-      const chunk = chunks[i]
-      const chunkPrompt = userPrompt.replace(documentContent, chunk)
-
-      console.log(`[Chunking] Processing chunk ${i + 1}/${chunks.length} (${chunk.length} chars)`)
-
-      try {
-        const response = await client.models.generateContent({
-          model: modelConfig.name,
-          contents: [{
-            role: 'user',
-            parts: [{ text: systemPrompt + '\n\n' + chunkPrompt }]
-          }],
-          config: {
-            temperature: modelConfig.temperature,
-            maxOutputTokens: Math.floor(modelConfig.baseOutputTokens / chunks.length),
-            topK: modelConfig.topK,
-          }
-        })
-
-        const chunkResult = response.text || ''
-        if (chunkResult.length > 0) {
-          chunkResults.push(chunkResult)
-        }
-      } catch (chunkError) {
-        console.error(`[Chunking] Chunk ${i + 1} failed:`, chunkError)
-        // Continue with other chunks
-      }
-    }
-
-    if (chunkResults.length === 0) {
-      console.error('[Chunking] All chunks failed')
-      return null
-    }
-
-    // Combine chunk results intelligently based on study tool type
-    const combinedResult = combineChunkResults(chunkResults, type)
-
-    console.log(`[Chunking] Successfully combined ${chunkResults.length} chunks`)
-    return {
-      resultText: combinedResult,
-      chunksUsed: chunkResults.length
-    }
-
-  } catch (error) {
-    console.error('[Chunking] Chunking strategy failed:', error)
-    return null
-  }
-}
-
-/**
- * Simplified prompt strategy for edge cases
- */
-async function generateWithSimplifiedPrompt(
-  client: GoogleGenAI,
-  modelConfig: ModelConfig,
-  systemPrompt: string,
-  userPrompt: string,
-  type: string
-): Promise<{ resultText: string; chunksUsed: number } | null> {
-  try {
-    console.log('[Simplified] Attempting generation with simplified prompt')
-
-    // Create a simplified version of the prompt
-    const simplifiedSystemPrompt = getSimplifiedSystemPrompt(type)
-    const simplifiedUserPrompt = getSimplifiedUserPrompt(userPrompt, type)
-
-    const response = await client.models.generateContent({
-      model: modelConfig.name,
-      contents: [{
-        role: 'user',
-        parts: [{ text: simplifiedSystemPrompt + '\n\n' + simplifiedUserPrompt }]
-      }],
-      config: {
-        temperature: Math.min(modelConfig.temperature + 0.1, 1.0), // Slightly higher temperature
-        maxOutputTokens: Math.floor(modelConfig.baseOutputTokens * 0.8), // Reduce output expectation
-        topK: Math.max(modelConfig.topK - 10, 20), // Reduce topK
-      }
-    })
-
-    const resultText = response.text || ''
-
-    if (resultText.length < 50) {
-      return null
-    }
-
-    console.log('[Simplified] Success with simplified prompt')
-    return {
-      resultText,
-      chunksUsed: 1
-    }
-
-  } catch (error) {
-    console.error('[Simplified] Simplified prompt failed:', error)
-    return null
-  }
-}
-
-/**
- * Utility functions for content processing
- */
-function splitIntoChunks(content: string, chunkSize: number): string[] {
-  if (content.length <= chunkSize) {
-    return [content]
-  }
-
-  const chunks: string[] = []
-  let start = 0
-
-  while (start < content.length) {
-    let end = start + chunkSize
-
-    // Try to split at natural boundaries (paragraphs, sentences)
-    if (end < content.length) {
-      const lastParagraph = content.lastIndexOf('\n\n', end)
-      const lastSentence = content.lastIndexOf('. ', end)
-      const lastNewline = content.lastIndexOf('\n', end)
-
-      if (lastParagraph > start + chunkSize * 0.5) {
-        end = lastParagraph + 2
-      } else if (lastSentence > start + chunkSize * 0.5) {
-        end = lastSentence + 2
-      } else if (lastNewline > start + chunkSize * 0.5) {
-        end = lastNewline + 1
-      }
-    }
-
-    chunks.push(content.slice(start, end).trim())
-    start = end
-  }
-
-  return chunks.filter(chunk => chunk.length > 0)
-}
-
-function combineChunkResults(chunkResults: string[], type: string): string {
-  if (chunkResults.length === 1) {
-    return chunkResults[0]
-  }
-
-  // Combine results based on study tool type
-  switch (type) {
-    case 'flashcards':
-      // For flashcards, merge JSON arrays
-      return combineFlashcardChunks(chunkResults)
-
-    case 'smart-summary':
-      return `# Combined Summary\n\n${chunkResults.join('\n\n## Section Summary\n\n')}`
-
-    case 'smart-notes':
-      return `# Combined Notes\n\n${chunkResults.map((result, index) =>
-        `## Section ${index + 1}\n\n${result}`
-      ).join('\n\n')}`
-
-    case 'study-guide':
-      return `# Comprehensive Study Guide\n\n${chunkResults.map((result, index) =>
-        `## Part ${index + 1}\n\n${result}`
-      ).join('\n\n')}`
-
-    default:
-      return chunkResults.join('\n\n---\n\n')
-  }
-}
-
-function combineFlashcardChunks(chunkResults: string[]): string {
-  try {
-    const allCards: any[] = []
-
-    for (const chunk of chunkResults) {
-      try {
-        const cleanedChunk = chunk.trim().replace(/^```json\n?/, '').replace(/\n?```$/, '')
-        const cards = JSON.parse(cleanedChunk)
-        if (Array.isArray(cards)) {
-          allCards.push(...cards)
-        }
-      } catch (parseError) {
-        console.error('[Combine] Failed to parse flashcard chunk:', parseError)
-      }
-    }
-
-    // Ensure unique IDs
-    allCards.forEach((card, index) => {
-      if (!card.id) {
-        card.id = `combined_${Date.now()}_${index}`
-      }
-    })
-
-    return JSON.stringify(allCards, null, 2)
-  } catch (error) {
-    console.error('[Combine] Failed to combine flashcard chunks:', error)
-    return chunkResults[0] // Return first chunk as fallback
-  }
-}
-
-function getSimplifiedSystemPrompt(type: string): string {
-  const basePrompts = {
-    'flashcards': 'Create flashcards with questions and one-line answers in JSON format.',
-    'smart-summary': 'Create a comprehensive summary of the content.',
-    'smart-notes': 'Create organized notes from the content.',
-    'study-guide': 'Create a study guide from the content.'
-  }
-
-  return basePrompts[type as keyof typeof basePrompts] || 'Analyze and organize the content.'
-}
-
-function getSimplifiedUserPrompt(originalPrompt: string, type: string): string {
-  // Extract just the source material and basic requirements
-  const documentContentMatch = originalPrompt.match(/Source Material:\s*([\s\S]*?)(?=\n\n##|$)/)
-  const documentContent = documentContentMatch ? documentContentMatch[1].trim() : originalPrompt
-
-  // Truncate if too long (rough approximation)
-  const maxLength = 8000 // Roughly 2000 tokens
-  const truncatedContent = documentContent.length > maxLength ?
-    documentContent.slice(0, maxLength) + '\n\n[Content truncated for processing...]' :
-    documentContent
-
-  return `Content to process:\n\n${truncatedContent}\n\nGenerate a ${type.replace('-', ' ')} based on this content.`
-}
 
 interface StudyToolGenerateRequest {
   type: StudyToolPromptType
@@ -564,23 +283,6 @@ interface StudyToolGenerateRequest {
   }
 }
 
-interface DocumentSection {
-  id: string
-  title: string
-  page_start: number
-  page_end: number
-  parent_id?: string
-}
-
-interface DocumentChunk {
-  id: string
-  chunk_index: number
-  content: string
-  page_start: number
-  page_end: number
-  section_title?: string
-  token_count: number
-}
 
 interface Message {
   id: string
@@ -756,94 +458,13 @@ export async function POST(req: NextRequest) {
 
     console.log(`[StudyTools] Generating ${type} for "${documentTitle}" (${documentContent.length} chars)`)
 
-<<<<<<< HEAD
-    // Generate study tool using Gemini with 3 retries and fallback
-    const startTime = Date.now()
-    let result
-    let modelUsed = 'gemini-2.5-pro'
-    const maxRetries = 3
-
-    // Helper function to generate with Google GenAI
-    async function generateWithModel(modelName: string, attempt: number = 1): Promise<any> {
-      const client = getGenAIClient()
-
-      try {
-        console.log(`[StudyTools] Attempt ${attempt} with ${modelName}`)
-
-        // Use the same API pattern as the working chat system
-        const response = await client.models.generateContentStream({
-          model: modelName,
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }]
-            }
-          ],
-          config: {
-            temperature: 0.7,
-            topK: 40,
-          }
-        })
-
-        // Collect the streamed response
-        let accumulatedText = ''
-        for await (const chunk of response) {
-          const chunkText = chunk.text || ''
-          accumulatedText += chunkText
-        }
-
-        return {
-          text: accumulatedText
-        }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error)
-        console.warn(`[StudyTools] ${modelName} attempt ${attempt} failed:`, errorMessage)
-
-        // Check if it's an overload/rate limit error and we haven't reached max retries
-        if ((errorMessage.includes('overloaded') || errorMessage.includes('503') || errorMessage.includes('429')) && attempt < maxRetries) {
-          console.log(`[StudyTools] Retrying ${modelName} in 2 seconds... (${attempt + 1}/${maxRetries})`)
-          await new Promise(resolve => setTimeout(resolve, 2000)) // Wait 2 seconds before retry
-          return generateWithModel(modelName, attempt + 1)
-        }
-
-        throw error
-      }
-    }
-
-    try {
-      // Try Gemini Pro with 3 retries
-      result = await generateWithModel('gemini-2.5-pro')
-      modelUsed = 'gemini-2.5-pro'
-    } catch (proError) {
-      // After 3 failed attempts with Pro, try Flash as fallback
-      const errorMessage = proError instanceof Error ? proError.message : String(proError)
-      console.warn('[StudyTools] Gemini Pro failed after 3 attempts, trying Flash fallback:', errorMessage)
-
-      if (errorMessage.includes('overloaded') || errorMessage.includes('503') || errorMessage.includes('429')) {
-        console.log('[StudyTools] Using Gemini Flash as fallback model')
-        modelUsed = 'gemini-2.5-flash'
-
-        try {
-          result = await generateWithModel('gemini-2.5-flash')
-        } catch (flashError) {
-          console.error('[StudyTools] Both Pro and Flash failed:', flashError)
-          throw new Error('AI service is temporarily unavailable. Please try again later.')
-        }
-      } else {
-        // Re-throw non-overload errors
-        throw proError
-      }
-    }
-=======
     // Generate study tool using multi-model fallback strategy
     const startTime = Date.now()
     const { resultText, modelUsed, duration: generationDuration } = await generateWithFallback(
       systemPrompt,
       userPrompt,
-      type,
-      documentContent.length
+      type
     )
->>>>>>> claude-code-subagents
 
     const duration = Date.now() - startTime
     console.log(`[StudyTools] Generated ${type} in ${duration}ms using ${modelUsed} (${resultText.length} chars)`)
@@ -930,28 +551,20 @@ export async function POST(req: NextRequest) {
             options: flashcardOptions,
             metadata: {
               model: modelUsed,
-<<<<<<< HEAD
-              duration,
-=======
               duration: generationDuration,
->>>>>>> claude-code-subagents
               contentLength: processedContent.length,
               sourceContentLength: documentContent.length,
               totalCards: flashcardData.length,
               avgDifficulty: flashcardOptions?.difficulty || 'medium',
-              fallbackStrategy: modelUsed.includes('chunked') || modelUsed.includes('flash') ? 'applied' : 'none'
+              fallbackStrategy: modelUsed.includes('flash') ? 'applied' : 'none'
             }
           } : {
             metadata: {
               model: modelUsed,
-<<<<<<< HEAD
-              duration,
-=======
               duration: generationDuration,
->>>>>>> claude-code-subagents
               contentLength: processedContent.length,
               sourceContentLength: documentContent.length,
-              fallbackStrategy: modelUsed.includes('chunked') || modelUsed.includes('flash') ? 'applied' : 'none'
+              fallbackStrategy: modelUsed.includes('flash') ? 'applied' : 'none'
             }
           })
         }
@@ -1001,11 +614,7 @@ export async function POST(req: NextRequest) {
       metadata: {
         generatedAt: new Date().toISOString(),
         model: modelUsed,
-<<<<<<< HEAD
-        duration,
-=======
         duration: generationDuration,
->>>>>>> claude-code-subagents
         contentLength: processedContent.length,
         sourceContentLength: documentContent.length,
         fallbackStrategy: modelUsed.includes('chunked') || modelUsed.includes('flash') ? 'applied' : 'none',

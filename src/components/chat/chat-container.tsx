@@ -704,12 +704,12 @@ const FullscreenCanvas: React.FC = () => {
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
-                    pre: ({ children, ...props }: any) => (
+                    pre: ({ children, ...props }: React.ComponentProps<'pre'>) => (
                       <pre className="bg-muted/80 p-4 rounded-lg overflow-x-auto mb-4 text-sm border border-border text-foreground" {...props}>
                         {children}
                       </pre>
                     ),
-                    code: ({ children, inline, ...props }: any) => {
+                    code: ({ children, inline, ...props }: React.ComponentProps<'code'> & { inline?: boolean }) => {
                       if (inline) {
                         return (
                           <code className="bg-muted/60 px-1.5 py-0.5 rounded text-sm font-mono text-foreground">

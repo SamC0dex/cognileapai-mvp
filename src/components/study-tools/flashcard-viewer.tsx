@@ -102,7 +102,7 @@ export const FlashcardViewer: React.FC<FlashcardViewerProps> = ({
   }, [])
 
   // Swipe handlers
-  const handleDragEnd = React.useCallback((event: any, info: PanInfo) => {
+  const handleDragEnd = React.useCallback((event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     const threshold = 100
 
     if (info.offset.x > threshold && currentIndex > 0) {

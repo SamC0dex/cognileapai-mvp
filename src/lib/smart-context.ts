@@ -40,6 +40,7 @@ export interface DocumentChunk {
   semanticScore?: number
   keywordScore?: number
   combinedScore?: number
+  intelligentScore?: number // Additional scoring metric
   tokenCount?: number
   chunkType?: 'paragraph' | 'section' | 'table' | 'list'
 }
@@ -225,7 +226,7 @@ function chunkSection(
       sectionTitle: section.title,
       startIndex: 0,
       endIndex: words.length,
-      chunkType: section.type as any
+      chunkType: section.type as DocumentChunk['chunkType']
     }]
   }
 
@@ -241,7 +242,7 @@ function chunkSection(
         sectionTitle: section.title,
         startIndex: i,
         endIndex: Math.min(i + chunkSize, words.length),
-        chunkType: section.type as any
+        chunkType: section.type as DocumentChunk['chunkType']
       })
     }
   }
@@ -472,7 +473,7 @@ export async function selectRelevantChunks(
       id: chunk.id,
       semanticScore: chunk.semanticScore?.toFixed(3) || 'N/A',
       keywordScore: chunk.keywordScore?.toFixed(3) || 'N/A',
-      intelligentScore: (chunk as any).intelligentScore?.toFixed(3) || 'N/A',
+      intelligentScore: chunk.intelligentScore?.toFixed(3) || 'N/A',
       combinedScore: chunk.combinedScore?.toFixed(3) || 'N/A',
       preview: chunk.content.slice(0, 50) + '...'
     })))

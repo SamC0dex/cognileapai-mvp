@@ -10,7 +10,8 @@ import { StudyToolsConfirmationDialog } from './study-tools-confirmation-dialog'
 import { FlashcardCustomizationDialog } from './flashcard-customization-dialog'
 import { FlashcardViewer } from './flashcard-viewer'
 import { useFlashcardStore } from '@/lib/flashcard-store'
-import { FlashcardOptions } from '@/types/flashcards'
+import { FlashcardOptions, FlashcardSet } from '@/types/flashcards'
+import { StudyToolContent } from '@/lib/study-tools-store'
 import {
   ChevronLeft,
   ChevronRight,
@@ -326,7 +327,7 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [activeDropdown])
 
-  const handleRename = (content: any) => {
+  const handleRename = (content: StudyToolContent) => {
     setEditingTitle(content.id)
     setEditingValue(content.title)
     setActiveDropdown(null)
@@ -365,7 +366,7 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
     }
   }
 
-  const handleDownloadContent = async (content: any) => {
+  const handleDownloadContent = async (content: StudyToolContent) => {
     try {
       await downloadAsDOCX(content)
       setActiveDropdown(null)
@@ -385,7 +386,7 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
     }
   }
 
-  const DocumentDropdownMenu = ({ content }: { content: any }) => {
+  const DocumentDropdownMenu = ({ content }: { content: StudyToolContent }) => {
     const isActive = activeDropdown === content.id
 
     return (
@@ -1156,7 +1157,7 @@ const ExpandedPanel: React.FC<{
                           </div>
                         </blockquote>
                       ),
-                      code: ({ children, inline }: any) => {
+                      code: ({ children, inline }: { children?: React.ReactNode; inline?: boolean }) => {
                         if (inline) {
                           return (
                             <code className="bg-primary/10 text-primary px-1.5 py-0.5 rounded text-xs font-mono border border-primary/20">
@@ -1314,7 +1315,7 @@ const FlashcardSetsSection: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [activeDropdown])
 
-  const handleStartRename = (flashcardSet: any) => {
+  const handleStartRename = (flashcardSet: FlashcardSet) => {
     setEditingTitle(flashcardSet.id)
     setEditingValue(flashcardSet.title)
   }
@@ -1345,7 +1346,7 @@ const FlashcardSetsSection: React.FC = () => {
   }
 
   // Flashcard Dropdown Menu Component
-  const FlashcardDropdownMenu: React.FC<{ flashcardSet: any }> = ({ flashcardSet }) => {
+  const FlashcardDropdownMenu: React.FC<{ flashcardSet: FlashcardSet }> = ({ flashcardSet }) => {
     const isOpen = activeDropdown === flashcardSet.id
 
     return (

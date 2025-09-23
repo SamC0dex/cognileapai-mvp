@@ -325,7 +325,7 @@ export function getSessionInfo(sessionId: string): StatefulChatSession | null {
 /**
  * Get chat history from session
  */
-export async function getSessionHistory(sessionId: string): Promise<any[] | null> {
+export async function getSessionHistory(sessionId: string): Promise<Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> | null> {
   const session = activeSessions.get(sessionId)
 
   if (!session) {

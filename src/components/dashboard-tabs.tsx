@@ -4,6 +4,7 @@ import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
+import { FlashcardSet } from '@/types/flashcards'
 import {
   FileText,
   BookOpen,
@@ -95,7 +96,7 @@ const StudyToolCard: React.FC<StudyToolCardProps> = ({ content, onClick }) => {
 
 // Flashcard Set Card Component
 interface FlashcardCardProps {
-  flashcardSet: any
+  flashcardSet: FlashcardSet
   onClick: () => void
 }
 
@@ -174,7 +175,7 @@ const StudyToolListItem: React.FC<StudyToolListItemProps> = ({ content, onClick 
 
 // Flashcard Set List Item Component
 interface FlashcardListItemProps {
-  flashcardSet: any
+  flashcardSet: FlashcardSet
   onClick: () => void
 }
 
@@ -286,7 +287,7 @@ export function DashboardTabs({
     }
   }
 
-  const handleFlashcardClick = (flashcardSet: any) => {
+  const handleFlashcardClick = (flashcardSet: FlashcardSet) => {
     // Set up the flashcard to be opened
     expandPanel()
     openViewer(flashcardSet)

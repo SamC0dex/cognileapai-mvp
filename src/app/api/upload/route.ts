@@ -2,6 +2,43 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { supabase } from '@/lib/supabase'
 
+// TypeScript interfaces for PDF parser data structures
+interface PDFTextRun {
+  T: string // Encoded text content
+}
+
+interface PDFTextItem {
+  R: PDFTextRun[] // Array of text runs
+}
+
+interface PDFPage {
+  Texts: PDFTextItem[] // Array of text items on the page
+}
+
+interface PDFParserData {
+  Pages: PDFPage[] // Array of pages in the PDF
+}
+
+interface PDFParserError {
+  parserError: string // Error message from PDF parser
+}
+
+// Database document interface (based on Supabase schema)
+interface DatabaseDocument {
+  id: string
+  title: string
+  processing_status: 'pending' | 'processing' | 'completed' | 'failed' | null
+  error_message?: string | null
+  page_count: number
+  bytes?: number | null
+  storage_path?: string | null
+  chunk_count?: number | null
+  document_content?: string | null
+  checksum?: string | null
+  created_at: string
+  updated_at: string
+}
+
 export async function POST(req: NextRequest) {
   try {
     console.log('Upload API called')
@@ -33,7 +70,7 @@ export async function POST(req: NextRequest) {
       console.error('Failed to check for duplicate document:', duplicateError)
     }
 
-    const handleDuplicate = async (document: any) => {
+    const handleDuplicate = async (document: DatabaseDocument) => {
       console.log(`Duplicate document detected for checksum ${checksum}, reusing document ${document.id}`)
 
       let nextStatus = document.processing_status || 'processing'
@@ -125,11 +162,11 @@ export async function POST(req: NextRequest) {
         return new Promise((resolve, reject) => {
           const pdfParser = new PDFParser()
 
-          pdfParser.on('pdfParser_dataError', (errData: any) => {
+          pdfParser.on('pdfParser_dataError', (errData: PDFParserError) => {
             reject(new Error(errData.parserError))
           })
 
-          pdfParser.on('pdfParser_dataReady', (pdfData: any) => {
+          pdfParser.on('pdfParser_dataReady', (pdfData: PDFParserData) => {
             const pages = pdfData.Pages ? pdfData.Pages.length : 0
             resolve(pages)
           })
@@ -247,19 +284,19 @@ async function startBackgroundProcessing(documentId: string, buffer: Buffer) {
         return new Promise<string>((resolve, reject) => {
           const pdfParser = new PDFParser()
 
-          pdfParser.on('pdfParser_dataError', (errData: any) => {
+          pdfParser.on('pdfParser_dataError', (errData: PDFParserError) => {
             reject(new Error(errData.parserError))
           })
 
-          pdfParser.on('pdfParser_dataReady', (pdfData: any) => {
+          pdfParser.on('pdfParser_dataReady', (pdfData: PDFParserData) => {
             try {
               let text = ''
               if (pdfData.Pages) {
-                pdfData.Pages.forEach((page: any) => {
+                pdfData.Pages.forEach((page: PDFPage) => {
                   if (page.Texts) {
-                    page.Texts.forEach((textItem: any) => {
+                    page.Texts.forEach((textItem: PDFTextItem) => {
                       if (textItem.R) {
-                        textItem.R.forEach((textRun: any) => {
+                        textItem.R.forEach((textRun: PDFTextRun) => {
                           if (textRun.T) {
                             // Decode the text and add spaces
                             text += decodeURIComponent(textRun.T) + ' '
