@@ -8,8 +8,6 @@ import { FlashcardSet } from '@/types/flashcards'
 import {
   FileText,
   BookOpen,
-  GraduationCap,
-  Lightbulb,
   Search,
   Filter,
   Plus,
@@ -32,7 +30,7 @@ import {
   Button,
   Input
 } from '@/components/ui'
-import { useStudyToolsStore, STUDY_TOOLS, type StudyToolContent, type StudyToolType } from '@/lib/study-tools-store'
+import { useStudyToolsStore, STUDY_TOOLS, type StudyToolContent } from '@/lib/study-tools-store'
 import { useFlashcardStore } from '@/lib/flashcard-store'
 import { FlashcardsStackIcon } from '@/components/icons/flashcards-stack-icon'
 

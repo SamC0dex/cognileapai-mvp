@@ -13,14 +13,12 @@ import {
   Download,
   FileText,
   Check,
-  MoreHorizontal,
   Calendar,
   Sparkles,
   BookOpen,
   PenTool,
   Zap,
   ExternalLink,
-  Share2,
   Maximize2,
   Minimize2
 } from 'lucide-react'
@@ -332,7 +330,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ content, isFullscreen
       try {
         parsedContent = JSON.parse(content.content)
         console.log('[FlashcardViewer] Parsed as direct JSON:', parsedContent.length, 'cards')
-      } catch (directParseError) {
+      } catch {
         // If direct parse fails, try cleaning markdown code block markers
         const cleanedContent = content.content
           .trim()
@@ -507,7 +505,6 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ content, isFullscreen
   }
 
   const renderTypeSpecificHeader = () => {
-    const tool = STUDY_TOOLS[content.type]
     const headers = {
       'flashcards': {
         text: '📚 Interactive flashcards - Click to reveal answers',

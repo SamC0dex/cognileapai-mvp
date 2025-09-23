@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { supabase } from '@/lib/supabase'
+import PDFParser from 'pdf2json'
 
 // TypeScript interfaces for PDF parser data structures
 interface PDFTextRun {
@@ -19,9 +20,6 @@ interface PDFParserData {
   Pages: PDFPage[] // Array of pages in the PDF
 }
 
-interface PDFParserError {
-  parserError: string // Error message from PDF parser
-}
 
 // Database document interface (based on Supabase schema)
 interface DatabaseDocument {
@@ -156,14 +154,14 @@ export async function POST(req: NextRequest) {
 
     let pageCount = 0
     try {
-      const PDFParser = require('pdf2json')
 
       const parsePdf = () => {
         return new Promise((resolve, reject) => {
           const pdfParser = new PDFParser()
 
-          pdfParser.on('pdfParser_dataError', (errData: PDFParserError) => {
-            reject(new Error(errData.parserError))
+          pdfParser.on('pdfParser_dataError', (errMsg: Error | { parserError: Error }) => {
+            const errorMessage = errMsg instanceof Error ? errMsg.message : errMsg.parserError.message
+            reject(new Error(errorMessage))
           })
 
           pdfParser.on('pdfParser_dataReady', (pdfData: PDFParserData) => {
@@ -278,14 +276,14 @@ async function startBackgroundProcessing(documentId: string, buffer: Buffer) {
     // Extract text content from PDF using pdf2json
     let extractedText = ''
     try {
-      const PDFParser = require('pdf2json')
 
       const extractText = () => {
         return new Promise<string>((resolve, reject) => {
           const pdfParser = new PDFParser()
 
-          pdfParser.on('pdfParser_dataError', (errData: PDFParserError) => {
-            reject(new Error(errData.parserError))
+          pdfParser.on('pdfParser_dataError', (errMsg: Error | { parserError: Error }) => {
+            const errorMessage = errMsg instanceof Error ? errMsg.message : errMsg.parserError.message
+            reject(new Error(errorMessage))
           })
 
           pdfParser.on('pdfParser_dataReady', (pdfData: PDFParserData) => {

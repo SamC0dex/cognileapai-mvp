@@ -17,8 +17,8 @@ interface SelectedDocument {
 
 // ✅ LAZY LOAD THE HEAVY COMPONENT (1778 lines!)
 const StudyToolsPanel = lazy(async () => {
-  const module = await import('./study-tools-panel')
-  return { default: module.StudyToolsPanel }
+  const studyToolsModule = await import('./study-tools-panel')
+  return { default: studyToolsModule.StudyToolsPanel }
 })
 
 // Lightweight skeleton component for loading state

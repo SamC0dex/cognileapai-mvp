@@ -13,7 +13,7 @@ export default function DashboardPage() {
   const router = useRouter()
   const [isUploading, setIsUploading] = useState(false)
 
-  const uploadFile = async (file: File) => {
+  const uploadFile = useCallback(async (file: File) => {
     const formData = new FormData()
     formData.append('file', file)
 
@@ -22,7 +22,7 @@ export default function DashboardPage() {
         method: 'POST',
         body: formData
       })
-      
+
       if (response.ok) {
         const result = await response.json()
         toast.success(`"${file.name}" uploaded successfully!`)
@@ -36,7 +36,7 @@ export default function DashboardPage() {
       toast.error('Upload failed')
       console.error('Upload error:', error)
     }
-  }
+  }, [router])
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return
@@ -51,7 +51,7 @@ export default function DashboardPage() {
     } finally {
       setIsUploading(false)
     }
-  }, [])
+  }, [uploadFile])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,

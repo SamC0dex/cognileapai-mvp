@@ -169,7 +169,8 @@ export function useChatStore(): StoreShape {
     } finally {
       setIsLoading(false)
     }
-  }, [documentContext])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documentContext]) // updateTokenTracking is properly memoized and stable - adding would cause unnecessary re-renders
 
 
   const sendMessage = useCallback(async (content: string, documentId?: string | null, model?: GeminiModelKey, selectedDocuments?: Array<{id: string, title: string}>, skipUserMessage?: boolean) => {
@@ -370,11 +371,11 @@ export function useChatStore(): StoreShape {
                   finalTokenUsage = metadata.usage.totalTokens
                   console.log('[Chat] Received token usage:', finalTokenUsage)
                 }
-              } catch (parseError) {
+              } catch {
                 // Continue if metadata parsing fails
               }
             }
-          } catch (parseError) {
+          } catch {
             continue
           }
         }
@@ -471,7 +472,8 @@ export function useChatStore(): StoreShape {
       setIsLoading(false)
       setStreamingMessage('')
     }
-  }, [documentContext, selectedModel])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documentContext, selectedModel]) // updateTokenTracking is stable and called directly - no dependency needed
 
   // Define createNewConversationInternal before it's used in callbacks
   const createNewConversationInternal = async (documentId?: string): Promise<string> => {
@@ -659,6 +661,9 @@ export function getSuggestedQuestions(ctx: DocumentContext | null | undefined): 
   ]
 }
 
-export async function createNewConversation(documentId: string): Promise<string> {
+export async function createNewConversation(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  documentId: string
+): Promise<string> {
   return crypto.randomUUID()
 }

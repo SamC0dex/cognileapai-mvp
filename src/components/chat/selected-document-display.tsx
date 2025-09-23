@@ -54,7 +54,7 @@ export const SelectedDocumentDisplay: React.FC<SelectedDocumentDisplayProps> = (
     const interval = setInterval(fetchProgress, 1000)
 
     return () => clearInterval(interval)
-  }, [document?.id, document?.processing_status])
+  }, [document])
 
   if (!document) return null
 

@@ -1,22 +1,18 @@
 'use client'
 
 import * as React from 'react'
-import { useState } from 'react'
 import { usePathname } from 'next/navigation'
 import {
   ChevronLeft,
   ChevronRight,
-  Plus,
   LayoutDashboard,
   Settings,
   FileText,
-  ChevronDown,
   MoreHorizontal,
   User,
   Sun,
   Moon,
-  Palette,
-  Lightbulb
+  Palette
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { cn } from '@/lib/utils'

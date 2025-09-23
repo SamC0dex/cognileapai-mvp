@@ -5,7 +5,6 @@ import { useState } from 'react'
 import { Sidebar } from '@/components/sidebar'
 import { DocumentsPanel } from '@/components/documents-panel'
 import { DocumentsProvider } from '@/contexts/documents-context'
-import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 
 interface DashboardLayoutProps {

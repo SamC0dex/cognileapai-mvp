@@ -55,7 +55,7 @@ export class GeminiModelSelector {
    * Select the optimal Gemini model based on message context
    */
   static selectModel(context: MessageContext): GeminiModelKey {
-    const { content, chatType, isFollowUp, messageHistory, requestedOutputType } = context
+    const { content } = context
     
     // Word count analysis
     const wordCount = content.trim().split(/\s+/).length

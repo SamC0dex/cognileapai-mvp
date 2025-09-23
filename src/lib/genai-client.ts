@@ -142,7 +142,6 @@ export async function createStatefulChat(options: CreateChatOptions): Promise<st
       return existingSession.id
     }
 
-    const client = getGenAIClient()
     const modelKey = options.modelKey || 'FLASH'
     const modelName = mapModelKeyToGenAIModel(modelKey)
 

@@ -36,26 +36,7 @@ const MAX_CACHE_SIZE = 1000 // Maximum number of cached embeddings
 const EMBEDDING_MODEL = 'mixedbread-ai/mxbai-embed-xsmall-v1' // 22MB, 384 dimensions
 const EMBEDDING_DIMENSIONS = 384
 
-type SupportedDevice = 'webgpu' | 'wasm'
 
-function resolveEmbeddingDevice(): SupportedDevice {
-  if (typeof process !== 'undefined' && process.env.EMBEDDINGS_DEVICE) {
-    const device = process.env.EMBEDDINGS_DEVICE.toLowerCase()
-    if (device === 'webgpu' || device === 'wasm') {
-      return device
-    }
-  }
-
-  if (typeof window === 'undefined') {
-    return 'wasm'
-  }
-
-  if ('gpu' in navigator) {
-    return 'webgpu'
-  }
-
-  return 'wasm'
-}
 
 export interface EmbeddingResult {
   embedding: number[]
@@ -88,7 +69,6 @@ async function initializeEmbeddingPipeline(): Promise<FeatureExtractionPipeline 
     const pipelineResult = await pipeline('feature-extraction', EMBEDDING_MODEL)
     embeddingPipeline = pipelineResult as FeatureExtractionPipeline
 
-    const initTime = Date.now() - Date.now()
     console.log(`[Embeddings] Model initialized successfully`)
     return embeddingPipeline
 
@@ -100,37 +80,6 @@ async function initializeEmbeddingPipeline(): Promise<FeatureExtractionPipeline 
   }
 }
 
-async function createEmbeddingPipeline(device: SupportedDevice, allowFallback: boolean): Promise<FeatureExtractionPipeline> {
-  const startTime = Date.now()
-
-  try {
-    // @ts-ignore - Transformers.js has complex union types that TS can't resolve
-    const pipelineInstance = await pipeline(
-      'feature-extraction',
-      EMBEDDING_MODEL,
-      {
-        // Server-side optimization
-        device,
-        dtype: 'fp32',  // Good balance of speed/quality
-      }
-    )
-
-    const initTime = Date.now() - startTime
-    console.log(`[Embeddings] Model initialized on ${device} in ${initTime}ms`)
-
-    embeddingPipeline = pipelineInstance
-    return pipelineInstance
-  } catch (error) {
-    console.error(`[Embeddings] Failed to initialize on ${device}:`, error)
-
-    if (allowFallback && device === 'webgpu') {
-      console.warn('[Embeddings] Falling back to WASM backend')
-      return createEmbeddingPipeline('wasm', false)
-    }
-
-    throw error
-  }
-}
 
 /**
  * Generate a cache key for text

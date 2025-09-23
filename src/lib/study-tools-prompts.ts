@@ -1,3 +1,5 @@
+import { FLASHCARD_COUNTS } from '@/types/flashcards'
+
 /**
  * Comprehensive System Prompts for Study Tools Generation
  *
@@ -381,8 +383,6 @@ export function getStudyToolPrompt(
 
   // Handle flashcard-specific replacements
   if (toolType === 'flashcards' && flashcardOptions) {
-    // Import the card count mapping
-    const { FLASHCARD_COUNTS } = require('@/types/flashcards')
     const cardCount = FLASHCARD_COUNTS[flashcardOptions.numberOfCards as keyof typeof FLASHCARD_COUNTS]
     const cardCountText = `${cardCount.min}-${cardCount.max} cards (${flashcardOptions.numberOfCards})`
 

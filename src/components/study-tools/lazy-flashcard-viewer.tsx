@@ -11,8 +11,8 @@ import { FlashcardEntry } from '@/types/flashcards'
 
 // ✅ LAZY LOAD FLASHCARD VIEWER (440 lines)
 const FlashcardViewer = lazy(async () => {
-  const module = await import('./flashcard-viewer')
-  return { default: module.FlashcardViewer }
+  const flashcardModule = await import('./flashcard-viewer')
+  return { default: flashcardModule.FlashcardViewer }
 })
 
 // Lightweight skeleton for flashcard viewer

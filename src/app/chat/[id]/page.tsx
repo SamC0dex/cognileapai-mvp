@@ -29,6 +29,7 @@ export default function ChatPage({ params }: ChatPageProps) {
   const [documentId, setDocumentId] = useState<string | undefined>(undefined)
   const [chatType, setChatType] = useState<'course' | 'lesson' | 'document' | null>(null)
   const [isInitialized, setIsInitialized] = useState(false)
+  const [initTimeout, setInitTimeout] = useState(false)
   const { isViewerOpen, isFullscreen } = useFlashcardStore()
   const { isCanvasOpen, isCanvasFullscreen } = useStudyToolsStore()
   const isFlashcardFullscreen = isViewerOpen && isFullscreen
@@ -70,8 +71,6 @@ export default function ChatPage({ params }: ChatPageProps) {
 
   // Initialize conversation from URL params
   useEffect(() => {
-    if (isInitialized) return // Prevent double initialization
-
     const initializeFromParams = async () => {
       try {
         const chatId = resolvedParams.id
@@ -90,15 +89,20 @@ export default function ChatPage({ params }: ChatPageProps) {
           setDocumentId(urlDocumentId || undefined)
 
           // Try to get conversation details from chat history
-          const { getThreads } = await import('@/lib/chat-history')
-          const threads = await getThreads()
-          const thread = threads.find(t => t.id === chatId)
+          try {
+            const { getThreads } = await import('@/lib/chat-history')
+            const threads = await getThreads()
+            const thread = threads.find(t => t.id === chatId)
 
-          if (thread) {
-            setPageTitle(thread.title || urlTitle || 'CogniLeap AI Chat')
-            setDocumentId(thread.documentId || urlDocumentId || undefined)
-          } else if (urlTitle) {
-            setPageTitle(urlTitle)
+            if (thread) {
+              setPageTitle(thread.title || urlTitle || 'CogniLeap AI Chat')
+              setDocumentId(thread.documentId || urlDocumentId || undefined)
+            } else if (urlTitle) {
+              setPageTitle(urlTitle)
+            }
+          } catch (historyError) {
+            console.warn('Failed to load chat history, continuing with URL params:', historyError)
+            if (urlTitle) setPageTitle(urlTitle)
           }
 
           setIsInitialized(true)
@@ -108,12 +112,31 @@ export default function ChatPage({ params }: ChatPageProps) {
         }
       } catch (error) {
         console.error('Failed to initialize conversation from params:', error)
-        router.replace('/chat')
+        // Set conversation ID anyway to prevent infinite loading
+        setConversationId(resolvedParams.id)
+        setIsInitialized(true)
       }
     }
 
-    initializeFromParams()
-  }, [resolvedParams.id, searchParams, router, isInitialized])
+    // Remove the isInitialized check to allow re-initialization if params change
+    if (resolvedParams.id) {
+      initializeFromParams()
+    }
+  }, [resolvedParams.id, searchParams, router])
+
+  // Add timeout to prevent infinite loading
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!conversationId && !isInitialized) {
+        console.warn('Chat initialization timeout, forcing conversation ID')
+        setConversationId(resolvedParams.id || 'fallback')
+        setInitTimeout(true)
+        setIsInitialized(true)
+      }
+    }, 5000) // 5 second timeout
+
+    return () => clearTimeout(timer)
+  }, [conversationId, isInitialized, resolvedParams.id])
 
   useEffect(() => {
     const handleDocumentUploaded = (event: Event) => {
@@ -176,8 +199,8 @@ export default function ChatPage({ params }: ChatPageProps) {
     router.push('/chat')
   }, [router])
 
-  // Don't render until we have a conversation ID
-  if (!conversationId) {
+  // Don't render until we have a conversation ID (with timeout safety)
+  if (!conversationId && !initTimeout) {
     return (
       <DashboardLayout>
         <div className="h-full flex items-center justify-center">
@@ -275,7 +298,7 @@ export default function ChatPage({ params }: ChatPageProps) {
           <ChatContainer
             key={chatInstanceKey}
             documentId={documentId}
-            conversationId={conversationId}
+            conversationId={conversationId || undefined}
             selectedModel={selectedModel}
             onModelChange={setSelectedModel}
           />

@@ -207,7 +207,10 @@ export const ChatContainer: React.FC<{
     }, 2000) // Poll every 2 seconds
 
     return () => clearInterval(pollInterval)
-  }, [documentId, isDemoMode, urlSelectedDocument?.processing_status])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documentId, urlSelectedDocument?.processing_status, isDemoMode])
+  // isDemoMode is intentionally included to prevent database calls when Supabase is not configured
+  // Removing this dependency would cause continuous failed API calls in demo mode
 
   // Poll for status updates on selected documents
   useEffect(() => {
@@ -237,7 +240,10 @@ export const ChatContainer: React.FC<{
 
     const pollInterval = setInterval(pollForSelectedDocuments, 2000)
     return () => clearInterval(pollInterval)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDocuments, updateDocumentStatus, isDemoMode])
+  // isDemoMode is intentionally included to prevent database calls when Supabase is not configured
+  // This is a critical safety guard that must remain in the dependency array
 
   // Listen for document uploads from chat input
   useEffect(() => {
@@ -471,6 +477,22 @@ const FullscreenCanvas: React.FC = () => {
   const [zoomLevel, setZoomLevel] = useState(100)
   const [zoomInputValue, setZoomInputValue] = useState('100%')
 
+  // Close menus when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element
+      if (showZoomControl && !target.closest('[data-zoom-control]')) {
+        setShowZoomControl(false)
+      }
+      if (showExportMenu && !target.closest('[data-export-menu]')) {
+        setShowExportMenu(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showZoomControl, showExportMenu])
+
   if (!canvasContent) return null
 
   const handleCopy = async () => {
@@ -510,23 +532,6 @@ const FullscreenCanvas: React.FC = () => {
     setZoomLevel(newZoom)
     setZoomInputValue(`${newZoom}%`)
   }
-
-
-  // Close menus when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Element
-      if (showZoomControl && !target.closest('[data-zoom-control]')) {
-        setShowZoomControl(false)
-      }
-      if (showExportMenu && !target.closest('[data-export-menu]')) {
-        setShowExportMenu(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showZoomControl, showExportMenu])
 
   return (
     <div className="absolute inset-0 bg-background z-40">
@@ -709,7 +714,7 @@ const FullscreenCanvas: React.FC = () => {
                         {children}
                       </pre>
                     ),
-                    code: ({ children, inline, ...props }: React.ComponentProps<'code'> & { inline?: boolean }) => {
+                    code: ({ children, inline }: React.ComponentProps<'code'> & { inline?: boolean }) => {
                       if (inline) {
                         return (
                           <code className="bg-muted/60 px-1.5 py-0.5 rounded text-sm font-mono text-foreground">

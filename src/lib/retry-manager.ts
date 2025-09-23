@@ -371,7 +371,9 @@ class BackgroundRetryManager {
     return new Date(Date.now() + delay)
   }
 
-  private async retryChatTask(payload: ChatTaskPayload): Promise<boolean> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private async retryChatTask(_payload: ChatTaskPayload): Promise<boolean> {
+    // _payload is intentionally unused - reserved for future implementation
     // TODO: Implement proper chat retry mechanism
     // Note: This requires refactoring to use the actual store instance
     console.warn('[RetryManager] Chat retry not implemented - requires store instance')

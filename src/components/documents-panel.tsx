@@ -3,9 +3,9 @@
 import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Plus, FileText, Upload, MoreHorizontal, Trash2, Edit3 } from 'lucide-react'
+import { X, Plus, FileText, MoreHorizontal, Trash2, Edit3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger, Input } from '@/components/ui'
+import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Input } from '@/components/ui'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
@@ -32,11 +32,11 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
   const [removeDialog, setRemoveDialog] = useState<{open: boolean, document: DocumentItem | null}>({open: false, document: null})
   const [newDocumentName, setNewDocumentName] = useState('')
 
-  // Client-side Supabase client
-  const supabase = createClient(
+  // Memoized Supabase client to prevent recreating on every render
+  const supabase = React.useMemo(() => createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  ), [])
 
   // Fetch documents from Supabase
   const fetchDocuments = React.useCallback(async () => {
@@ -59,7 +59,7 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [supabase])
 
   useEffect(() => {
     if (isOpen) {
@@ -91,30 +91,7 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
     }
   }, [])
 
-  const handleUpload = React.useCallback(() => {
-    if (isUploading) return
-    
-    // Create file input dynamically (same approach as dashboard)
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.pdf'
-    input.multiple = true
-    input.onchange = async (e) => {
-      const files = Array.from((e.target as HTMLInputElement).files || [])
-      if (files.length > 0) {
-        // Create a synthetic event that matches React.ChangeEvent<HTMLInputElement>
-        const syntheticEvent = {
-          target: e.target,
-          currentTarget: e.target
-        } as React.ChangeEvent<HTMLInputElement>
-        await handleFileChange(syntheticEvent)
-      }
-    }
-    input.click()
-  }, [isUploading])
-
-  const handleFileChange = React.useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
+  const handleFileUpload = React.useCallback(async (files: FileList) => {
     if (!files || files.length === 0) return
 
     setIsUploading(true)
@@ -151,10 +128,30 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
       console.error('Upload error:', error)
     } finally {
       setIsUploading(false)
-      // Reset the input value so the same file can be selected again
-      e.target.value = ''
     }
   }, [fetchDocuments])
+
+  const handleUpload = React.useCallback(() => {
+    if (isUploading) return
+
+    // Create file input dynamically (same approach as dashboard)
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.pdf'
+    input.multiple = true
+    input.onchange = async (e) => {
+      const files = (e.target as HTMLInputElement).files
+      if (files && files.length > 0) {
+        await handleFileUpload(files)
+      }
+      // Reset the input value so the same file can be selected again
+      if (e.target) {
+        (e.target as HTMLInputElement).value = ''
+      }
+    }
+    input.click()
+  }, [isUploading, handleFileUpload])
+
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes'
@@ -280,7 +277,7 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
     } else {
       setSelectAll(false)
     }
-  }, [documents.length, contextSelectedDocs, isDocumentSelected])
+  }, [documents, contextSelectedDocs, isDocumentSelected])
 
   return (
     <AnimatePresence>
@@ -493,7 +490,7 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
               <AlertDialogHeader>
                 <AlertDialogTitle>Rename Document</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Enter a new name for "{renameDialog.document?.title}"
+                  Enter a new name for &quot;{renameDialog.document?.title}&quot;
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <Input
@@ -524,7 +521,7 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
               <AlertDialogHeader>
                 <AlertDialogTitle>Remove Document</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Are you sure you want to remove "{removeDialog.document?.title}"? This action cannot be undone.
+                  Are you sure you want to remove &quot;{removeDialog.document?.title}&quot;? This action cannot be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

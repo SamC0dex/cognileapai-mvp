@@ -9,7 +9,7 @@ import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, RefreshCw, Clock, AlertTriangle, CheckCircle, XCircle, Wifi, WifiOff } from 'lucide-react'
 import { Button } from '../ui'
-import { retryManager, type RetryAttempt, subscribeToRetries, cancelRetry } from '@/lib/retry-manager'
+import { type RetryAttempt, subscribeToRetries, cancelRetry } from '@/lib/retry-manager'
 
 // Error Toast Component
 interface ErrorToastProps {
@@ -270,7 +270,7 @@ export function NetworkStatusIndicator() {
           <div className="bg-orange-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center space-x-2">
             <WifiOff className="h-4 w-4" />
             <span className="text-sm font-medium">
-              You're offline. Retries will resume when connection is restored.
+              You&apos;re offline. Retries will resume when connection is restored.
             </span>
           </div>
         </motion.div>

@@ -18,7 +18,6 @@ export function ChatHistoryDrawer({
   open,
   onClose,
   onSelectThread,
-  onNewChat,
   currentConversationId,
   onCurrentChatDeleted
 }: ChatHistoryDrawerProps) {

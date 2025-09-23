@@ -179,7 +179,7 @@ export const ChatInput: React.FC<ChatInputProps & {
       // Let default paste behavior handle this, but recalculate height
       setTimeout(calculateHeight, 0)
     }
-  }, [handleSendMessage, inputValue, messages, calculateHeight])
+  }, [handleSendMessage, inputValue, messages, calculateHeight, handleClear])
 
   // Listen for custom clear event
   useEffect(() => {

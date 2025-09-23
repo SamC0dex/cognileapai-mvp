@@ -63,11 +63,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Parse request body
-    const { 
-      message, 
-      documentId, 
-      conversationId, 
-      messageHistory = [] 
+    const {
+      message,
+      documentId,
+      conversationId
     }: ChatDocumentRequest = await req.json()
 
     // Validate required fields

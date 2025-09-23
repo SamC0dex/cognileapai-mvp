@@ -308,8 +308,7 @@ const cleanAIIntroduction = (content: string): string => {
 }
 
 const GeneratedDocumentsSection: React.FC = React.memo(() => {
-  const { generatedContent, openCanvas, removeGeneratedContent, renameGeneratedContent, copyToClipboard } = useStudyToolsStore()
-  const { downloadAsPDF, downloadAsDOCX } = useStudyToolsStore()
+  const { generatedContent, openCanvas, removeGeneratedContent, renameGeneratedContent, copyToClipboard, downloadAsDOCX } = useStudyToolsStore()
   const prefersReducedMotion = useReducedMotion()
   const [activeDropdown, setActiveDropdown] = React.useState<string | null>(null)
   const [editingTitle, setEditingTitle] = React.useState<string | null>(null)
@@ -1242,7 +1241,7 @@ const ExpandedPanel: React.FC<{
             </p>
 
             <div className="grid grid-cols-2 gap-3">
-              {Object.entries(STUDY_TOOLS).map(([type, tool]) => (
+              {Object.entries(STUDY_TOOLS).map(([type]) => (
                 <StudyToolCard
                   key={type}
                   type={type as StudyToolType}
@@ -1622,7 +1621,6 @@ export const StudyToolsPanel: React.FC<{
 }> = React.memo(({ documentId, conversationId, selectedDocuments, primaryDocument, hasMessages }) => {
   const {
     isPanelExpanded,
-    isGenerating,
     isGeneratingType,
     expandPanel,
     collapsePanel,
@@ -1647,8 +1645,7 @@ export const StudyToolsPanel: React.FC<{
     isOpen: false
   })
 
-  // Flashcard store
-  const { isViewerOpen, currentFlashcardSet, isFullscreen, closeViewer, toggleFullscreen } = useFlashcardStore()
+  // Flashcard store (placeholder for future features)
 
   // Load study tools from database on mount and when context changes
   React.useEffect(() => {

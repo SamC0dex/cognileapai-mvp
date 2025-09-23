@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { cva, type VariantProps } from 'class-variance-authority'
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu'
@@ -150,12 +151,14 @@ Avatar.displayName = "Avatar"
 
 const AvatarImage = React.forwardRef<
   HTMLImageElement,
-  React.ImgHTMLAttributes<HTMLImageElement>
->(({ className, alt = "", ...props }, ref) => (
-  <img
+  React.ComponentProps<typeof Image>
+>(({ className, alt = "", width = 40, height = 40, ...props }, ref) => (
+  <Image
     ref={ref}
     alt={alt}
-    className={cn("aspect-square h-full w-full", className)}
+    width={width}
+    height={height}
+    className={cn("aspect-square h-full w-full object-cover", className)}
     {...props}
   />
 ))
@@ -332,10 +335,7 @@ const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(
 Progress.displayName = "Progress"
 
 // Input Component
-export interface InputProps
-  extends React.InputHTMLAttributes<HTMLInputElement> {
-  // Additional input-specific props can be added here if needed
-}
+export type InputProps = React.InputHTMLAttributes<HTMLInputElement>
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, ...props }, ref) => {

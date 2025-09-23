@@ -214,8 +214,8 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
         return useFlashcardStoreRef
       }
 
-      const module = await import('@/lib/flashcard-store')
-      useFlashcardStoreRef = module.useFlashcardStore
+      const flashcardStoreModule = await import('@/lib/flashcard-store')
+      useFlashcardStoreRef = flashcardStoreModule.useFlashcardStore
       return useFlashcardStoreRef
     }
 
@@ -324,7 +324,6 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
 
         if (elapsedSeconds <= 100) {
           // Smooth progression to 90% over 100 seconds with subtle easing
-          const linearProgress = (elapsedSeconds / 100) * 90
           // Apply gentle easing to make it feel natural
           const easingFactor = 1 - Math.pow(1 - (elapsedSeconds / 100), 1.2)
           progress = easingFactor * 90

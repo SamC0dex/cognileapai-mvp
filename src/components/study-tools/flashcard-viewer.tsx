@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from 'framer-motion'
+import { motion, AnimatePresence, useMotionValue } from 'framer-motion'
 import { Button } from '@/components/ui'
 import {
   ChevronLeft,
@@ -13,7 +13,7 @@ import {
   X
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { FlashcardEntry, FlashcardProgress } from '@/types/flashcards'
+import { FlashcardEntry } from '@/types/flashcards'
 
 interface FlashcardViewerProps {
   flashcards: FlashcardEntry[]
@@ -39,8 +39,6 @@ export const FlashcardViewer: React.FC<FlashcardViewerProps> = ({
 
   // Animation controls
   const x = useMotionValue(0)
-  const rotate = useTransform(x, [-200, 200], [-25, 25])
-  const opacity = useTransform(x, [-200, -150, 0, 150, 200], [0, 1, 1, 1, 0])
 
   const currentCard = flashcards[currentIndex]
   const progress = ((currentIndex + 1) / flashcards.length) * 100
@@ -101,21 +99,6 @@ export const FlashcardViewer: React.FC<FlashcardViewerProps> = ({
     setShowAnswer(prev => !prev)
   }, [])
 
-  // Swipe handlers
-  const handleDragEnd = React.useCallback((event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    const threshold = 100
-
-    if (info.offset.x > threshold && currentIndex > 0) {
-      // Swipe right - go to previous
-      goToPrevious()
-    } else if (info.offset.x < -threshold && currentIndex < flashcards.length - 1) {
-      // Swipe left - go to next
-      goToNext()
-    } else {
-      // Snap back
-      x.set(0)
-    }
-  }, [currentIndex, flashcards.length, goToNext, goToPrevious, x])
 
   // Keyboard navigation
   React.useEffect(() => {

@@ -24,7 +24,8 @@ export function useChat(documentId?: string, conversationId?: string, selectedDo
       })
     }
     // If neither conversationId nor documentId, this is a new general chat (no initialization needed)
-  }, [documentId, conversationId, store.loadConversation, store.setDocumentContext])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documentId, conversationId, store.loadConversation, store.setDocumentContext]) // store object recreated every render - individual function deps are correct pattern
 
   // Send message with simplified API
   const sendMessage = useCallback(async (content: string, modelOverride?: import('./ai-config').GeminiModelKey) => {
