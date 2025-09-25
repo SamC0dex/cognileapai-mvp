@@ -187,7 +187,8 @@ Both commands should pass before considering any implementation complete.
 - **Backend**: Next.js API Routes with Server-Sent Events for streaming
 - **Database**: Supabase PostgreSQL with Row Level Security
 - **Storage**: Supabase Storage for PDF files
-- **AI**: Google Gemini 2.5 Pro/Flash/Lite via Vercel AI SDK
+- **AI**: Google Gemini 2.5 Pro/Flash/Lite via Google GenAI SDK (`@google/genai`)
+- **Session Management**: Database-persistent chat sessions with in-memory caching
 - **Semantic Search**: Transformers.js with mixedbread-ai/mxbai-embed-xsmall-v1 (FREE, no API costs)
 - **State Management**: Zustand for chat, study tools, and flashcards state management
 - **Local Storage**: Dexie (IndexedDB) for chat history and offline capabilities
@@ -198,6 +199,9 @@ Both commands should pass before considering any implementation complete.
 #### Chat System Architecture
 - **Zustand Store** (`lib/chat-store.ts`) - Centralized state management for all chat operations
 - **Custom Hook** (`lib/use-chat.ts`) - Simplified API for components to interact with chat
+- **Stateful Sessions** (`lib/genai-client.ts`) - Database-persistent chat sessions with conversation memory
+- **Session Management** (`lib/session-store.ts`) - Database persistence for chat sessions to survive server restarts
+- **Google GenAI Integration** - Direct integration with `@google/genai` SDK for enhanced performance
 - **Server-Sent Events** - Real-time streaming AI responses via `/api/chat` endpoints
 - **Optimistic Updates** - Immediate UI feedback with error rollback
 - **Document Context Integration** - Chat responses use document sections for context
@@ -211,11 +215,14 @@ Both commands should pass before considering any implementation complete.
 #### API Architecture (Implemented)
 - `/api/chat` - General AI chat with conversation persistence
 - `/api/chat/document` - Document-specific chat with section context
+- `/api/chat/stateful` - Stateful chat sessions with database persistence
 - `/api/upload` - PDF upload and processing pipeline
 - `/api/extract-content` - Document content extraction and processing
 - `/api/documents/[id]/status` - Real-time document processing status
 - `/api/study-tools/generate` - AI-powered study materials generation
 - `/api/study-tools/fetch` - Retrieve existing study materials
+- `/api/study-tools/update` - Update existing study materials
+- `/api/study-tools/delete` - Delete study materials
 - All endpoints use Server-Sent Events for streaming responses
 - Database operations use server-only Supabase service role
 
@@ -254,6 +261,8 @@ src/
 │   ├── chat-store.ts    # Zustand chat state management
 │   ├── use-chat.ts      # Custom hook for chat operations
 │   ├── ai-config.ts     # AI model configuration and selection
+│   ├── genai-client.ts  # Google GenAI SDK client with stateful sessions
+│   ├── session-store.ts # Database persistence for chat sessions
 │   ├── chat-history.ts  # Local storage for chat persistence
 │   ├── smart-context.ts # Intelligent context retrieval for large documents
 │   ├── study-tools-store.ts # Study tools state management
@@ -268,10 +277,11 @@ src/
 ### Database Schema
 Core entities in Supabase:
 - `documents` - PDF metadata and storage paths
-- `sections` - Document sections with hierarchical structure  
+- `sections` - Document sections with hierarchical structure
 - `conversations` - Chat conversation metadata
 - `messages` - Individual chat messages with role, content, metadata
 - `outputs` - Generated study materials (summary/notes/study_guide) as JSONB
+- `chat_sessions` - Stateful chat sessions with conversation history for persistence
 
 See `supabase/schema.sql` for complete schema and `docs/DATABASE_SCHEMA.md` for details.
 
@@ -294,10 +304,13 @@ const { messages, sendMessage, isStreaming } = useChat(documentId)
 ```
 
 ### AI Integration
+- **Google GenAI SDK**: Direct integration with `@google/genai` for enhanced performance and reliability
+- **Stateful Sessions**: Database-persistent conversation memory that survives server restarts
 - **Model Selection**: Automatic based on context (see `ai-config.ts`)
-- **Streaming Responses**: Server-Sent Events with smooth UI updates
+- **Streaming Responses**: Server-Sent Events with smooth UI updates and timeout protection
 - **Document Context**: Relevant sections passed to AI for accurate responses
 - **Smart Context Retrieval**: Intelligent chunking for large documents (see `smart-context.ts`)
+- **Session Management**: In-memory caching with database persistence for optimal performance
 - **Citation Support**: AI responses include document references
 - **Error Recovery**: Graceful handling of API failures with retry mechanisms
 
@@ -425,6 +438,17 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 - **FREE semantic search** - use `generateEmbedding()` and `cosineSimilarity()` for semantic matching
 - **Performance optimization** - embeddings are cached for 1 hour, context results cached for 30 minutes
 
+### Working with Google GenAI SDK and Sessions
+- **Session Creation** - use `createStatefulChat()` to create persistent chat sessions
+- **Message Streaming** - use `sendStatefulMessage()` for streaming responses with timeout protection
+- **Database Persistence** - sessions automatically persist to database and restore from database
+- **In-Memory Caching** - active sessions cached in memory for performance, with automatic cleanup
+- **Session Management** - sessions have unique IDs and can be associated with conversationIds
+- **Error Handling** - graceful degradation with fallback responses and automatic recovery
+- **Model Selection** - intelligent model selection based on context using `GeminiModelSelector`
+- **Timeout Protection** - both overall stream timeouts (60s) and chunk timeouts (10s)
+- **Conversation History** - maintains full conversation context within sessions
+
 ### Code Quality Standards  
 - **TypeScript strict mode** - no `any` types, proper interface definitions
 - **ESLint configuration** - follows Next.js recommended rules
@@ -439,6 +463,9 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 ## Key Files
 - `src/lib/chat-store.ts` - Central chat state management with streaming and persistence
+- `src/lib/genai-client.ts` - Google GenAI SDK client with stateful sessions and database persistence
+- `src/lib/session-store.ts` - Database persistence layer for chat sessions
+- `src/lib/ai-config.ts` - Enhanced AI model configuration and intelligent selection
 - `src/lib/study-tools-store.ts` - Study tools state management and generation
 - `src/lib/flashcard-store.ts` - Flashcard-specific state with study sessions and progress tracking
 - `src/lib/smart-context.ts` - Enterprise-grade RAG system with FREE semantic search
