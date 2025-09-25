@@ -312,7 +312,7 @@ export const ChatMessage: React.FC<ChatMessageProps & {
 
           {/* External Action Buttons - ChatGPT Style */}
           {role === 'assistant' && !isStreaming && (
-            <div className="relative">
+            <div className="relative min-h-[2.5rem] mt-1">
               <AnimatePresence>
                 {showActions && (
                   <motion.div

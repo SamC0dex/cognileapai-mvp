@@ -176,6 +176,7 @@ export function useChatStore(): StoreShape {
   const sendMessage = useCallback(async (content: string, documentId?: string | null, model?: GeminiModelKey, selectedDocuments?: Array<{id: string, title: string}>, skipUserMessage?: boolean) => {
     const modelToUse = model || selectedModel
     let user: Message | null = null
+    let finalTokenUsage: number | undefined // Declare at function scope for both finalUpdate functions
 
     // Add user message unless this is a regeneration
     if (!skipUserMessage) {
@@ -198,31 +199,70 @@ export function useChatStore(): StoreShape {
       setTimeout(() => updateTokenTracking(), 0)
     }
 
-    // Immediately add assistant placeholder for streaming
-    const assistantId = `a_${Date.now()}`
-    const assistantPlaceholder: Message = {
-      id: assistantId,
-      role: 'assistant',
-      content: '',
-      timestamp: new Date(),
-      isStreaming: true
-    }
-    setMessages(prev => [...prev, assistantPlaceholder])
-
-    // Update token tracking immediately after adding assistant placeholder
-    setTimeout(() => updateTokenTracking(), 0)
-
     setIsLoading(false) // No loading state needed with optimistic UI
     setStreamingMessage('')
     setError(null)
 
+    // Prepare streaming resources and state - declare at function scope for error handling
+    let serverBuffer = ''
+    let displayedText = ''
+    let isStreamingActive = true
+
+    // Resource tracking for cleanup - declare at function scope for error handling
+    let streamInterval: NodeJS.Timeout | null = null
+    let waitForCompletion: NodeJS.Timeout | null = null
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
+    const abortController = new AbortController()
+
+    // Cleanup function to prevent resource leaks
+    const cleanupResources = () => {
+      console.log('[Chat] Cleaning up streaming resources')
+
+      if (streamInterval) {
+        clearInterval(streamInterval)
+        streamInterval = null
+      }
+
+      if (waitForCompletion) {
+        clearInterval(waitForCompletion)
+        waitForCompletion = null
+      }
+
+      if (reader) {
+        try {
+          reader.releaseLock()
+        } catch (e) {
+          console.warn('[Chat] Reader already released:', e)
+        }
+        reader = null
+      }
+
+      isStreamingActive = false
+    }
+
     try {
-      // Create conversation if needed
+      // Create conversation if needed BEFORE adding assistant placeholder
+      // This ensures proper timing for first message indicators
       let convId = conversationRef.current
       if (!convId) {
         console.log('[Chat] Creating new conversation...')
         convId = await createNewConversationInternal(documentId || documentContext?.id)
       }
+
+      // Add assistant placeholder for streaming AFTER conversation exists
+      // This ensures consistent timing for typing indicator across first and subsequent messages
+      const assistantId = `a_${Date.now()}`
+      const assistantPlaceholder: Message = {
+        id: assistantId,
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(),
+        isStreaming: true
+      }
+      setMessages(prev => [...prev, assistantPlaceholder])
+
+      // Update token tracking immediately after adding assistant placeholder
+      setTimeout(() => updateTokenTracking(), 0)
 
       // For regeneration, ensure we send messages up to and including the user message
       // For new messages, use allMessagesRef which is more current
@@ -264,130 +304,144 @@ export function useChatStore(): StoreShape {
       console.log(`[Chat] Sending message with model ${modelToUse}...`)
       const startTime = Date.now()
 
-      // Ultra-smooth streaming: consistent pace like ChatGPT/T3.chat
-      let serverBuffer = '' // Buffer for chunks from server
-      let displayedText = '' // Text currently shown to user
-      let isStreamingActive = true
+      try {
+        // Network request with abort signal
+        const apiEndpoint = '/api/chat/stateful'
+        console.log(`[Chat] Using STATEFUL chat endpoint`)
 
-      // 🚀 ROUTE TO STATEFUL CHAT ENDPOINT
-      const apiEndpoint = '/api/chat/stateful'
-      console.log(`[Chat] Using STATEFUL chat endpoint`)
+        const res = await fetch(apiEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: abortController.signal // Add abort support
+        })
 
-      const res = await fetch(apiEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
+        if (!res.ok) {
+          throw new Error(`API error: ${res.status}`)
+        }
 
-      if (!res.ok) {
-        throw new Error(`API error: ${res.status}`)
-      }
+        if (!res.body) {
+          throw new Error('No response body')
+        }
 
-      if (!res.body) {
-        throw new Error('No response body')
-      }
+        reader = res.body.getReader()
+        const decoder = new TextDecoder()
 
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
+        // Improved streaming with better performance
+        const STREAM_SPEED = 100 // Reduced frequency to 100ms for better performance
+        const BATCH_SIZE = 8 // Increased batch size for smoother streaming
+        let lastUpdateTime = 0
 
-      // ✅ OPTIMIZED streaming: Better performance with batching
-      const STREAM_SPEED = 50 // Increased to 50ms for better performance
-      const BATCH_SIZE = 2 // Stream 2 characters at once for smoother flow
-      let streamInterval: NodeJS.Timeout
-      let lastUpdateTime = 0
+        const startSmoothStreaming = () => {
+          streamInterval = setInterval(() => {
+            if (displayedText.length < serverBuffer.length && isStreamingActive) {
+              const nextText = serverBuffer.slice(0, displayedText.length + BATCH_SIZE)
+              displayedText = nextText
 
-      const startSmoothStreaming = () => {
-        streamInterval = setInterval(() => {
-          if (displayedText.length < serverBuffer.length && isStreamingActive) {
-            // ✅ BATCH CHARACTERS for better performance
-            const nextText = serverBuffer.slice(0, displayedText.length + BATCH_SIZE)
-            displayedText = nextText
+              // Throttle UI updates to reduce React re-renders
+              const now = Date.now()
+              if (now - lastUpdateTime > 32) { // ~30fps throttling for better performance
+                lastUpdateTime = now
+                requestAnimationFrame(() => {
+                  if (isStreamingActive) { // Double-check we're still streaming
+                    setMessages(prev => prev.map(msg =>
+                      msg.id === assistantId
+                        ? { ...msg, content: displayedText, isStreaming: true }
+                        : msg
+                    ))
+                  }
+                })
+              }
+            } else if (displayedText.length >= serverBuffer.length && !isStreamingActive) {
+              // Streaming complete
+              if (streamInterval) {
+                clearInterval(streamInterval)
+                streamInterval = null
+              }
 
-            // ✅ THROTTLE UI updates using requestAnimationFrame
-            const now = Date.now()
-            if (now - lastUpdateTime > 16) { // ~60fps throttling
-              lastUpdateTime = now
               requestAnimationFrame(() => {
                 setMessages(prev => prev.map(msg =>
                   msg.id === assistantId
-                    ? { ...msg, content: displayedText, isStreaming: true }
+                    ? { ...msg, content: displayedText, isStreaming: false }
                     : msg
                 ))
               })
             }
-          } else if (displayedText.length >= serverBuffer.length && !isStreamingActive) {
-            // Streaming complete - stop interval and mark as done
-            clearInterval(streamInterval)
-            requestAnimationFrame(() => {
-              setMessages(prev => prev.map(msg =>
-                msg.id === assistantId
-                  ? { ...msg, content: displayedText, isStreaming: false }
-                  : msg
-              ))
-            })
-          }
-        }, STREAM_SPEED)
-      }
-
-      // Start smooth streaming immediately
-      startSmoothStreaming()
-
-      // Collect chunks from server as fast as possible
-      let finalTokenUsage: number | undefined
-      while (true) {
-        const { value, done } = await reader.read()
-        if (done) {
-          isStreamingActive = false
-          break
+          }, STREAM_SPEED)
         }
 
-        const chunk = decoder.decode(value, { stream: true })
-        const lines = chunk.split('\n').filter(line => line.trim())
+        // Start streaming
+        startSmoothStreaming()
 
-        for (const line of lines) {
-          try {
-            if (line.startsWith('0:')) {
-              const content = JSON.parse(line.slice(2))
-              if (typeof content === 'string') {
-                serverBuffer += content
-              }
-            } else if (line.startsWith('d:')) {
-              const data = line.slice(2)
-              try {
-                const parsed = JSON.parse(data)
-                if (parsed?.text) {
-                  serverBuffer += parsed.text
+        // Read from stream with timeout protection
+        const streamStartTime = Date.now()
+        const MAX_STREAM_TIME = 90000 // 90 seconds max
+
+        while (true) {
+          // Check for timeout
+          if (Date.now() - streamStartTime > MAX_STREAM_TIME) {
+            console.warn('[Chat] Stream timeout reached, stopping')
+            break
+          }
+
+          const { value, done } = await reader.read()
+          if (done) {
+            isStreamingActive = false
+            break
+          }
+
+          const chunk = decoder.decode(value, { stream: true })
+          const lines = chunk.split('\n').filter(line => line.trim())
+
+          for (const line of lines) {
+            try {
+              if (line.startsWith('0:')) {
+                const content = JSON.parse(line.slice(2))
+                if (typeof content === 'string') {
+                  serverBuffer += content
                 }
-              } catch {
-                if (data) {
-                  serverBuffer += data
+              } else if (line.startsWith('d:')) {
+                const data = line.slice(2)
+                try {
+                  const parsed = JSON.parse(data)
+                  if (parsed?.text) {
+                    serverBuffer += parsed.text
+                  }
+                } catch {
+                  if (data) {
+                    serverBuffer += data
+                  }
+                }
+              } else if (line.startsWith('8:')) {
+                try {
+                  const metadata = JSON.parse(line.slice(2))
+                  if (metadata?.usage?.totalTokens) {
+                    finalTokenUsage = metadata.usage.totalTokens
+                    console.log('[Chat] Received token usage:', finalTokenUsage)
+                  }
+                } catch {
+                  // Continue if metadata parsing fails
                 }
               }
-            } else if (line.startsWith('8:')) {
-              // Handle completion metadata (usage tokens)
-              try {
-                const metadata = JSON.parse(line.slice(2))
-                if (metadata?.usage?.totalTokens) {
-                  finalTokenUsage = metadata.usage.totalTokens
-                  console.log('[Chat] Received token usage:', finalTokenUsage)
-                }
-              } catch {
-                // Continue if metadata parsing fails
-              }
+            } catch {
+              continue
             }
-          } catch {
-            continue
           }
         }
-      }
 
-      // Ensure smooth streaming completes
-      const waitForCompletion = setInterval(() => {
-        if (displayedText.length >= serverBuffer.length) {
-          clearInterval(waitForCompletion)
-          clearInterval(streamInterval)
-        }
-      }, 100)
+        // Final completion check with timeout
+        waitForCompletion = setInterval(() => {
+          if (displayedText.length >= serverBuffer.length || !isStreamingActive) {
+            if (waitForCompletion) {
+              clearInterval(waitForCompletion)
+              waitForCompletion = null
+            }
+            if (streamInterval) {
+              clearInterval(streamInterval)
+              streamInterval = null
+            }
+          }
+        }, 100)
 
       const duration = Date.now() - startTime
       console.log(`[Chat] Streaming completed in ${duration}ms`)
@@ -459,14 +513,98 @@ export function useChatStore(): StoreShape {
           // Don't fail the whole operation for history update errors
         }
       }
+      } catch (streamError) {
+        console.error('[Chat] Stream reading error:', streamError)
+        // Don't fail completely, just stop streaming
+      } finally {
+        // Always cleanup streaming resources
+        cleanupResources()
+      }
+
+      const duration = Date.now() - startTime
+      console.log(`[Chat] Streaming completed in ${duration}ms`)
+
+      // Ensure we have some response
+      if (!serverBuffer || serverBuffer.trim() === '') {
+        serverBuffer = "I apologize, but I didn't receive a complete response. Please try again."
+        console.warn('[Chat] Empty response received, using fallback')
+      }
+
+      // Get model display name
+      const { GeminiModelSelector } = await import('./ai-config')
+      const modelConfig = GeminiModelSelector.getModelConfig(modelToUse)
+
+      // Final update with metadata
+      const finalUpdate = () => {
+        const assistantTokenCount = TokenManager.estimate(serverBuffer)
+        setMessages(prev => prev.map(msg =>
+          msg.id === assistantId
+            ? {
+                ...msg,
+                content: serverBuffer,
+                isStreaming: false,
+                tokenCount: {
+                  estimated: assistantTokenCount.estimated,
+                  confidence: assistantTokenCount.confidence
+                },
+                metadata: {
+                  model: modelConfig.displayName,
+                  modelKey: modelToUse,
+                  duration,
+                  tokens: finalTokenUsage || assistantTokenCount.estimated
+                }
+              }
+            : msg
+        ))
+
+        // Update token tracking
+        updateTokenTracking()
+      }
+
+      // Apply final update
+      setTimeout(finalUpdate, 200)
+
+      // Update chat history
+      if (typeof window !== 'undefined') {
+        try {
+          const { upsertThread, touchThread } = await import('./chat-history')
+          const preview = serverBuffer.slice(0, 100) + (serverBuffer.length > 100 ? '...' : '')
+
+          if (allMessagesRef.current.length === 0) {
+            await upsertThread({
+              id: convId,
+              title: content.slice(0, 50) + (content.length > 50 ? '...' : ''),
+              documentId: documentId || documentContext?.id,
+              preview,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+              messagesCount: 2
+            })
+          } else {
+            await touchThread(convId, {
+              preview,
+              messagesCount: allMessagesRef.current.length + 2
+            })
+          }
+        } catch (historyError) {
+          console.warn('[Chat] Failed to update chat history:', historyError)
+        }
+      }
+
     } catch (e: unknown) {
       const errorMessage = e instanceof Error ? e.message : 'Unknown error occurred'
       console.error('[Chat] sendMessage failed:', errorMessage, e)
       setError(`Failed to send message: ${errorMessage}`)
 
+      // Abort any ongoing requests
+      abortController.abort()
+
+      // Cleanup resources on error
+      if (typeof cleanupResources === 'function') {
+        cleanupResources()
+      }
+
       // Remove optimistically added messages on error
-      // For regeneration (no user message added): remove 1 message (assistant placeholder)
-      // For normal messages: remove 2 messages (user + assistant placeholder)
       setMessages(prev => prev.slice(0, skipUserMessage ? -1 : -2))
     } finally {
       setIsLoading(false)

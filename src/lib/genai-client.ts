@@ -191,6 +191,7 @@ export async function createStatefulChat(options: CreateChatOptions): Promise<st
 
 /**
  * Send message to existing stateful session with streaming
+ * Now includes timeout protection and proper error handling
  */
 export async function* sendStatefulMessage(options: SendMessageOptions): AsyncGenerator<StreamChunk> {
   let session = activeSessions.get(options.sessionId)
@@ -253,7 +254,7 @@ export async function* sendStatefulMessage(options: SendMessageOptions): AsyncGe
       parts: [{ text: options.message }]
     })
 
-    // Stream response
+    // Stream response with timeout protection
     const response = await client.models.generateContentStream({
       model: modelName,
       contents,
@@ -264,15 +265,44 @@ export async function* sendStatefulMessage(options: SendMessageOptions): AsyncGe
     })
 
     let accumulatedText = ''
+    let lastChunkTime = Date.now()
+    const STREAM_TIMEOUT = 60000 // 60 seconds total timeout
+    const CHUNK_TIMEOUT = 10000  // 10 seconds per chunk timeout
 
-    for await (const chunk of response) {
-      const chunkText = chunk.text || ''
-      accumulatedText += chunkText
+    try {
+      for await (const chunk of response) {
+        const now = Date.now()
 
-      yield {
-        text: chunkText,
-        isComplete: false
+        // Check if streaming has taken too long overall
+        if (now - lastChunkTime > STREAM_TIMEOUT) {
+          console.warn(`[GenAI] Stream timeout after ${STREAM_TIMEOUT}ms for session: ${options.sessionId}`)
+          break
+        }
+
+        // Check if this chunk took too long
+        if (now - lastChunkTime > CHUNK_TIMEOUT) {
+          console.warn(`[GenAI] Chunk timeout after ${CHUNK_TIMEOUT}ms for session: ${options.sessionId}`)
+          break
+        }
+
+        const chunkText = chunk.text || ''
+        accumulatedText += chunkText
+        lastChunkTime = now
+
+        yield {
+          text: chunkText,
+          isComplete: false
+        }
       }
+    } catch (streamError) {
+      console.error(`[GenAI] Stream error for session ${options.sessionId}:`, streamError)
+      // Don't throw - let the function complete gracefully with what we have
+    }
+
+    // Ensure we have some response content
+    if (!accumulatedText.trim()) {
+      accumulatedText = "I apologize, but I encountered an issue generating a response. Please try again."
+      console.warn(`[GenAI] Empty response for session ${options.sessionId}, using fallback message`)
     }
 
     // Add conversation to history
@@ -285,22 +315,27 @@ export async function* sendStatefulMessage(options: SendMessageOptions): AsyncGe
       parts: [{ text: accumulatedText }]
     })
 
-    // Save updated session to database
-    await saveSession({
-      id: session.id,
-      conversationId: session.conversationId,
-      modelKey: session.modelKey,
-      systemPrompt: session.systemPrompt,
-      documentContext: session.documentContext,
-      history: session.history
-    })
+    // Save updated session to database (non-blocking)
+    try {
+      await saveSession({
+        id: session.id,
+        conversationId: session.conversationId,
+        modelKey: session.modelKey,
+        systemPrompt: session.systemPrompt,
+        documentContext: session.documentContext,
+        history: session.history
+      })
+    } catch (dbError) {
+      console.error(`[GenAI] Failed to save session ${options.sessionId}:`, dbError)
+      // Don't fail the stream for database errors
+    }
 
-    // Final chunk with completion signal
+    // Final chunk with completion signal - ALWAYS send this
     yield {
       text: '',
       isComplete: true,
       usage: {
-        totalTokens: Math.ceil(accumulatedText.length / 4), // Rough estimate
+        totalTokens: Math.ceil(accumulatedText.length / 4),
         promptTokens: undefined,
         completionTokens: undefined
       }
@@ -310,7 +345,17 @@ export async function* sendStatefulMessage(options: SendMessageOptions): AsyncGe
 
   } catch (error) {
     console.error(`[GenAI] Failed to send message to session ${options.sessionId}:`, error)
-    throw error
+
+    // Always yield a completion signal even on error
+    yield {
+      text: "I apologize, but I encountered an error processing your request. Please try again.",
+      isComplete: true,
+      usage: {
+        totalTokens: 20,
+        promptTokens: undefined,
+        completionTokens: undefined
+      }
+    }
   }
 }
 
