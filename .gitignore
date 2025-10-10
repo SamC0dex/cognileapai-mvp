@@ -26,6 +26,21 @@ docs/TESTING_GUIDE.md
 .DS_Store
 Thumbs.db
 
+# Windows reserved filenames
+nul
+NUL
+CON
+PRN
+AUX
+COM1
+COM2
+COM3
+COM4
+LPT1
+LPT2
+LPT3
+LPT4
+
 # Logs
 logs
 *.log

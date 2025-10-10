@@ -21,13 +21,15 @@ export function ErrorManagementProvider({ children }: ErrorManagementProviderPro
     }
   }, [])
 
+  // Note: ErrorBoundary cannot be used at root layout level in Next.js 15
+  // Use error.tsx and global-error.tsx files instead for page-level error handling
   return (
-    <ErrorBoundary>
+    <>
       {children}
       {/* <RetryStatusPanel /> */}
       <NetworkStatusIndicator />
       <GlobalErrorHandler />
-    </ErrorBoundary>
+    </>
   )
 }
 

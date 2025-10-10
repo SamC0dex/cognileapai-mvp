@@ -28,6 +28,12 @@ const nextConfig = {
       'dexie'
     ],
   },
+  webpack: (config, { isServer }) => {
+    // Fix case sensitivity issues on Windows
+    config.resolve.symlinks = false
+
+    return config
+  },
 };
 
 export default bundleAnalyzer(nextConfig);

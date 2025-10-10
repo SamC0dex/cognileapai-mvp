@@ -1,11 +1,11 @@
 'use client'
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Button } from '@/components/ui'
-import { useStudyToolsStore, STUDY_TOOLS, type StudyToolContent } from '@/lib/study-tools-store'
+import { useStudyToolsStore, STUDY_TOOLS, type StudyToolContent, normalizeStudyToolMarkdown } from '@/lib/study-tools-store'
 import { FlashcardViewer } from './flashcard-viewer'
 import {
   X,
@@ -319,6 +319,8 @@ interface ContentRendererProps {
 
 const ContentRenderer: React.FC<ContentRendererProps> = ({ content, isFullscreen }) => {
 
+  const renderedMarkdown = useMemo(() => normalizeStudyToolMarkdown(content.content), [content.content])
+
   // Handle flashcards specifically
   if (content.type === 'flashcards') {
     try {
@@ -621,7 +623,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ content, isFullscreen
               remarkPlugins={[remarkGfm]}
               components={markdownComponents}
             >
-              {content.content}
+              {renderedMarkdown}
             </ReactMarkdown>
           </motion.div>
         </div>
