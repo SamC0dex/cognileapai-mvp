@@ -6,7 +6,8 @@ import { useUser } from '@/hooks/use-user'
 export function DashboardHeader() {
   const { profile, user, loading } = useUser()
 
-  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'there'
+  const fullName = profile?.full_name?.trim()
+  const displayName = fullName?.split(/\s+/)[0] || user?.email?.split('@')[0] || 'there'
 
   return (
     <div className="relative overflow-hidden bg-gradient-to-br from-background via-background to-muted/20 border-b border-border">

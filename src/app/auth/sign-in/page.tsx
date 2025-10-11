@@ -64,10 +64,11 @@ function SignInForm() {
     setError(null)
 
     try {
+      const callbackUrl = `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirect)}`
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`,
+          redirectTo: callbackUrl,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',

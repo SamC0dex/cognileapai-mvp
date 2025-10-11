@@ -138,7 +138,7 @@ export async function POST(req: NextRequest) {
         if (!candidate.storage_path) continue
 
         try {
-          const downloadResult = await supabase.storage.from('documents').download(candidate.storage_path)
+          const downloadResult = await serviceSupabase.storage.from('documents').download(candidate.storage_path)
           if (downloadResult.error) {
             console.error(`Failed to download existing document ${candidate.id}:`, downloadResult.error)
             continue
@@ -196,8 +196,9 @@ export async function POST(req: NextRequest) {
     }
 
     const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
-    const fileName = `${Date.now()}-${sanitizedFileName}`
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    // Store under per-user prefix to reduce discoverability and enforce server mediation
+    const fileName = `${user.id}/${Date.now()}-${sanitizedFileName}`
+    const { data: uploadData, error: uploadError } = await serviceSupabase.storage
       .from('documents')
       .upload(fileName, buffer, {
         contentType: 'application/pdf'
@@ -230,14 +231,14 @@ export async function POST(req: NextRequest) {
         console.warn(`Checksum conflict detected during insert for checksum ${checksum}`)
 
         // Only check for conflicts within user's own documents
-        const { data: conflictingDocument, error: conflictError } = await supabase
+            const { data: conflictingDocument, error: conflictError } = await supabase
           .from('documents')
           .select('id, title, page_count, bytes, storage_path, processing_status, chunk_count, error_message, document_content, created_at, updated_at')
           .eq('checksum', checksum)
           .eq('user_id', user.id)
           .maybeSingle()
 
-        await supabase.storage.from('documents').remove([uploadData.path])
+        await serviceSupabase.storage.from('documents').remove([uploadData.path])
 
         if (conflictError && conflictError.code !== 'PGRST116') {
           console.error('Failed to retrieve conflicting document:', conflictError)
@@ -247,7 +248,7 @@ export async function POST(req: NextRequest) {
       }
 
       console.error('Database error:', dbError)
-      await supabase.storage.from('documents').remove([uploadData.path])
+      await serviceSupabase.storage.from('documents').remove([uploadData.path])
       return NextResponse.json({ error: 'Failed to save document' }, { status: 500 })
     }
 

@@ -1,13 +1,22 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
 
+function isValidRedirect(url: string): boolean {
+  if (!url) return false
+  if (!url.startsWith('/')) return false
+  if (url.includes('..')) return false
+  if (url.startsWith('//')) return false
+  return true
+}
+
 export default function SignUpPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
 
   const [firstName, setFirstName] = useState('')
@@ -18,6 +27,9 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+
+  const redirectParam = searchParams.get('redirect')
+  const redirect = redirectParam && isValidRedirect(redirectParam) ? redirectParam : '/dashboard'
 
   const handleEmailSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -48,7 +60,7 @@ export default function SignUpPage() {
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirect)}`,
         data: {
           first_name: firstName.trim(),
           last_name: lastName.trim(),
@@ -66,7 +78,7 @@ export default function SignUpPage() {
         setError('Email already registered. Please sign in.')
       } else {
         setMessage('Account created! Check your email to confirm.')
-        setTimeout(() => router.push('/dashboard'), 2000)
+        setTimeout(() => router.push(redirect), 2000)
       }
     }
   }
@@ -75,19 +87,26 @@ export default function SignUpPage() {
     setLoading(true)
     setError(null)
 
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        },
-      },
-    })
+    const callbackUrl = `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirect)}`
 
-    if (oauthError) {
-      setError(oauthError.message)
+    try {
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: callbackUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      })
+
+      if (oauthError) {
+        setError(oauthError.message)
+        setLoading(false)
+      }
+    } catch {
+      setError('An unexpected error occurred')
       setLoading(false)
     }
   }

@@ -43,8 +43,9 @@ const MarkdownBlock = React.memo<{ content: string; components: MarkdownComponen
       key={`block-${index}`}
       remarkPlugins={[remarkGfm]}
       components={components}
-      skipHtml={false}
-      allowedElements={undefined}
+      // Security: disallow raw HTML and restrict to safe tags
+      skipHtml
+      allowedElements={SAFE_ELEMENTS}
     >
       {content}
     </ReactMarkdown>
@@ -82,8 +83,9 @@ export const MemoizedMarkdown = React.memo<MemoizedMarkdownProps>(
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={customComponents}
-              skipHtml={false}
-              allowedElements={undefined}
+              // Security: disallow raw HTML and restrict to safe tags
+              skipHtml
+              allowedElements={SAFE_ELEMENTS}
             >
               {streamingContent}
             </ReactMarkdown>
@@ -97,3 +99,12 @@ export const MemoizedMarkdown = React.memo<MemoizedMarkdownProps>(
 )
 
 MemoizedMarkdown.displayName = 'MemoizedMarkdown'
+
+// Whitelist of safe markdown elements to mitigate XSS
+const SAFE_ELEMENTS = [
+  'p', 'strong', 'em', 'del', 'code', 'pre', 'blockquote',
+  'ul', 'ol', 'li', 'hr',
+  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'table', 'thead', 'tbody', 'tr', 'th', 'td',
+  'a'
+] as const

@@ -805,3 +805,15 @@ export async function createNewConversation(
 ): Promise<string> {
   return crypto.randomUUID()
 }
+
+// Cleanup helpers for logout flows
+export function cleanupChatStoreCaches() {
+  try {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('cognileap:threads')
+      window.dispatchEvent(new CustomEvent('chat:threads:changed'))
+    }
+  } catch {
+    // ignore
+  }
+}

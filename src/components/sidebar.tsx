@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import {
   ChevronLeft,
   ChevronRight,
@@ -32,7 +32,7 @@ import { ClientOnly } from '@/components/client-only'
 import { Logo } from './logo'
 import { ChatDuotoneIcon } from '@/components/icons/chat-duotone'
 import { useUser } from '@/hooks/use-user'
-import { createClient } from '@/lib/supabase/client'
+import { signOutAndClear } from '@/lib/auth-utils'
 
 interface SidebarProps {
   isCollapsed?: boolean
@@ -43,7 +43,6 @@ interface SidebarProps {
 
 export function Sidebar({ isCollapsed = false, onCollapsedChange, isDocumentsPanelOpen = false, onDocumentsPanelToggle }: SidebarProps) {
   const pathname = usePathname()
-  const router = useRouter()
   const { theme, setTheme } = useTheme()
   const { user, profile, loading } = useUser()
   const [signingOut, setSigningOut] = React.useState(false)
@@ -56,10 +55,7 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange, isDocumentsPan
   const handleSignOut = async () => {
     try {
       setSigningOut(true)
-      const supabase = createClient()
-      await supabase.auth.signOut()
-      router.push('/auth/sign-in')
-      router.refresh()
+      await signOutAndClear('/auth/sign-in')
     } catch (error) {
       console.error('Sign out error:', error)
     } finally {

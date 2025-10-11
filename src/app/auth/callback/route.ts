@@ -2,6 +2,14 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+function isValidRedirect(url: string | null): url is string {
+  if (!url) return false
+  if (!url.startsWith('/')) return false
+  if (url.includes('..')) return false
+  if (url.startsWith('//')) return false
+  return true
+}
+
 /**
  * OAuth Callback Route Handler
  *
@@ -15,7 +23,7 @@ export async function GET(request: NextRequest) {
   try {
     const requestUrl = new URL(request.url)
     const code = requestUrl.searchParams.get('code')
-    const next = requestUrl.searchParams.get('next') ?? '/dashboard'
+    const nextParam = requestUrl.searchParams.get('next') ?? requestUrl.searchParams.get('redirect')
 
     // Validate code parameter
     if (!code) {
@@ -26,7 +34,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Validate redirect URL is relative (security check)
-    const redirectUrl = next.startsWith('/') ? next : '/dashboard'
+    const redirectUrl = isValidRedirect(nextParam) ? nextParam : '/dashboard'
 
     // Create Supabase server client
     const supabase = await createClient()

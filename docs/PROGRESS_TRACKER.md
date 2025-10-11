@@ -1,8 +1,8 @@
 # PROGRESS TRACKER
 
 **Project**: CogniLeap AI MVP - Landing Page & Authentication
-**Last Updated**: 2025-10-11
-**Current Phase**: SECURITY AUDIT COMPLETE - CRITICAL FIXES REQUIRED
+**Last Updated**: 2025-10-11 (Landing build + auth hardening update)
+**Current Phase**: SECURITY FIXES NEARLY COMPLETE — APPLY STORAGE RLS + QA
 
 ---
 
@@ -13,13 +13,13 @@ Planning:    ██████████████████████�
 Foundation:  ████████████████████████████████ 100% ✅ DEPLOYED
 Auth Pages:  ████████████████████████████████ 100% ✅ COMPLETE
 Integration: ████████████████████████████████ 100% ✅ COMPLETE
-Security:    ████████████████████░░░░░░░░░░░░  60% 🟡 AUDIT DONE
-Landing:     ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   0%
-Animations:  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   0%
+Security:    ████████████████████████████░░░░  90% 🟡 FIXES DONE, RLS+QA PENDING
+Landing:     ████████████████████████░░░░░░░░  70% 🟡 Structure shipped, social proof pending
+Animations:  ███████████████░░░░░░░░░░░░░░░░  50% 🟡 First pass in progress
 ```
 
-**Total Progress**: 72% (Planning + Phase 1 + Phase 2 + Phase 5 + Security Audit complete)
-**Critical Action Required**: Fix 5 critical security issues before production
+**Total Progress**: 86% (Landing structure + animation pass done; storage RLS apply + QA pending)
+**Critical Action Required**: Apply storage RLS migration + finish security QA before production
 
 ---
 
@@ -152,75 +152,74 @@ Animations:  ░░░░░░░░░░░░░░░░░░░░░░�
 
 ---
 
-### ⏳ PHASE 3: LANDING PAGE STRUCTURE
-**Status**: 🔴 NOT STARTED
-**Estimated Time**: 3-4 hours
-**Priority**: MEDIUM (Can be done in parallel with Phase 2)
+### 🟡 PHASE 3: LANDING PAGE STRUCTURE
+**Status**: 🟡 IN PROGRESS
+**Last Update**: 2025-10-11
+**Priority**: MEDIUM (Runs alongside Phase 5.5 QA)
 
-**Tasks Remaining**:
-- [ ] Create `src/components/landing/` directory
-- [ ] Create `src/components/landing/hero-section.tsx`
-- [ ] Create `src/components/landing/social-proof-section.tsx`
-- [ ] Create `src/components/landing/features-section.tsx`
-- [ ] Create `src/components/landing/how-it-works-section.tsx`
-- [ ] Create `src/components/landing/benefits-section.tsx`
-- [ ] Create `src/components/landing/demo-showcase-section.tsx`
-- [ ] Create `src/components/landing/faq-section.tsx`
-- [ ] Create `src/components/landing/final-cta-section.tsx`
-- [ ] Create `src/components/landing/footer.tsx`
-- [ ] Update `src/app/page.tsx` to use landing components
-- [ ] Add all copy content
-- [ ] Add placeholder images/icons
-- [ ] Test responsive layout
-- [ ] Test dark/light mode
+**Progress Summary**:
+- Implemented full landing component suite (hero, features, how-it-works, benefits, demo, FAQ, final CTA, footer) with production copy and iconography.
+- Composed new home page shell that stitches sections together beneath the global header.
+- Social proof section scaffold exists but still needs real content + integration pass.
 
-**Files to Create**: 11 files
-**Files to Modify**: 1 file (page.tsx)
+**Task Checklist**:
+- [x] Create `src/components/landing/` directory
+- [x] Create `src/components/landing/hero-section.tsx`
+- [ ] Create `src/components/landing/social-proof-section.tsx` (placeholder present; needs content + layout)
+- [x] Create `src/components/landing/features-section.tsx`
+- [x] Create `src/components/landing/how-it-works-section.tsx`
+- [x] Create `src/components/landing/benefits-section.tsx`
+- [x] Create `src/components/landing/demo-showcase-section.tsx`
+- [x] Create `src/components/landing/faq-section.tsx`
+- [x] Create `src/components/landing/final-cta-section.tsx`
+- [x] Create `src/components/landing/footer.tsx`
+- [x] Update `src/app/page.tsx` to use landing components
+- [ ] Add all copy content (social proof + supporting stats outstanding)
+- [x] Add placeholder images/icons (lucide iconography + demo transcript)
+- [ ] Test responsive layout (manual QA pending)
+- [ ] Test dark/light mode (manual QA pending)
 
-**Dependencies**: None (can start anytime)
+**Files Created**: 9 landing sections + footer (≈18 KB total)
+**Files Modified**: `src/app/page.tsx`, `src/components/header.tsx` (hydration-safe theme toggle)
 
-**Completion Criteria**:
-- ✅ All sections created
-- ✅ All copy added
-- ✅ Responsive on all screen sizes
-- ✅ Dark/light mode working
-- ✅ Navigation working
-- ✅ Links functional
+**Notes**:
+- All sections follow CogniLeap design tokens and leverage shared `buttonVariants`.
+- Demo showcase currently uses static transcript; replace with interactive embed later.
+- Ensure SocialProof section is wired into the page once content is ready.
 
 ---
 
-### ⏳ PHASE 4: ANIMATIONS & POLISH
-**Status**: 🔴 NOT STARTED
-**Estimated Time**: 2-3 hours
-**Priority**: MEDIUM (After Phase 3)
+### 🟡 PHASE 4: ANIMATIONS & POLISH
+**Status**: 🟡 IN PROGRESS
+**Last Update**: 2025-10-11
+**Priority**: MEDIUM (Finalize after Phase 5.5 QA)
 
-**Tasks Remaining**:
-- [ ] Add hero section animations
-- [ ] Add scroll-triggered animations for features
-- [ ] Add scroll-triggered animations for other sections
-- [ ] Add hover effects on cards
-- [ ] Add hover effects on buttons
-- [ ] Add transition animations
-- [ ] Add gradient animations
+**Progress Summary**:
+- Added dedicated `animation-variants.ts` with 40+ reusable Framer Motion variants.
+- Wired hero, features, how-it-works, benefits, demo, FAQ, and final CTA sections with scroll-triggered + hover animations.
+- Introduced `use-scroll-animation` hook helpers for future sequential reveals and reduced-motion handling.
+
+**Task Checklist**:
+- [x] Add hero section animations
+- [x] Add scroll-triggered animations for features
+- [x] Add scroll-triggered animations for other sections
+- [x] Add hover effects on cards (3D tilt + soft hover states)
+- [ ] Add hover effects on buttons (needs magnetic/glow wiring across CTA buttons)
+- [x] Add transition animations (section fades, timeline reveals)
+- [ ] Add gradient animations (decorative background loops pending)
 - [ ] Test animation performance (60fps)
-- [ ] Test with prefers-reduced-motion
-- [ ] Optimize animation bundle size
-- [ ] Polish spacing and alignment
-- [ ] Polish typography
-- [ ] Add micro-interactions
+- [x] Test with prefers-reduced-motion (hero + CTA respect reduced motion; ensure parity elsewhere)
+- [ ] Optimize animation bundle size (audit tree-shaking + lazy loading)
+- [ ] Polish spacing and alignment (final QA pass pending)
+- [ ] Polish typography (micro-tweaks pending)
+- [ ] Add micro-interactions (button magnetics, cursor parallax)
 
-**Files to Create**: 0-2 files (animation utilities)
-**Files to Modify**: All landing components
+**Files Created**: `src/lib/landing/animation-variants.ts`, `src/hooks/use-scroll-animation.ts`
+**Files Modified**: Landing sections listed in Phase 3 summary
 
-**Dependencies**: Phase 3 (landing structure)
-
-**Completion Criteria**:
-- ✅ All animations smooth and performant
-- ✅ No jank or stuttering
-- ✅ Animations disabled for reduced-motion users
-- ✅ Hover states polished
-- ✅ Transitions smooth
-- ✅ Visual polish complete
+**Notes**:
+- Motion components guard against reduced-motion and use GPU-friendly transforms.
+- Ensure SocialProof section adopts the same animation system once built.
 
 ---
 
@@ -274,7 +273,7 @@ Animations:  ░░░░░░░░░░░░░░░░░░░░░░�
 ---
 
 ### 🚨 PHASE 5.5: CRITICAL SECURITY FIXES
-**Status**: 🔴 IN PROGRESS (BLOCKING PRODUCTION)
+**Status**: 🟡 NEARLY COMPLETE (BLOCKING PRODUCTION until storage RLS applied + QA)
 **Estimated Time**: 2-3 hours
 **Priority**: CRITICAL (Must fix before any production deployment)
 **Date Started**: 2025-10-11
@@ -287,33 +286,36 @@ Animations:  ░░░░░░░░░░░░░░░░░░░░░░�
 5. 🔴 **XSS risk in markdown rendering** (HIGH)
 
 **Tasks Remaining**:
-- [ ] Create centralized logout handler (`src/lib/auth-utils.ts`)
-- [ ] Update sidebar logout to use centralized handler
-- [ ] Add chat-store cleanup on logout
-- [ ] Add study-tools-store cleanup on logout
-- [ ] Add flashcard-store cleanup on logout
-- [ ] Clear localStorage completely on logout
-- [ ] Clear IndexedDB/Dexie on logout
-- [ ] Add storage bucket RLS policies (4 policies)
-- [ ] Fix race condition in useUser hook
-- [ ] Remove duplicate RLS policies (28+ duplicates)
-- [ ] Fix XSS vulnerability in markdown renderer
-- [ ] Add user validation on page load
+- [x] Create centralized logout handler (`src/lib/auth-utils.ts`)
+- [x] Update sidebar logout to use centralized handler
+- [x] Add chat-store cleanup on logout
+- [x] Add study-tools-store cleanup on logout
+- [x] Add flashcard-store cleanup on logout
+- [x] Clear localStorage completely on logout
+- [x] Clear IndexedDB/Dexie on logout
+- [x] Add server-side storage mitigation (per-user prefixes + short‑lived signed URLs)
+- [x] Configure Supabase browser/server clients to enforce PKCE for Google OAuth
+- [x] Resolve landing header hydration mismatch (mounted theme toggle)
+- [ ] Add storage bucket RLS policies (4 policies) — migration CREATED at `supabase/migrations/20251011_storage_documents_rls.sql`, needs APPLY in Supabase
+- [x] Fix race condition in useUser hook
+- [x] Remove duplicate RLS policies (28+ duplicates) — cleaned via migration
+- [x] Fix XSS vulnerability in markdown renderer
+- [x] Add user validation on page load
 - [ ] Test multi-account switching thoroughly
 - [ ] Verify no data leakage between users
 
 **Files to Create**:
-- [ ] `src/lib/auth-utils.ts` (centralized logout)
+- [x] `src/lib/auth-utils.ts` (centralized logout)
 
 **Files to Modify**:
-- [ ] `src/components/sidebar.tsx` (logout handler)
-- [ ] `src/lib/chat-store.ts` (add cleanup export)
-- [ ] `src/lib/study-tools-store.ts` (add cleanup export)
-- [ ] `src/lib/flashcard-store.ts` (add cleanup export)
-- [ ] `src/hooks/use-user.ts` (fix race condition)
-- [ ] `src/components/chat/memoized-markdown.tsx` (XSS fix)
-- [ ] `src/contexts/auth-context.tsx` (add validation)
-- [ ] Supabase Storage policies (SQL)
+- [x] `src/components/sidebar.tsx` (logout handler → centralized)
+- [x] `src/lib/chat-store.ts` (added cleanup export)
+- [ ] `src/lib/study-tools-store.ts` (cleanup available via existing API)
+- [ ] `src/lib/flashcard-store.ts` (cleanup available via existing API)
+- [x] `src/hooks/use-user.ts` (fixed race condition)
+- [x] `src/components/chat/memoized-markdown.tsx` (XSS fix)
+- [x] `src/contexts/auth-context.tsx` (validation + centralized cleanup)
+- [ ] Supabase Storage policies (SQL) — APPLY required
 
 **Dependencies**: Phase 5 complete
 
@@ -401,31 +403,44 @@ See agent reports for full details on all 23 security issues identified.
 - [x] `src/app/auth/update-password/page.tsx` (312 lines)
 - [x] `src/app/auth/callback/route.ts` (58 lines)
 
+### ✅ Created (Landing Page Structure)
+- [x] `src/components/landing/hero-section.tsx`
+- [x] `src/components/landing/features-section.tsx`
+- [x] `src/components/landing/how-it-works-section.tsx`
+- [x] `src/components/landing/benefits-section.tsx`
+- [x] `src/components/landing/demo-showcase-section.tsx`
+- [x] `src/components/landing/faq-section.tsx`
+- [x] `src/components/landing/final-cta-section.tsx`
+- [x] `src/components/landing/footer.tsx`
+- [x] `src/app/page.tsx` (landing composition)
+
+### ✅ Created (Landing Animations)
+- [x] `src/lib/landing/animation-variants.ts`
+- [x] `src/hooks/use-scroll-animation.ts`
+
+### ✅ Created (Security Fixes)
+- [x] `src/lib/auth-utils.ts`
+- [x] `supabase/migrations/20251011_storage_documents_rls.sql` (apply in Supabase)
+- [x] `src/app/api/documents/[id]/signed-url/route.ts`
+
+### ✅ Modified (Security Fixes)
+- [x] `src/components/sidebar.tsx`
+- [x] `src/components/chat/memoized-markdown.tsx`
+- [x] `src/hooks/use-user.ts`
+- [x] `src/contexts/auth-context.tsx`
+- [x] `src/lib/chat-store.ts`
+- [x] `src/app/api/upload/route.ts` (service role + per-user storage path)
+- [x] `src/lib/supabase/client.ts` (PKCE enforcement)
+- [x] `src/lib/supabase/server.ts` (PKCE enforcement)
+- [x] `src/components/header.tsx` (hydration-safe theme toggle)
+
 ### ⏳ To Create (Landing Page)
-- [ ] `src/components/landing/hero-section.tsx`
-- [ ] `src/components/landing/social-proof-section.tsx`
-- [ ] `src/components/landing/features-section.tsx`
-- [ ] `src/components/landing/how-it-works-section.tsx`
-- [ ] `src/components/landing/benefits-section.tsx`
-- [ ] `src/components/landing/demo-showcase-section.tsx`
-- [ ] `src/components/landing/faq-section.tsx`
-- [ ] `src/components/landing/final-cta-section.tsx`
-- [ ] `src/components/landing/footer.tsx`
+- [ ] `src/components/landing/social-proof-section.tsx` (content, metrics, testimonials)
 
 ### ⏳ To Modify
-- [ ] `src/app/layout.tsx` (add AuthProvider)
-- [ ] `src/app/page.tsx` (landing page content)
-- [ ] `src/app/api/upload/route.ts` (user context)
-- [ ] `src/app/api/extract-content/route.ts` (user context)
-- [ ] `src/app/api/study-tools/generate/route.ts` (user context)
-- [ ] `src/app/api/study-tools/fetch/route.ts` (user context)
-- [ ] `src/app/api/study-tools/update/route.ts` (user context)
-- [ ] `src/app/api/study-tools/delete/route.ts` (user context)
-- [ ] `src/app/api/chat/route.ts` (user context)
-- [ ] `src/app/api/chat/document/route.ts` (user context)
-- [ ] `src/app/api/chat/stateful/route.ts` (user context)
-- [ ] `src/app/dashboard/page.tsx` (auth context)
-- [ ] `package.json` (add @supabase/ssr)
+- [ ] `src/components/landing/social-proof-section.tsx` (fill content, hook up animations)
+- [ ] `src/components/landing/*.tsx` (responsive QA fixes if any found)
+- [ ] `src/components/header.tsx` (follow-up audit after reduced-motion enhancements)
 
 ---
 
@@ -437,30 +452,37 @@ See agent reports for full details on all 23 security issues identified.
    - When User A logs out and User B logs in, User B can access User A's data
    - Affects: Chat history, study tools, flashcards, all localStorage data
    - Fix: Implement centralized logout handler that clears all storage
+   - Status: FIXED (centralized logout + full client storage cleanup)
 
 2. **Zustand Stores Don't Clear on Logout** 🔴 CRITICAL
    - chat-store, study-tools-store, flashcard-store persist after logout
    - Data remains in memory and localStorage
    - Fix: Export and call cleanup functions on logout
+   - Status: FIXED (cleanup integrated in auth-utils)
 
 3. **Storage Bucket Has NO RLS Policies** 🔴 CRITICAL
    - Any authenticated user can potentially access other users' PDFs
    - Complete data exposure vulnerability
    - Fix: Add 4 RLS policies to storage.objects table
+   - Status: MITIGATED AT APP LEVEL (per-user storage paths + server-signed URLs); MIGRATION PREPARED (apply `supabase/migrations/20251011_storage_documents_rls.sql`)
 
 4. **Race Condition in Auth State** 🟡 HIGH
    - User state and profile load separately, causing potential data mismatch
    - Fix: Atomic user+profile update in use-user.ts
+   - Status: FIXED (restored stable implementation ensuring reliable profile load)
 
 5. **XSS Vulnerability in Markdown** 🟡 HIGH
    - Raw HTML allowed in markdown rendering (skipHtml={false})
    - Could execute malicious scripts in user browser
    - Fix: Enable skipHtml, add allowedElements whitelist
+   - Status: FIXED (HTML disabled, safe whitelist enforced)
 
 ### Other Issues
 
 - **Duplicate RLS Policies**: 28+ duplicate policies in database (maintenance issue)
 - **Console Logging**: 90+ sensitive data logs (information disclosure)
+- **Social Proof Gap**: Social proof section currently returns `null`; add testimonials + wire into home page
+- **Landing QA Pending**: Responsive + dark/light manual QA not yet executed for new sections
 
 ---
 
@@ -489,27 +511,24 @@ After completing each phase:
 
 ## 🎯 NEXT STEPS
 
-### 🚨 URGENT: Fix Critical Security Issues (Phase 5.5)
+### 🚨 URGENT: Finalize Critical Security Fixes (Phase 5.5)
 **MUST BE COMPLETED BEFORE ANY PRODUCTION DEPLOYMENT**
 
-**Step-by-step**:
-1. Create `src/lib/auth-utils.ts` with centralized logout handler
-2. Update `src/components/sidebar.tsx` to use new logout handler
-3. Export cleanup functions from all Zustand stores
-4. Add storage bucket RLS policies in Supabase
-5. Fix XSS vulnerability in markdown renderer
-6. Fix race condition in useUser hook
-7. Remove duplicate RLS policies from database
-8. Test with 2 user accounts - verify complete data isolation
-9. Verify localStorage clears on logout
-10. Verify IndexedDB clears on logout
-11. Test rapid account switching
-12. Mark Phase 5.5 as complete
+**Step-by-step (updated)**:
+1) Apply Storage RLS migration in Supabase (owner privileges required):
+   - Open Supabase SQL Editor, paste contents of `supabase/migrations/20251011_storage_documents_rls.sql`, run, then verify policies exist on `storage.objects` for bucket `documents`.
+2) Manual QA with two accounts (A and B):
+   - Upload/generate data as A; sign out; sign in as B; confirm no A data visible; confirm localStorage and IndexedDB are cleared on logout; repeat rapid account switches.
+3) When QA passes, mark Phase 5.5 complete here, then finish Phase 3 deliverables (social proof content + responsive/dark-mode QA) before polishing animations.
 
 **Reference**: See agent security audit reports above for full details
 
-### After Security Fixes: Phase 3 (Landing Page)
-Only start after Phase 5.5 is 100% complete and tested
+### After Security Fixes: Phase 3 Wrap-Up
+Pending once Phase 5.5 storage RLS + QA are complete:
+- [ ] Fill `SocialProofSection` with testimonials/metrics and mount it in the home page flow
+- [ ] Run responsive + dark/light regression pass across landing sections
+- [ ] Capture hero/demo assets (screenshots or motion) if needed for final polish
+- [ ] Update copy deck once social proof content is finalized
 
 ### Recommended Implementation Order
 ```
@@ -529,6 +548,22 @@ Phase 2 (Auth Pages) ← Can start Phase 3 in parallel
 ---
 
 ## 🔄 CHANGE LOG
+
+### 2025-10-11 - Landing Page Structure & Animation Pass (In Progress)
+- Shipped full landing section suite (hero, features, how-it-works, benefits, demo, FAQ, final CTA, footer) and composed new home page.
+- Authored reusable animation system (`animation-variants.ts`, `use-scroll-animation.ts`) and wired scroll/hover motion across sections.
+- Resolved landing header hydration mismatch via mounted theme toggle + reduced-motion safeguards.
+- Enforced Supabase PKCE flow by configuring browser/server clients; OAuth buttons now share consistent callback handling.
+- Social proof section scaffolded; testimonials + responsive QA still pending.
+
+### 2025-10-11 - Phase 5.5 Security Fixes Implemented (Pending RLS Apply + QA)
+- Added centralized logout and full client cleanup (`src/lib/auth-utils.ts`)
+- Sidebar wired to centralized logout
+- Chat store cleanup export and integration
+- XSS mitigations in markdown renderer (disallow raw HTML, whitelist safe tags)
+- Fixed auth race conditions in `use-user.ts` and added validation in `auth-context.tsx`
+- Prepared Storage RLS migration (`supabase/migrations/20251011_storage_documents_rls.sql`) — needs apply
+- Cleaned duplicate RLS policies via migration
 
 ### 2025-10-11 - CRITICAL: Comprehensive Security Audit Complete
 - Deployed 3 specialized security agents in parallel:
@@ -633,4 +668,4 @@ Phase 2 (Auth Pages) ← Can start Phase 3 in parallel
 
 **End of Progress Tracker**
 **Last Updated**: 2025-10-11
-**Next Update**: After completing Phase 5.5 (Critical Security Fixes)
+**Next Update**: After applying Storage RLS and completing QA (Phase 5.5)
