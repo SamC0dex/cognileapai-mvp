@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Input } from '@/components/ui'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/client'
 import { useDocuments } from '@/contexts/documents-context'
 import type { Database } from '@/lib/supabase'
 import type { DocumentUploadedDetail } from '@/types/documents'
@@ -33,24 +33,23 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
   const [newDocumentName, setNewDocumentName] = useState('')
 
   // Memoized Supabase client to prevent recreating on every render
-  const supabase = React.useMemo(() => createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  ), [])
+  const supabase = React.useMemo(() => createClient(), [])
 
   // Fetch documents from Supabase
   const fetchDocuments = React.useCallback(async () => {
     setIsLoading(true)
     try {
+      console.log('[DocumentsPanel] Fetching documents...')
       const { data, error } = await supabase
         .from('documents')
         .select('*')
         .order('created_at', { ascending: false })
 
       if (error) {
-        console.error('Failed to fetch documents:', error)
+        console.error('[DocumentsPanel] Failed to fetch documents:', error)
         toast.error('Failed to load documents')
       } else {
+        console.log('[DocumentsPanel] Fetched documents:', data?.length || 0, 'documents')
         setDocuments(data || [])
       }
     } catch (error) {

@@ -10,8 +10,11 @@ export default function SignUpPage() {
   const router = useRouter()
   const supabase = createClient()
 
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
@@ -22,8 +25,21 @@ export default function SignUpPage() {
     setError(null)
     setMessage(null)
 
+    // Validation
+    if (!firstName.trim() || !lastName.trim()) {
+      setError('Please enter your first and last name')
+      setLoading(false)
+      return
+    }
+
     if (password.length < 8) {
       setError('Password must be at least 8 characters')
+      setLoading(false)
+      return
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match')
       setLoading(false)
       return
     }
@@ -33,6 +49,11 @@ export default function SignUpPage() {
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
+        data: {
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          full_name: `${firstName.trim()} ${lastName.trim()}`,
+        },
       },
     })
 
@@ -73,31 +94,32 @@ export default function SignUpPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md space-y-8">
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">Create Account</h1>
-          <p className="text-sm text-muted-foreground">
-            Start your learning journey
-          </p>
-        </div>
-
-        {/* Error Message */}
-        {error && (
-          <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-            {error}
+      <div className="w-full max-w-md">
+        <div className="bg-card border border-border rounded-xl shadow-xl p-8 space-y-6">
+          {/* Header */}
+          <div className="text-center space-y-2">
+            <h1 className="text-3xl font-bold tracking-tight">Create Account</h1>
+            <p className="text-sm text-muted-foreground">
+              Start your learning journey
+            </p>
           </div>
-        )}
 
-        {/* Success Message */}
-        {message && (
-          <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 text-primary text-sm">
-            {message}
-          </div>
-        )}
+          {/* Error Message */}
+          {error && (
+            <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+              {error}
+            </div>
+          )}
 
-        {/* Sign Up Form */}
-        <div className="space-y-4">
+          {/* Success Message */}
+          {message && (
+            <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 text-primary text-sm">
+              {message}
+            </div>
+          )}
+
+          {/* Sign Up Form */}
+          <div className="space-y-4">
           {/* Google OAuth Button */}
           <button
             onClick={handleGoogleSignUp}
@@ -137,6 +159,40 @@ export default function SignUpPage() {
 
           {/* Email/Password Form */}
           <form onSubmit={handleEmailSignUp} className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label htmlFor="firstName" className="text-sm font-medium">
+                  First Name
+                </label>
+                <input
+                  id="firstName"
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                  placeholder="John"
+                  disabled={loading}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="lastName" className="text-sm font-medium">
+                  Last Name
+                </label>
+                <input
+                  id="lastName"
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                  placeholder="Doe"
+                  disabled={loading}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium">
                 Email
@@ -171,6 +227,23 @@ export default function SignUpPage() {
               <p className="text-xs text-muted-foreground">At least 8 characters</p>
             </div>
 
+            <div className="space-y-2">
+              <label htmlFor="confirmPassword" className="text-sm font-medium">
+                Confirm Password
+              </label>
+              <input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                minLength={8}
+                placeholder="••••••••"
+                disabled={loading}
+                className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
+              />
+            </div>
+
             <button
               type="submit"
               disabled={loading}
@@ -194,6 +267,7 @@ export default function SignUpPage() {
               Sign in
             </Link>
           </p>
+        </div>
         </div>
       </div>
     </div>

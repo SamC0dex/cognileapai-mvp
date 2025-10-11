@@ -688,24 +688,29 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
     try {
       console.log('[StudyToolsStore] Loading study tools from database:', { documentId, conversationId })
 
-      if (!documentId && !conversationId) {
-        console.warn('[StudyToolsStore] No documentId or conversationId provided for database loading')
-        return
-      }
-
+      // Allow loading all user's study tools when no specific context is provided
+      // This is used by dashboard to show all user's content
       const response = await fetch('/api/study-tools/fetch', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          documentId,
-          conversationId,
+          documentId: documentId || undefined,
+          conversationId: conversationId || undefined,
         }),
       })
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch study tools: ${response.status}`)
+        // Gracefully handle 404 - user might not have any study tools yet
+        if (response.status === 404) {
+          console.log('[StudyToolsStore] No study tools found (404) - user may not have any content yet')
+          return
+        }
+
+        // Log other errors but don't throw to avoid breaking the UI
+        console.warn(`[StudyToolsStore] Failed to fetch study tools: ${response.status}`)
+        return
       }
 
       const result = await response.json()

@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   ChevronLeft,
   ChevronRight,
@@ -12,7 +12,8 @@ import {
   User,
   Sun,
   Moon,
-  Palette
+  Palette,
+  LogOut
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { cn } from '@/lib/utils'
@@ -30,6 +31,8 @@ import {
 import { ClientOnly } from '@/components/client-only'
 import { Logo } from './logo'
 import { ChatDuotoneIcon } from '@/components/icons/chat-duotone'
+import { useUser } from '@/hooks/use-user'
+import { createClient } from '@/lib/supabase/client'
 
 interface SidebarProps {
   isCollapsed?: boolean
@@ -40,13 +43,30 @@ interface SidebarProps {
 
 export function Sidebar({ isCollapsed = false, onCollapsedChange, isDocumentsPanelOpen = false, onDocumentsPanelToggle }: SidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const { theme, setTheme } = useTheme()
+  const { user, profile, loading } = useUser()
+  const [signingOut, setSigningOut] = React.useState(false)
 
   const handleToggle = () => {
     const newState = !isCollapsed
     onCollapsedChange?.(newState)
   }
-  
+
+  const handleSignOut = async () => {
+    try {
+      setSigningOut(true)
+      const supabase = createClient()
+      await supabase.auth.signOut()
+      router.push('/auth/sign-in')
+      router.refresh()
+    } catch (error) {
+      console.error('Sign out error:', error)
+    } finally {
+      setSigningOut(false)
+    }
+  }
+
   const toggleTheme = () => {
     const root = document.documentElement
     const next = theme === 'dark' ? 'light' : 'dark'
@@ -298,21 +318,42 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange, isDocumentsPan
 
       {/* User Profile */}
       <div className="p-4 border-t border-sidebar-border">
-        {!isCollapsed ? (
+        {loading ? (
+          // Loading skeleton
+          <div className="animate-pulse">
+            {!isCollapsed ? (
+              <div className="flex items-center gap-3 p-3">
+                <div className="h-8 w-8 rounded-full bg-sidebar-accent" />
+                <div className="flex-1">
+                  <div className="h-4 w-20 bg-sidebar-accent rounded mb-1" />
+                  <div className="h-3 w-32 bg-sidebar-accent rounded" />
+                </div>
+              </div>
+            ) : (
+              <div className="flex justify-center">
+                <div className="h-10 w-10 rounded-full bg-sidebar-accent" />
+              </div>
+            )}
+          </div>
+        ) : !isCollapsed ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 className="w-full justify-start h-auto p-3 hover:bg-sidebar-accent"
               >
                 <Avatar className="h-8 w-8 mr-3">
                   <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-medium">
-                    S
+                    {profile?.full_name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
                   </AvatarFallback>
                 </Avatar>
                 <div className="text-left flex-1">
-                  <div className="text-sm font-medium text-sidebar-foreground">Swami</div>
-                  <div className="text-xs text-sidebar-foreground/60">swami@example.com</div>
+                  <div className="text-sm font-medium text-sidebar-foreground truncate">
+                    {profile?.full_name || user?.email?.split('@')[0] || 'User'}
+                  </div>
+                  <div className="text-xs text-sidebar-foreground/60 truncate">
+                    {user?.email || 'No email'}
+                  </div>
                 </div>
                 <MoreHorizontal className="h-4 w-4 text-sidebar-foreground/60" />
               </Button>
@@ -323,8 +364,13 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange, isDocumentsPan
                 Profile Settings
               </DropdownMenuItem>
               <Separator />
-              <DropdownMenuItem className="text-red-600">
-                Sign Out
+              <DropdownMenuItem
+                className="text-red-600"
+                onClick={handleSignOut}
+                disabled={signingOut}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                {signingOut ? 'Signing out...' : 'Sign Out'}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -332,7 +378,7 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange, isDocumentsPan
           <div className="flex justify-center">
             <Avatar className="h-10 w-10">
               <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-medium">
-                S
+                {profile?.full_name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
               </AvatarFallback>
             </Avatar>
           </div>

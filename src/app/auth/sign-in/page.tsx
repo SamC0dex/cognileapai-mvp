@@ -87,24 +87,25 @@ function SignInForm() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md space-y-8">
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">Welcome Back</h1>
-          <p className="text-sm text-muted-foreground">
-            Sign in to continue your learning journey
-          </p>
-        </div>
-
-        {/* Error Message */}
-        {error && (
-          <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-            {error}
+      <div className="w-full max-w-md">
+        <div className="bg-card border border-border rounded-xl shadow-xl p-8 space-y-6">
+          {/* Header */}
+          <div className="text-center space-y-2">
+            <h1 className="text-3xl font-bold tracking-tight">Welcome Back</h1>
+            <p className="text-sm text-muted-foreground">
+              Sign in to continue your learning journey
+            </p>
           </div>
-        )}
 
-        {/* Sign In Form */}
-        <div className="space-y-4">
+          {/* Error Message */}
+          {error && (
+            <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+              {error}
+            </div>
+          )}
+
+          {/* Sign In Form */}
+          <div className="space-y-4">
           {/* Google OAuth Button */}
           <button
             onClick={handleGoogleSignIn}
@@ -207,6 +208,7 @@ function SignInForm() {
               Sign up
             </Link>
           </p>
+        </div>
         </div>
       </div>
     </div>

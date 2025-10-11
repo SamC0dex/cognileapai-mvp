@@ -1,6 +1,6 @@
 "use client"
 
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/client'
 
 export type ChatThread = {
   id: string
@@ -15,11 +15,8 @@ export type ChatThread = {
 
 const STORAGE_KEY = "cognileap:threads"
 
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+// Initialize Supabase client using proper browser client
+const getSupabaseClient = () => createClient()
 
 function loadFromLocalStorage(): ChatThread[] {
   try {
@@ -42,6 +39,8 @@ function saveToLocalStorage(threads: ChatThread[]) {
 
 async function loadFromDatabase(): Promise<ChatThread[]> {
   try {
+    const supabase = getSupabaseClient()
+
     // First get conversations
     const { data: conversations, error: convError } = await supabase
       .from('conversations')
@@ -157,6 +156,8 @@ export function touchThread(id: string, updates: Partial<ChatThread>) {
 
 export async function deleteThread(id: string) {
   try {
+    const supabase = getSupabaseClient()
+
     // Try to delete from database first
     const { error } = await supabase
       .from('conversations')
@@ -178,6 +179,8 @@ export async function deleteThread(id: string) {
 
 export async function renameThread(id: string, newTitle: string) {
   try {
+    const supabase = getSupabaseClient()
+
     // Update in database first
     const { error } = await supabase
       .from('conversations')
@@ -210,6 +213,8 @@ export async function renameThread(id: string, newTitle: string) {
 
 export async function toggleStarThread(id: string) {
   try {
+    const supabase = getSupabaseClient()
+
     // Get current starred state from database
     const { data: conversation, error: fetchError } = await supabase
       .from('conversations')

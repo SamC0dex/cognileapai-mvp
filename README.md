@@ -6,12 +6,21 @@ A comprehensive web application designed for students, researchers, and professi
 
 ## 🚀 Key Features
 
+### User Authentication & Management
+- **Secure Authentication** - Complete Supabase Auth integration with email/password and Google OAuth
+- **Multi-Tenant Architecture** - Row Level Security (RLS) with 26+ policies for data isolation
+- **Session Management** - Persistent user sessions with automatic refresh and route protection
+- **User Profiles** - Automatic profile creation and management
+- **Password Reset** - Complete password recovery flow with secure email links
+- **Protected Routes** - Middleware-based authentication for secure access control
+
 ### Document Intelligence
 - **Advanced PDF Processing** - Intelligent extraction from text-based PDFs with structure detection
 - **Smart Outline Recognition** - Automatically identifies document hierarchy and section organization
 - **Enterprise RAG System** - Production-ready retrieval augmented generation with hybrid search
 - **Free Semantic Search** - Cost-effective semantic search using Transformers.js (no API dependencies)
 - **Context-Aware Responses** - Document-specific interactions with relevant section citations
+- **User Isolation** - Each user's documents are completely isolated with RLS policies
 
 ### AI-Powered Study Materials
 - **Structured Study Guides** - Multi-level learning paths: Foundation → Connections → Applications → Mastery
@@ -22,8 +31,10 @@ A comprehensive web application designed for students, researchers, and professi
 
 ### Advanced Chat System
 - **Document-Contextual Chat** - Intelligent conversations grounded in document content
+- **Stateful Sessions** - Database-persistent chat sessions with conversation memory that survives server restarts
 - **Real-Time Streaming** - Server-sent events with smooth, character-by-character response rendering
-- **Conversation Persistence** - Automatic storage with both database and local caching
+- **Conversation Persistence** - Automatic storage with both database and local caching (Dexie/IndexedDB)
+- **Session Management** - In-memory caching with automatic database persistence and session restoration
 - **Optimistic UI Updates** - Immediate feedback with graceful error handling
 - **Keyboard Shortcuts** - Productivity-focused shortcuts (Enter to send, Shift+Enter for newline, Cmd/Ctrl+K to focus)
 
@@ -44,8 +55,10 @@ A comprehensive web application designed for students, researchers, and professi
 
 ### Backend & Database
 - **Next.js API Routes** - RESTful endpoints with Server-Sent Events for streaming
-- **Supabase PostgreSQL** - Production database with Row Level Security
+- **Supabase PostgreSQL** - Production database with Row Level Security (26+ RLS policies)
+- **Supabase Auth** - Complete authentication with email/password and Google OAuth
 - **Supabase Storage** - Secure file storage with private access and signed URLs
+- **@supabase/ssr** - Server-side rendering support with session management
 - **Dexie (IndexedDB)** - Client-side storage for offline capabilities and caching
 
 ### AI & Machine Learning
@@ -109,10 +122,20 @@ A comprehensive web application designed for students, researchers, and professi
 4. **Database Setup**
    - Create a new Supabase project
    - Run the provided migration scripts in `supabase/migrations/`
-   - Configure Row Level Security policies
-   - Set up storage bucket for PDF files
+   - Configure Row Level Security policies (26+ policies for data isolation)
+   - Set up storage bucket for PDF files (private access)
+   
+5. **Authentication Configuration**
+   - Navigate to Authentication > Providers in Supabase Dashboard
+   - Enable Email provider with confirmation emails (optional)
+   - For Google OAuth:
+     - Enable Google provider
+     - Create OAuth credentials in Google Cloud Console
+     - Add authorized redirect URIs: `https://your-project-ref.supabase.co/auth/v1/callback`
+     - Copy Client ID and Client Secret to Supabase
+   - Configure email templates for password reset and confirmation
 
-5. **Start Development Server**
+6. **Start Development Server**
    ```bash
    # Standard development server
    pnpm dev
@@ -121,8 +144,11 @@ A comprehensive web application designed for students, researchers, and professi
    pnpm dev:turbo
    ```
 
-6. **Access the Application**
-   Open [http://localhost:3000](http://localhost:3000) in your browser
+7. **Access the Application**
+   - Open [http://localhost:3000](http://localhost:3000) in your browser
+   - Create your account at `/auth/sign-up`
+   - Sign in at `/auth/sign-in` (or use Google OAuth)
+   - Access the dashboard at `/dashboard` after authentication
 
 ## 📋 Development Commands
 
@@ -142,6 +168,14 @@ pnpm typecheck         # Run TypeScript type checking
 ## 🏗️ Architecture Overview
 
 ### Core Systems Architecture
+
+#### Authentication & Authorization
+- **Multi-Tenant Architecture** - Complete user isolation with Row Level Security
+- **Session Management** - Browser and server-side authentication with automatic refresh
+- **Route Protection** - Middleware-based authentication for protected routes
+- **OAuth Integration** - Google OAuth with PKCE flow for secure third-party authentication
+- **Profile Management** - Automatic user profile creation with trigger-based setup
+- **RLS Policies** - 26+ database policies ensuring users only access their own data
 
 #### Chat System
 - **Centralized State** - Zustand store managing all chat operations and state
@@ -202,6 +236,12 @@ src/
 │   │   ├── upload/         # Document upload processing
 │   │   ├── extract-content/# Content extraction pipeline
 │   │   └── study-tools/    # Study materials generation
+│   ├── auth/               # Authentication pages
+│   │   ├── sign-up/        # User registration page
+│   │   ├── sign-in/        # User login page
+│   │   ├── forgot-password/# Password reset request
+│   │   ├── update-password/# Password reset completion
+│   │   └── callback/       # OAuth callback handler
 │   ├── dashboard/          # Main application interface
 │   └── chat/[id]/         # Individual conversation pages
 │
@@ -223,18 +263,38 @@ src/
 │   ├── smart-context.ts   # RAG system with semantic search
 │   ├── embeddings.ts      # Free semantic embedding generation
 │   ├── genai-client.ts    # Google Gemini AI client configuration
-│   └── supabase.ts        # Database client configuration
+│   └── supabase/          # Supabase client configurations
+│       ├── client.ts      # Browser-side Supabase client
+│       ├── server.ts      # Server-side Supabase client
+│       └── middleware.ts  # Session management & route protection
 │
 ├── contexts/               # React contexts
+│   ├── auth-context.tsx   # Authentication state provider
+│   └── documents-context.tsx # Document management state
+│
+├── hooks/                  # Custom React hooks
+│   └── use-user.ts        # User session management hook
+│
+├── middleware.ts           # Next.js route protection middleware
 └── types/                  # TypeScript type definitions
 ```
 
 ## 🔒 Security & Privacy
 
+### Authentication Security
+- **Supabase Auth** - Enterprise-grade authentication with email/password and Google OAuth
+- **Password Security** - Bcrypt hashing with secure password policies (8+ characters)
+- **Session Management** - HTTP-only cookies with automatic token refresh
+- **OAuth Security** - PKCE flow for secure third-party authentication
+- **Route Protection** - Middleware-based authentication for all protected routes
+- **Password Reset** - Secure email-based password recovery with expiring links
+
 ### Data Protection
+- **Multi-Tenant Isolation** - 26+ Row Level Security policies for complete data isolation
 - **Private Storage** - All documents stored in private Supabase storage buckets
 - **Access Control** - Time-limited signed URLs for secure file access
-- **User Isolation** - Row Level Security ensures users only access their own data
+- **User Isolation** - RLS ensures users only access their own data across all tables
+- **Cascade Policies** - Related tables (sections, messages) inherit parent access controls
 - **No Data Logging** - User content never logged or stored in telemetry
 
 ### API Security
@@ -242,6 +302,7 @@ src/
 - **Input Validation** - Comprehensive sanitization and validation on all endpoints
 - **Rate Limiting** - Built-in protection against API abuse
 - **HTTPS Enforcement** - Secure transmission of all data
+- **CSRF Protection** - OAuth state parameter and session token validation
 
 ### Compliance
 - **GDPR Ready** - User data control and deletion capabilities

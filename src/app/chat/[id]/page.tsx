@@ -76,6 +76,11 @@ export default function ChatPage({ params }: ChatPageProps) {
         const chatId = resolvedParams.id
 
         if (chatId && chatId !== 'new') {
+          console.log('[Chat] Initializing chat with ID:', chatId)
+
+          // Reset initialization flag when loading a new thread
+          setIsInitialized(false)
+
           // Load existing conversation
           setConversationId(chatId)
           setChatInstanceKey(chatId)
@@ -190,8 +195,22 @@ export default function ChatPage({ params }: ChatPageProps) {
   }, [router])
 
   const handleSelectThread = useCallback((t: ChatThread) => {
-    // Navigate directly to the selected thread
-    router.push(`/chat/${t.id}`)
+    // Build URL with query parameters from thread data
+    const params = new URLSearchParams()
+
+    if (t.documentId) {
+      params.set('type', 'document')
+      params.set('documentId', t.documentId)
+    }
+
+    if (t.title) {
+      params.set('title', t.title)
+    }
+
+    const url = params.toString() ? `/chat/${t.id}?${params.toString()}` : `/chat/${t.id}`
+
+    console.log('[Chat] Navigating to thread:', t.id, 'with params:', params.toString())
+    router.push(url)
   }, [router])
 
   const handleCurrentChatDeleted = useCallback(() => {

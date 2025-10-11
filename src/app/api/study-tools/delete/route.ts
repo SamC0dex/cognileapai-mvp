@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 
-// Initialize Supabase client with service role key for server-side operations
-const supabase = createClient(
+// Service role client for background operations only
+const serviceSupabase = createServiceClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
@@ -13,6 +14,19 @@ interface StudyToolDeleteRequest {
 
 export async function POST(req: NextRequest) {
   try {
+    // Authenticate user first
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please sign in to delete study tools' },
+        { status: 401 }
+      )
+    }
+
+    console.log('[StudyTools] Delete request from user:', user.id)
+
     const { id }: StudyToolDeleteRequest = await req.json()
 
     console.log('[StudyTools] Delete request:', { id })
@@ -33,11 +47,11 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // First, verify the record exists before attempting deletion
-    console.log('[StudyTools] Verifying record exists with ID:', id)
+    // First, verify the record exists and user owns it through document ownership
+    console.log('[StudyTools] Verifying record exists and user owns it with ID:', id)
     const { data: existingRecord, error: fetchError } = await supabase
       .from('outputs')
-      .select('id, payload')
+      .select('id, payload, document_id')
       .eq('id', id)
       .single()
 
@@ -52,16 +66,31 @@ export async function POST(req: NextRequest) {
     }
 
     if (!existingRecord) {
-      console.log('[StudyTools] Record not found, treating as already deleted')
+      console.log('[StudyTools] Record not found or access denied')
       return NextResponse.json({
-        success: true,
-        message: 'Study tool already deleted or does not exist'
-      })
+        error: 'Study tool not found or access denied'
+      }, { status: 404 })
     }
 
-    // Delete the record from the database
+    // Verify user owns the document this output belongs to
+    if (existingRecord.document_id) {
+      const { data: document } = await supabase
+        .from('documents')
+        .select('id')
+        .eq('id', existingRecord.document_id)
+        .eq('user_id', user.id)
+        .single()
+
+      if (!document) {
+        return NextResponse.json({
+          error: 'Access denied - You do not own this study tool'
+        }, { status: 403 })
+      }
+    }
+
+    // Delete the record from the database (use service role since we've verified ownership)
     console.log('[StudyTools] Deleting record with ID:', id)
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await serviceSupabase
       .from('outputs')
       .delete()
       .eq('id', id)

@@ -10,7 +10,7 @@ import { useChat } from '@/lib/use-chat'
 import { getSuggestedQuestions } from '@/lib/chat-store'
 import type { GeminiModelKey } from '@/lib/ai-config'
 import type { Citation } from './types'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/client'
 import { useDocuments } from '@/contexts/documents-context'
 import { useStudyToolsStore } from '@/components/study-tools'
 import { LazyStudyToolsPanel } from '@/components/study-tools/lazy-study-tools-panel'
@@ -78,10 +78,7 @@ const layoutVariants = {
 const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 // Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+const supabase = createClient()
 
 export const ChatContainer: React.FC<{
   documentId?: string

@@ -1,11 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-// Initialize Supabase client with service role key for server-side operations
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { createClient } from '@/lib/supabase/server'
 
 interface StudyToolsFetchRequest {
   documentId?: string
@@ -14,22 +8,42 @@ interface StudyToolsFetchRequest {
 
 export async function POST(req: NextRequest) {
   try {
+    // Authenticate user first
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please sign in to fetch study tools' },
+        { status: 401 }
+      )
+    }
+
+    console.log('[StudyTools] Fetch request from user:', user.id)
+
     const { documentId, conversationId }: StudyToolsFetchRequest = await req.json()
 
     console.log('[StudyTools] Fetch request:', { documentId, conversationId })
 
-    // Validate request - need at least one identifier
-    if (!documentId && !conversationId) {
-      return NextResponse.json(
-        { error: 'Either documentId or conversationId is required' },
-        { status: 400 }
-      )
-    }
-
     let outputs = []
 
     if (documentId) {
-      // Fetch study tools for specific document
+      // Fetch study tools for specific document (RLS will filter by user)
+      // Also verify user owns the document explicitly
+      const { data: document } = await supabase
+        .from('documents')
+        .select('id')
+        .eq('id', documentId)
+        .eq('user_id', user.id)
+        .single()
+
+      if (!document) {
+        return NextResponse.json(
+          { error: 'Document not found or access denied' },
+          { status: 404 }
+        )
+      }
+
       const { data, error } = await supabase
         .from('outputs')
         .select('*')
@@ -47,50 +61,80 @@ export async function POST(req: NextRequest) {
 
       outputs = data || []
     } else if (conversationId) {
-      // For conversation-based fetch, we need to find outputs that match the conversation
-      // This is more complex as we need to match the conversationId in the payload
-      const { data, error } = await supabase
-        .from('outputs')
-        .select('*')
-        .eq('overall', true)
-        .order('created_at', { ascending: false })
+      // Verify user owns the conversation first
+      const { data: conversation } = await supabase
+        .from('conversations')
+        .select('id, document_id')
+        .eq('id', conversationId)
+        .eq('user_id', user.id)
+        .single()
 
-      if (error) {
-        console.error('[StudyTools] Database fetch error:', error)
+      if (!conversation) {
         return NextResponse.json(
-          { error: 'Failed to fetch study tools from database' },
-          { status: 500 }
+          { error: 'Conversation not found or access denied' },
+          { status: 404 }
         )
       }
 
-      // Filter by conversationId in payload
-      outputs = (data || []).filter(output =>
-        output.payload?.conversationId === conversationId
-      )
+      // For conversation-based fetch, get outputs from the associated document if it exists
+      if (conversation.document_id) {
+        const { data, error } = await supabase
+          .from('outputs')
+          .select('*')
+          .eq('document_id', conversation.document_id)
+          .eq('overall', true)
+          .order('created_at', { ascending: false })
+
+        if (error) {
+          console.error('[StudyTools] Database fetch error:', error)
+          return NextResponse.json(
+            { error: 'Failed to fetch study tools from database' },
+            { status: 500 }
+          )
+        }
+
+        // Filter by conversationId in payload if needed
+        outputs = (data || []).filter(output =>
+          output.payload?.conversationId === conversationId ||
+          output.payload?.documentId === conversation.document_id
+        )
+      }
     }
 
-    // If no specific outputs found and no documentId/conversationId provided,
-    // or if specific search returned no results, fetch recent study tools as fallback
-    if (outputs.length === 0) {
-      console.log('[StudyTools] No context-specific study tools found, fetching recent ones as fallback')
+    // If no documentId or conversationId provided, or no outputs found,
+    // fetch all study tools from user's documents (dashboard view)
+    if (outputs.length === 0 || (!documentId && !conversationId)) {
+      console.log('[StudyTools] Fetching all study tools for user\'s dashboard view')
 
-      const { data, error } = await supabase
-        .from('outputs')
-        .select('*')
-        .eq('overall', true)
-        .order('created_at', { ascending: false })
-        .limit(10) // Limit to 10 most recent study tools
+      // Get user's document IDs first
+      const { data: userDocs } = await supabase
+        .from('documents')
+        .select('id')
+        .eq('user_id', user.id)
 
-      if (error) {
-        console.error('[StudyTools] Database fallback fetch error:', error)
-        return NextResponse.json(
-          { error: 'Failed to fetch study tools from database' },
-          { status: 500 }
-        )
+      const userDocIds = (userDocs || []).map(d => d.id)
+
+      if (userDocIds.length > 0) {
+        const { data, error } = await supabase
+          .from('outputs')
+          .select('*')
+          .in('document_id', userDocIds)
+          .eq('overall', true)
+          .order('created_at', { ascending: false })
+
+        if (error) {
+          console.error('[StudyTools] Database fetch error:', error)
+          return NextResponse.json(
+            { error: 'Failed to fetch study tools from database' },
+            { status: 500 }
+          )
+        }
+
+        outputs = data || []
+        console.log('[StudyTools] Loaded', outputs.length, 'study tools for user dashboard')
+      } else {
+        console.log('[StudyTools] User has no documents yet')
       }
-
-      outputs = data || []
-      console.log('[StudyTools] Using fallback - loaded', outputs.length, 'recent study tools')
     }
 
     // Transform database outputs to frontend format

@@ -33,6 +33,7 @@ import {
 import { useStudyToolsStore, STUDY_TOOLS, type StudyToolContent } from '@/lib/study-tools-store'
 import { useFlashcardStore } from '@/lib/flashcard-store'
 import { FlashcardsStackIcon } from '@/components/icons/flashcards-stack-icon'
+import { useAuth } from '@/contexts/auth-context'
 
 interface DashboardTabsProps {
   onViewModeChange?: (mode: 'grid' | 'list') => void
@@ -218,24 +219,43 @@ export function DashboardTabs({
   const [isSearchExpanded, setIsSearchExpanded] = useState(false)
   const [isInitialLoading, setIsInitialLoading] = useState(true)
   const router = useRouter()
+  const { user } = useAuth()
 
-  // Get study tools data
-  const { generatedContent, loadStudyToolsFromDatabase, openCanvas, expandPanel } = useStudyToolsStore()
-  const { flashcardSets, openViewer } = useFlashcardStore()
+  // Get study tools data and clear functions
+  const { generatedContent, loadStudyToolsFromDatabase, openCanvas, expandPanel, clearGeneratedContent } = useStudyToolsStore()
+  const { flashcardSets, openViewer, clearFlashcardSets } = useFlashcardStore()
 
-  // Load study tools on mount
+  // Clear stores and reload data when user changes (handles account switching)
   useEffect(() => {
-    const loadData = async () => {
+    const loadDataForUser = async () => {
+      if (!user) {
+        console.log('[Dashboard] No user, clearing all data')
+        clearGeneratedContent()
+        clearFlashcardSets()
+        setIsInitialLoading(false)
+        return
+      }
+
+      console.log('[Dashboard] Loading data for user:', user.id)
+      setIsInitialLoading(true)
+
+      // Clear old data first to prevent showing wrong user's data
+      clearGeneratedContent()
+      clearFlashcardSets()
+
       try {
+        // Load fresh data from database for current user
         await loadStudyToolsFromDatabase()
       } catch (error) {
-        console.error('Failed to load study tools:', error)
+        console.error('[Dashboard] Failed to load study tools:', error)
       } finally {
         setIsInitialLoading(false)
       }
     }
-    loadData()
-  }, [loadStudyToolsFromDatabase])
+
+    loadDataForUser()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]) // Only depend on user ID to trigger reload on account switch
 
   // Filter data based on active tab
   const getFilteredData = () => {

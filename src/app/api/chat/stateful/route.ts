@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { createClient as createAuthClient } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
 import { buildContextPrompt } from '@/lib/smart-context'
 import { isEmbeddingsReady } from '@/lib/embeddings'
@@ -13,8 +14,8 @@ import {
 import type { GeminiModelKey } from '@/lib/ai-config'
 import { GeminiModelSelector } from '@/lib/ai-config'
 
-// Initialize Supabase client
-const supabase = createClient(
+// Service role client for background operations only
+const serviceSupabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
@@ -43,6 +44,19 @@ interface StatefulChatRequest {
 
 export async function POST(req: NextRequest) {
   try {
+    // Authenticate user first
+    const supabase = await createAuthClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - Please sign in' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log('[StatefulChat] Authenticated user:', user.id)
+
     // Validate configuration
     const validation = validateGeminiConfig()
     if (!validation.isValid) {
@@ -115,11 +129,12 @@ export async function POST(req: NextRequest) {
 
         if (documentsToProcess.length > 0) {
           try {
-            // Fetch document content
+            // Fetch document content (filtered by user_id through RLS)
             const { data: documents, error: docError } = await supabase
               .from('documents')
               .select('id, title, page_count, processing_status, document_content')
               .in('id', documentsToProcess.map(d => d.id))
+              .eq('user_id', user.id) // Explicit user filter for security
 
             if (!docError && documents && documents.length > 0) {
               console.log(`[StatefulChat] Found ${documents.length} documents`)
@@ -251,6 +266,7 @@ export async function POST(req: NextRequest) {
                 try {
                   await saveMessageToDatabase({
                     conversationId,
+                    userId: user.id,
                     role: 'user',
                     content: lastMessage.content,
                     metadata: {
@@ -264,6 +280,7 @@ export async function POST(req: NextRequest) {
 
                   await saveMessageToDatabase({
                     conversationId,
+                    userId: user.id,
                     role: 'assistant',
                     content: fullResponse,
                     metadata: {
@@ -383,11 +400,13 @@ Guidelines:
 
 async function saveMessageToDatabase({
   conversationId,
+  userId,
   role,
   content,
   metadata
 }: {
   conversationId: string
+  userId: string
   role: 'user' | 'assistant'
   content: string
   metadata?: Record<string, unknown>
@@ -399,19 +418,20 @@ async function saveMessageToDatabase({
       return
     }
 
-    // Check if conversation exists, create if not
-    const { error: convCheckError } = await supabase
+    // Check if conversation exists, create if not (using service role to bypass RLS for insert)
+    const { error: convCheckError } = await serviceSupabase
       .from('conversations')
-      .select('id')
+      .select('id, user_id')
       .eq('id', conversationId)
       .single()
 
     if (convCheckError && convCheckError.code === 'PGRST116') {
       console.log('[StatefulChat] Creating missing conversation:', conversationId)
-      const { error: createError } = await supabase
+      const { error: createError } = await serviceSupabase
         .from('conversations')
         .insert({
           id: conversationId,
+          user_id: userId, // Critical: Associate with user
           document_id: null,
           title: content.slice(0, 50) + (content.length > 50 ? '...' : '')
         })
@@ -422,15 +442,16 @@ async function saveMessageToDatabase({
       }
     }
 
-    // Get current message count for sequence number
-    const { count } = await supabase
+    // Get current message count for sequence number (using service role for background operation)
+    const { count } = await serviceSupabase
       .from('messages')
       .select('*', { count: 'exact', head: true })
       .eq('conversation_id', conversationId)
 
     const sequenceNumber = (count || 0) + 1
 
-    const { error } = await supabase
+    // Save message (using service role for background operation)
+    const { error } = await serviceSupabase
       .from('messages')
       .insert({
         conversation_id: conversationId,

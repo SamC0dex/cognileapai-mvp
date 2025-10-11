@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenAI } from '@google/genai'
+import { createClient as createAuthClient } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
 import { getStudyToolPrompt, generateStudyToolTitle, type StudyToolPromptType } from '@/lib/study-tools-prompts'
 import { classifyError, addRetryAttempt } from '@/lib/retry-manager'
 
-// Initialize Supabase client with service role key for server-side operations
-const supabase = createClient(
+// Service role client for background operations only (bypasses RLS)
+const serviceSupabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
@@ -298,6 +299,19 @@ export async function POST(req: NextRequest) {
   let flashcardOptions: StudyToolGenerateRequest['flashcardOptions']
 
   try {
+    // Authenticate user first
+    const supabase = await createAuthClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please sign in to generate study tools' },
+        { status: 401 }
+      )
+    }
+
+    console.log('[StudyTools] Authenticated user:', user.id)
+
     const requestData: StudyToolGenerateRequest = await req.json()
     type = requestData.type
     documentId = requestData.documentId
@@ -342,11 +356,12 @@ export async function POST(req: NextRequest) {
     if (documentId) {
       console.log('[StudyTools] Fetching document:', documentId)
 
-      // Fetch document and its content
+      // Fetch document and its content (filtered by user_id through RLS)
       const { data: document, error: docError } = await supabase
         .from('documents')
         .select('id, title, processing_status, document_content')
         .eq('id', documentId)
+        .eq('user_id', user.id) // Explicit user filter for security
         .single()
 
       console.log('[StudyTools] Document query result:', { document, docError })
@@ -382,11 +397,12 @@ export async function POST(req: NextRequest) {
       console.log('[StudyTools] Using document content length:', documentContent.length)
 
     } else if (conversationId) {
-      // Fetch conversation messages
+      // Fetch conversation messages (filtered by user_id through RLS)
       const { data: conversation, error: convError } = await supabase
         .from('conversations')
         .select('id, title, document_id')
         .eq('id', conversationId)
+        .eq('user_id', user.id) // Explicit user filter for security
         .single()
 
       if (convError || !conversation) {
@@ -428,6 +444,7 @@ export async function POST(req: NextRequest) {
           .from('documents')
           .select('document_content')
           .eq('id', conversation.document_id)
+          .eq('user_id', user.id) // Explicit user filter for security
           .single()
 
         if (docData && docData.document_content) {
@@ -581,7 +598,8 @@ export async function POST(req: NextRequest) {
       }
 
       if (saveDocumentId) {
-        const { data: output, error: saveError } = await supabase
+        // Use service role for insert since we've already verified user owns the document
+        const { data: output, error: saveError } = await serviceSupabase
           .from('outputs')
           .insert(insertData)
           .select('id')

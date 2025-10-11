@@ -129,7 +129,7 @@ export default function DashboardPage() {
         )}
 
         {/* Header */}
-        <DashboardHeader userName="Swami" />
+        <DashboardHeader />
         
         {/* Action Cards */}
         <DashboardActionCards />

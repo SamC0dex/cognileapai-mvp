@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/server'
+import { supabase as serviceSupabase } from '@/lib/supabase'
 import PDFParser from 'pdf2json'
 
 // TypeScript interfaces for PDF parser data structures
@@ -41,6 +42,17 @@ export async function POST(req: NextRequest) {
   try {
     console.log('Upload API called')
 
+    // Get authenticated user
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      console.error('Authentication error:', authError)
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    console.log('Authenticated user:', user.id)
+
     const formData = await req.formData()
     const file = formData.get('file') as File
 
@@ -58,10 +70,12 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(bytes)
     const checksum = createHash('sha256').update(buffer).digest('hex')
 
+    // Check for duplicates within user's own documents only
     const { data: duplicateDocument, error: duplicateError } = await supabase
       .from('documents')
       .select('id, title, page_count, bytes, storage_path, processing_status, chunk_count, error_message, document_content, created_at, updated_at')
       .eq('checksum', checksum)
+      .eq('user_id', user.id)
       .maybeSingle()
 
     if (duplicateError && duplicateError.code !== 'PGRST116') {
@@ -109,11 +123,13 @@ export async function POST(req: NextRequest) {
       return handleDuplicate(duplicateDocument)
     }
 
+    // Check existing documents for the authenticated user only
     const { data: existingCandidates, error: existingError } = await supabase
       .from('documents')
       .select('id, title, page_count, bytes, storage_path, processing_status, chunk_count, error_message, document_content, created_at, updated_at')
       .is('checksum', null)
       .eq('bytes', file.size)
+      .eq('user_id', user.id)
 
     if (existingError) {
       console.error('Failed to fetch checksum-less documents:', existingError)
@@ -194,6 +210,7 @@ export async function POST(req: NextRequest) {
 
     console.log('File uploaded successfully:', uploadData.path)
 
+    // Insert document with user_id to ensure proper ownership
     const { data: document, error: dbError } = await supabase
       .from('documents')
       .insert({
@@ -202,7 +219,8 @@ export async function POST(req: NextRequest) {
         bytes: file.size,
         storage_path: uploadData.path,
         processing_status: 'processing',
-        checksum
+        checksum,
+        user_id: user.id // Critical: Associate document with user
       })
       .select()
       .single()
@@ -211,10 +229,12 @@ export async function POST(req: NextRequest) {
       if (dbError.code === '23505') {
         console.warn(`Checksum conflict detected during insert for checksum ${checksum}`)
 
+        // Only check for conflicts within user's own documents
         const { data: conflictingDocument, error: conflictError } = await supabase
           .from('documents')
           .select('id, title, page_count, bytes, storage_path, processing_status, chunk_count, error_message, document_content, created_at, updated_at')
           .eq('checksum', checksum)
+          .eq('user_id', user.id)
           .maybeSingle()
 
         await supabase.storage.from('documents').remove([uploadData.path])
@@ -263,12 +283,13 @@ export async function POST(req: NextRequest) {
 }
 
 // Enhanced background processing function with PDF text extraction
+// Uses service role client to bypass RLS since this runs in background
 async function startBackgroundProcessing(documentId: string, buffer: Buffer) {
   try {
     console.log(`[Background] Starting PDF processing for document ${documentId}`)
 
-    // Update status to processing
-    await supabase
+    // Update status to processing (using service role client)
+    await serviceSupabase
       .from('documents')
       .update({ processing_status: 'processing' })
       .eq('id', documentId)
@@ -319,8 +340,8 @@ async function startBackgroundProcessing(documentId: string, buffer: Buffer) {
       extractedText = await extractText()
       console.log(`[Background] Extracted ${extractedText.length} characters from PDF`)
 
-      // Store the extracted text in the document_content column
-      await supabase
+      // Store the extracted text in the document_content column (using service role)
+      await serviceSupabase
         .from('documents')
         .update({
           processing_status: 'completed',
@@ -334,8 +355,8 @@ async function startBackgroundProcessing(documentId: string, buffer: Buffer) {
     } catch (textError) {
       console.error(`[Background] Text extraction failed, but marking as completed:`, textError)
 
-      // Even if text extraction fails, mark as completed so UI shows ready
-      await supabase
+      // Even if text extraction fails, mark as completed so UI shows ready (using service role)
+      await serviceSupabase
         .from('documents')
         .update({
           processing_status: 'completed',
@@ -348,7 +369,7 @@ async function startBackgroundProcessing(documentId: string, buffer: Buffer) {
   } catch (error) {
     console.error(`[Background] Processing failed for document ${documentId}:`, error)
 
-    await supabase
+    await serviceSupabase
       .from('documents')
       .update({
         processing_status: 'failed',
@@ -362,7 +383,8 @@ function queueBackgroundProcessing(documentId: string, buffer: Buffer) {
   startBackgroundProcessing(documentId, buffer).catch(error => {
     console.error(`Background PDF processing failed for document ${documentId}:`, error)
 
-    supabase
+    // Use service role client for background updates
+    serviceSupabase
       .from('documents')
       .update({
         processing_status: 'failed',

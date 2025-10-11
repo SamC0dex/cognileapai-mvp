@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useRef, useState } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/client'
 import type { GeminiModelKey } from './ai-config'
 import { TokenManager, type ConversationTokens } from './token-manager'
 
@@ -75,12 +75,6 @@ interface StoreShape {
 }
 
 
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
 // Enhanced chat store with Supabase integration
 export function useChatStore(): StoreShape {
   const [messages, setMessages] = useState<Message[]>([])
@@ -101,10 +95,14 @@ export function useChatStore(): StoreShape {
 
   const loadConversation = useCallback(async (conversationId: string, documentId?: string) => {
     try {
+      const supabase = createClient()
+
       setIsLoading(true)
       setError(null)
       setCurrentConversation(conversationId)
       conversationRef.current = conversationId
+
+      console.log('[Chat Store] Loading conversation:', conversationId)
 
       // Load messages from Supabase
       const { data: messagesData, error: messagesError } = await supabase
@@ -616,6 +614,8 @@ export function useChatStore(): StoreShape {
   // Define createNewConversationInternal before it's used in callbacks
   const createNewConversationInternal = async (documentId?: string): Promise<string> => {
     try {
+      const supabase = createClient()
+
       // Generate a proper UUID v4
       const conversationId = crypto.randomUUID()
 

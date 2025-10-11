@@ -32,13 +32,42 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient()
 
     // Exchange code for session
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (error) {
       console.error('OAuth callback error:', error.message)
       return NextResponse.redirect(
         `${requestUrl.origin}/auth/sign-in?error=auth_callback_error`
       )
+    }
+
+    // Create profile if it doesn't exist (for new users)
+    if (data?.user) {
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', data.user.id)
+        .single()
+
+      if (!existingProfile) {
+        // Get user metadata
+        const fullName = data.user.user_metadata?.full_name ||
+                        `${data.user.user_metadata?.first_name || ''} ${data.user.user_metadata?.last_name || ''}`.trim() ||
+                        data.user.email?.split('@')[0] ||
+                        'User'
+
+        const avatarUrl = data.user.user_metadata?.avatar_url || null
+
+        // Create profile
+        await supabase.from('profiles').insert({
+          id: data.user.id,
+          email: data.user.email || '',
+          full_name: fullName,
+          avatar_url: avatarUrl
+        })
+
+        console.log('Profile created for user:', data.user.id)
+      }
     }
 
     // Success - redirect to the requested page or dashboard
