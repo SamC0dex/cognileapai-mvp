@@ -5,6 +5,9 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { FlashcardSet, FlashcardProgress, FlashcardStudySession } from '@/types/flashcards'
 
 interface FlashcardStore {
+  // Hydration state (not persisted)
+  _hasHydrated: boolean
+
   // Viewer state
   isViewerOpen: boolean
   currentFlashcardSet: FlashcardSet | null
@@ -47,6 +50,9 @@ interface FlashcardStore {
 export const useFlashcardStore = create<FlashcardStore>()(
   persist(
     (set, get) => ({
+      // Hydration state (not persisted)
+      _hasHydrated: false,
+
       // Initial state
       isViewerOpen: false,
       currentFlashcardSet: null,
@@ -404,6 +410,10 @@ export const useFlashcardStore = create<FlashcardStore>()(
             const store = useFlashcardStore.getState()
             store.deduplicateFlashcardSets()
           }, 0)
+        }
+        if (state) {
+          // Mark as hydrated
+          state._hasHydrated = true
         }
       }
     }

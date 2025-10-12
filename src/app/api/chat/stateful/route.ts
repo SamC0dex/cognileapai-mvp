@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
 
     if (authError || !user) {
       return new Response(
-        JSON.stringify({ error: 'Unauthorized - Please sign in' }),
+        JSON.stringify({ error: 'Unauthorized - Please log in' }),
         { status: 401, headers: { 'Content-Type': 'application/json' } }
       )
     }

@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
 
     if (authError || !user) {
       return NextResponse.json(
-        { error: 'Unauthorized - Please sign in to delete study tools' },
+        { error: 'Unauthorized - Please log in to delete study tools' },
         { status: 401 }
       )
     }

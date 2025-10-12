@@ -54,7 +54,7 @@ export async function clearAllClientStorage() {
   }
 }
 
-export async function signOutAndClear(redirectTo = '/auth/sign-in') {
+export async function logOutAndClear(redirectTo = '/auth/login') {
   const supabase = createClient()
 
   // Best effort cleanup before signing out

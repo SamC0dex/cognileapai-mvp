@@ -3,14 +3,14 @@
 import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
-import { clearAllClientStorage, signOutAndClear } from '@/lib/auth-utils'
+import { clearAllClientStorage, logOutAndClear } from '@/lib/auth-utils'
 import { useStudyToolsStore } from '@/lib/study-tools-store'
 import { useFlashcardStore } from '@/lib/flashcard-store'
 
 interface AuthContextType {
   user: User | null
   loading: boolean
-  signOut: () => Promise<void>
+  logOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -88,12 +88,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })()
   }, [userId, loading])
 
-  const signOut = async () => {
-    await signOutAndClear('/')
+  const logOut = async () => {
+    await logOutAndClear('/')
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signOut }}>
+    <AuthContext.Provider value={{ user, loading, logOut }}>
       {children}
     </AuthContext.Provider>
   )

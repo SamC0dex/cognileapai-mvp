@@ -4,6 +4,9 @@ import { useCallback, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { GeminiModelKey } from './ai-config'
 import { TokenManager, type ConversationTokens } from './token-manager'
+import { translateError, getNextAutoRetryDelay } from './errors/translator'
+import { logError } from './errors/logger'
+import type { UserFacingError } from './errors/types'
 
 export type Role = 'user' | 'assistant'
 
@@ -49,9 +52,22 @@ interface StoreShape {
   isLoading: boolean
   streamingMessage: string
   error: string | null
+  friendlyError: UserFacingError | null
   documentContext: DocumentContext | null
   currentConversation: string | null
   selectedModel: GeminiModelKey
+  autoRetryState: AutoRetryState | null
+  rateLimitUntil: number | null
+  pendingMessage: string | null
+  contextLevel: ContextLevel
+  cautionToastPending: boolean
+  warningActive: boolean
+  warningDecision: WarningDecision
+  criticalActive: boolean
+  isContextBlocked: boolean
+  lastContextUpdate: number | null
+  isOptimizingConversation: boolean
+  lastOptimization: OptimizationSummary | null
 
   // token tracking
   conversationTokens: ConversationTokens | null
@@ -59,19 +75,73 @@ interface StoreShape {
 
   // actions
   loadConversation: (conversationId: string, documentId?: string) => Promise<void>
-  sendMessage: (content: string, documentId?: string | null, model?: GeminiModelKey, selectedDocuments?: Array<{id: string, title: string}>, skipUserMessage?: boolean) => Promise<void>
+  sendMessage: (content: string, documentId?: string | null, model?: GeminiModelKey, selectedDocuments?: Array<{id: string, title: string}>, skipUserMessage?: boolean, isAutoRetry?: boolean) => Promise<void>
 
   regenerateLastMessage: (modelOverride?: GeminiModelKey, selectedDocuments?: Array<{id: string, title: string}>) => Promise<void>
   setDocumentContext: (ctx: DocumentContext | null) => void
   setStreamingMessage: (val: string) => void
   setError: (err: string | null) => void
+  setFriendlyError: (err: UserFacingError | null) => void
   setSelectedModel: (model: GeminiModelKey) => void
   createNewConversation: (documentId?: string) => Promise<string>
   resetState: () => void
+  clearErrorStates: () => void
+  markCautionToastSeen: () => void
+  acknowledgeWarning: (decision: WarningResolution) => void
+  clearCriticalContext: () => void
+  optimizeConversation: () => Promise<OptimizationSummary | null>
 
   // token tracking actions
   updateTokenTracking: () => void
   canAddMessage: (content: string) => { canAdd: boolean; warning?: string }
+}
+
+interface AutoRetryState {
+  attempt: number
+  maxAttempts: number
+  nextRetryAt: number
+  message: string
+  model: GeminiModelKey
+  documentId?: string
+  selectedDocuments?: Array<{ id: string; title: string }>
+  skipUserMessage: boolean
+}
+
+export type ContextLevel = 'none' | 'caution' | 'warning' | 'critical'
+export type WarningDecision = 'none' | 'continue' | 'optimize' | 'start_new_chat'
+export type WarningResolution = Exclude<WarningDecision, 'none'>
+
+interface ContextState {
+  level: ContextLevel
+  cautionToastPending: boolean
+  warningActive: boolean
+  warningDecision: WarningDecision
+  criticalActive: boolean
+  isBlocked: boolean
+  lastUpdated: number | null
+}
+
+export interface OptimizationSummary {
+  timestamp: number
+  tokensRemoved: number
+  tokensKept: number
+  removedMessages: Message[]
+  keptLeading: number
+  keptTrailing: number
+  highlightSnippets: string[]
+  summaryMessageId?: string
+  originalMessages: Message[]
+  optimizedMessages: Message[]
+}
+
+const DEFAULT_CONTEXT_STATE: ContextState = {
+  level: 'none',
+  cautionToastPending: false,
+  warningActive: false,
+  warningDecision: 'none',
+  criticalActive: false,
+  isBlocked: false,
+  lastUpdated: null
 }
 
 
@@ -81,9 +151,16 @@ export function useChatStore(): StoreShape {
   const [isLoading, setIsLoading] = useState(false)
   const [streamingMessage, setStreamingMessage] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [friendlyError, setFriendlyErrorState] = useState<UserFacingError | null>(null)
   const [documentContext, setDocumentContext] = useState<DocumentContext | null>(null)
   const [currentConversation, setCurrentConversation] = useState<string | null>(null)
   const [selectedModel, setSelectedModel] = useState<GeminiModelKey>('FLASH')
+  const [autoRetryState, setAutoRetryState] = useState<AutoRetryState | null>(null)
+  const [rateLimitUntil, setRateLimitUntil] = useState<number | null>(null)
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null)
+  const [contextState, setContextState] = useState<ContextState>(DEFAULT_CONTEXT_STATE)
+  const [isOptimizingConversation, setIsOptimizingConversation] = useState(false)
+  const [lastOptimization, setLastOptimization] = useState<OptimizationSummary | null>(null)
 
   // token tracking state
   const [conversationTokens, setConversationTokens] = useState<ConversationTokens | null>(null)
@@ -92,6 +169,21 @@ export function useChatStore(): StoreShape {
   const conversationRef = useRef<string | null>(null)
   const allMessagesRef = useRef<Message[]>([])
   allMessagesRef.current = messages
+  const autoRetryTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const autoRetryStateRef = useRef<AutoRetryState | null>(null)
+  const contextStateRef = useRef<ContextState>(DEFAULT_CONTEXT_STATE)
+
+  const clearAutoRetryTimer = () => {
+    if (autoRetryTimerRef.current) {
+      clearTimeout(autoRetryTimerRef.current)
+      autoRetryTimerRef.current = null
+    }
+  }
+
+  const updateAutoRetryState = (state: AutoRetryState | null) => {
+    autoRetryStateRef.current = state
+    setAutoRetryState(state)
+  }
 
   const loadConversation = useCallback(async (conversationId: string, documentId?: string) => {
     try {
@@ -171,8 +263,26 @@ export function useChatStore(): StoreShape {
   }, [documentContext]) // updateTokenTracking is properly memoized and stable - adding would cause unnecessary re-renders
 
 
-  const sendMessage = useCallback(async (content: string, documentId?: string | null, model?: GeminiModelKey, selectedDocuments?: Array<{id: string, title: string}>, skipUserMessage?: boolean) => {
+  const sendMessage = useCallback(async (
+    content: string,
+    documentId?: string | null,
+    model?: GeminiModelKey,
+    selectedDocuments?: Array<{ id: string, title: string }>,
+    skipUserMessage = false,
+    isAutoRetry = false
+  ) => {
+    if (!content.trim()) return
+
     const modelToUse = model || selectedModel
+
+    if (!isAutoRetry) {
+      clearAutoRetryTimer()
+      updateAutoRetryState(null)
+      setFriendlyErrorState(null)
+      setError(null)
+    }
+
+    setPendingMessage(content)
     let user: Message | null = null
     let finalTokenUsage: number | undefined // Declare at function scope for both finalUpdate functions
 
@@ -589,10 +699,37 @@ export function useChatStore(): StoreShape {
         }
       }
 
+      setPendingMessage(null)
+      updateAutoRetryState(null)
+      setFriendlyErrorState(null)
+      setRateLimitUntil(null)
+
     } catch (e: unknown) {
       const errorMessage = e instanceof Error ? e.message : 'Unknown error occurred'
       console.error('[Chat] sendMessage failed:', errorMessage, e)
-      setError(`Failed to send message: ${errorMessage}`)
+
+      const errorContext = {
+        source: 'chat' as const,
+        operation: skipUserMessage ? 'regenerate' : 'send',
+        rawMessage: errorMessage,
+        payload: {
+          documentId,
+          conversationId: conversationRef.current,
+          model: modelToUse
+        }
+      }
+
+      const translated = translateError(e, errorContext)
+      const baseUserError: UserFacingError = {
+        ...translated.userError,
+        metadata: {
+          ...translated.userError.metadata,
+          autoRetryAttempt: isAutoRetry && autoRetryStateRef.current?.attempt ? autoRetryStateRef.current.attempt : 1,
+          autoRetryMax: translated.userError.autoBehavior?.maxAttempts ?? undefined
+        }
+      }
+
+      logError(e, errorContext, baseUserError)
 
       // Abort any ongoing requests
       abortController.abort()
@@ -604,6 +741,62 @@ export function useChatStore(): StoreShape {
 
       // Remove optimistically added messages on error
       setMessages(prev => prev.slice(0, skipUserMessage ? -1 : -2))
+
+      setFriendlyErrorState(baseUserError)
+      setError(baseUserError.message)
+
+      if (translated.userError.autoBehavior?.type === 'countdown') {
+        const countdownMs = (translated.userError.autoBehavior.countdownSeconds ?? 30) * 1000
+        setRateLimitUntil(Date.now() + countdownMs)
+      }
+
+      const autoBehavior = translated.userError.autoBehavior
+
+      if (translated.isRetryable && autoBehavior?.type === 'auto-retry') {
+        const maxAttempts = autoBehavior.maxAttempts ?? 3
+        const currentAttempt = isAutoRetry && autoRetryStateRef.current?.attempt
+          ? autoRetryStateRef.current.attempt
+          : 1
+        const nextAttempt = currentAttempt + 1
+
+        if (nextAttempt <= maxAttempts) {
+          const delay = getNextAutoRetryDelay(nextAttempt - 2 >= 0 ? nextAttempt - 2 : 0)
+          const nextRetryAt = Date.now() + delay
+
+          const retryUserError: UserFacingError = {
+            ...baseUserError,
+            message: `Our AI is momentarily busy. Retrying automatically (Attempt ${nextAttempt}/${maxAttempts})...`,
+            metadata: {
+              ...baseUserError.metadata,
+              autoRetryAttempt: nextAttempt,
+              autoRetryMax: maxAttempts
+            }
+          }
+
+          setFriendlyErrorState(retryUserError)
+
+          updateAutoRetryState({
+            attempt: nextAttempt,
+            maxAttempts,
+            nextRetryAt,
+            message: content,
+            model: modelToUse,
+            documentId: documentId || documentContext?.id || undefined,
+            selectedDocuments,
+            skipUserMessage
+          })
+
+          clearAutoRetryTimer()
+          autoRetryTimerRef.current = setTimeout(() => {
+            autoRetryTimerRef.current = null
+            void sendMessage(content, documentId, modelToUse, selectedDocuments, skipUserMessage, true)
+          }, delay)
+
+          return
+        }
+      }
+
+      updateAutoRetryState(null)
     } finally {
       setIsLoading(false)
       setStreamingMessage('')
@@ -688,12 +881,25 @@ export function useChatStore(): StoreShape {
     setMessages([])
     setStreamingMessage('')
     setError(null)
+    setFriendlyErrorState(null)
     setCurrentConversation(null)
     conversationRef.current = null
+    updateAutoRetryState(null)
+    clearAutoRetryTimer()
+    setRateLimitUntil(null)
+    setPendingMessage(null)
 
     // Reset token tracking
     setConversationTokens(null)
     setContextWarning(null)
+  }, [])
+
+  const clearErrorStates = useCallback(() => {
+    setError(null)
+    setFriendlyErrorState(null)
+    updateAutoRetryState(null)
+    clearAutoRetryTimer()
+    setRateLimitUntil(null)
   }, [])
 
   const stableSetDocumentContext = useCallback((ctx: DocumentContext | null) => {
@@ -759,9 +965,13 @@ export function useChatStore(): StoreShape {
     isLoading,
     streamingMessage,
     error,
+    friendlyError,
     documentContext,
     currentConversation,
     selectedModel,
+    autoRetryState,
+    rateLimitUntil,
+    pendingMessage,
 
     // token tracking
     conversationTokens,
@@ -774,9 +984,11 @@ export function useChatStore(): StoreShape {
     setDocumentContext: stableSetDocumentContext,
     setStreamingMessage,
     setError,
+    setFriendlyError: setFriendlyErrorState,
     setSelectedModel,
     createNewConversation,
     resetState,
+    clearErrorStates,
 
     // token tracking actions
     updateTokenTracking,

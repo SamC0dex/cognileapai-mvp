@@ -24,7 +24,7 @@ export default function FinalCtaSection() {
           <p className="mt-3 text-muted-foreground">CogniLeap turns dense PDFs into knowledge you can act on.</p>
           <div className="mt-6 flex items-center justify-center gap-3">
             <Link
-              href="/auth/sign-in"
+              href="/auth/login"
               className={buttonVariants({ size: "lg", variant: "default" }) + " shadow-glow"}
             >
               Start now

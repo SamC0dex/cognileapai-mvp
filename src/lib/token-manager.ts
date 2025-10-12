@@ -37,6 +37,8 @@ export interface ConversationTokens {
   conversationId: string
   totalTokens: number
   messageTokens: number
+  userTokens: number
+  assistantTokens: number
   documentTokens: number
   systemTokens: number
   lastUpdated: Date
@@ -99,6 +101,8 @@ export function estimateTokensFromText(text: string): TokenCount {
 export function estimateConversationTokens(messages: Message[]): ConversationTokens {
   let totalTokens = 0
   let messageTokens = 0
+  let userTokens = 0
+  let assistantTokens = 0
   let documentTokens = 0
   let systemTokens = 0
 
@@ -110,7 +114,11 @@ export function estimateConversationTokens(messages: Message[]): ConversationTok
 
     switch (message.role) {
       case 'user':
+        userTokens += tokens
+        messageTokens += tokens
+        break
       case 'assistant':
+        assistantTokens += tokens
         messageTokens += tokens
         break
       case 'system':
@@ -126,11 +134,11 @@ export function estimateConversationTokens(messages: Message[]): ConversationTok
 
   // Determine warning level
   let warningLevel: 'none' | 'caution' | 'warning' | 'critical' = 'none'
-  if (totalTokens > CONTEXT_LIMITS.CRITICAL_THRESHOLD) {
+  if (totalTokens >= CONTEXT_LIMITS.PRACTICAL_INPUT_MAX) {
     warningLevel = 'critical'
-  } else if (totalTokens > CONTEXT_LIMITS.WARNING_THRESHOLD) {
+  } else if (totalTokens >= CONTEXT_LIMITS.CRITICAL_THRESHOLD) {
     warningLevel = 'warning'
-  } else if (totalTokens > CONTEXT_LIMITS.WARNING_THRESHOLD * 0.8) {
+  } else if (totalTokens >= CONTEXT_LIMITS.WARNING_THRESHOLD) {
     warningLevel = 'caution'
   }
 
@@ -138,6 +146,8 @@ export function estimateConversationTokens(messages: Message[]): ConversationTok
     conversationId: '', // Will be set by caller
     totalTokens,
     messageTokens,
+    userTokens,
+    assistantTokens,
     documentTokens,
     systemTokens,
     lastUpdated: new Date(),
@@ -190,13 +200,13 @@ export function getContextWarningMessage(tokens: ConversationTokens): string | n
 
   switch (warningLevel) {
     case 'caution':
-      return `Conversation is ${percentage}% of optimal context window. Consider starting a new chat if performance degrades.`
+      return `💡 Tip: Conversation is ${percentage}% of the context window. Consider starting a new chat soon for best quality.`
 
     case 'warning':
-      return `⚠️ Conversation is ${percentage}% of optimal context window. Starting a new chat is recommended for best AI responses.`
+      return `⚠️ Context window is ${percentage}% full. AI response quality may decline without a fresh chat or optimization.`
 
     case 'critical':
-      return `🚨 Conversation has exceeded optimal context window (${totalTokens.toLocaleString()} tokens). Please start a new chat for optimal performance.`
+      return `🚨 Context limit reached (${totalTokens.toLocaleString()} tokens). Start a new chat or optimize to continue.`
 
     default:
       return null
@@ -208,47 +218,103 @@ export function getContextWarningMessage(tokens: ConversationTokens): string | n
  */
 export function optimizeConversationLength(
   messages: Message[],
-  targetTokens: number = CONTEXT_LIMITS.WARNING_THRESHOLD
+  targetTokens: number = Math.round(CONTEXT_LIMITS.PRACTICAL_INPUT_MAX * 0.6),
+  options?: {
+    leadingMessages?: number
+    trailingMessages?: number
+    minimumTrailing?: number
+    highlightSamples?: number
+  }
 ): {
   optimizedMessages: Message[]
   summaryMessage?: Message
   tokensRemoved: number
   tokensKept: number
+  removedMessages: Message[]
+  keptLeading: number
+  keptTrailing: number
+  highlightSnippets: string[]
 } {
+  const {
+    leadingMessages = 3,
+    trailingMessages = 30,
+    minimumTrailing = 8,
+    highlightSamples = 3
+  } = options ?? {}
+
   const conversationTokens = estimateConversationTokens(messages)
 
   if (conversationTokens.totalTokens <= targetTokens) {
     return {
       optimizedMessages: messages,
       tokensRemoved: 0,
-      tokensKept: conversationTokens.totalTokens
+      tokensKept: conversationTokens.totalTokens,
+      removedMessages: [],
+      keptLeading: Math.min(leadingMessages, messages.length),
+      keptTrailing: Math.min(trailingMessages, messages.length),
+      highlightSnippets: []
     }
   }
 
-  // Keep the most recent messages that fit within target
-  const recentMessages: Message[] = []
-  let currentTokens = 0
+  const tokenizedMessages = messages.map(message => ({
+    message,
+    tokens: (message.tokenCount || estimateTokensFromText(message.content)).estimated
+  }))
 
-  // Work backwards from most recent
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const message = messages[i]
-    const messageTokens = estimateTokensFromText(message.content).estimated
+  const headCount = Math.min(leadingMessages, tokenizedMessages.length)
+  const leadingSlice = tokenizedMessages.slice(0, headCount)
 
-    if (currentTokens + messageTokens <= targetTokens) {
-      recentMessages.unshift(message)
-      currentTokens += messageTokens
-    } else {
-      break
+  let trailingStart = Math.max(headCount, tokenizedMessages.length - trailingMessages)
+  let trailingSlice = tokenizedMessages.slice(trailingStart)
+
+  const middleSlice = tokenizedMessages.slice(headCount, trailingStart)
+
+  let keptTokens = [...leadingSlice, ...trailingSlice].reduce((sum, entry) => sum + entry.tokens, 0)
+
+  if (keptTokens > targetTokens) {
+    const minTrailing = Math.max(1, Math.min(minimumTrailing, trailingSlice.length))
+    while (keptTokens > targetTokens && trailingSlice.length > minTrailing) {
+      const shifted = trailingSlice.shift()
+      if (shifted) {
+        keptTokens -= shifted.tokens
+        middleSlice.unshift(shifted)
+      }
     }
   }
 
-  // Create summary of removed messages
-  const removedMessages = messages.slice(0, messages.length - recentMessages.length)
-  const tokensRemoved = conversationTokens.totalTokens - currentTokens
+  if (keptTokens > targetTokens && leadingSlice.length > 1) {
+    while (keptTokens > targetTokens && leadingSlice.length > 1) {
+      const removed = leadingSlice.pop()
+      if (removed) {
+        keptTokens -= removed.tokens
+        middleSlice.unshift(removed)
+      }
+    }
+  }
+
+  const removedMessages = middleSlice.map(entry => entry.message)
+  const tokensRemoved = Math.max(conversationTokens.totalTokens - keptTokens, 0)
+
+  const highlightCandidates = middleSlice
+    .filter(entry => entry.message.role === 'user')
+    .map(entry => entry.message.content.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+
+  const highlightSnippets = highlightCandidates
+    .slice(0, highlightSamples)
+    .map(snippet => snippet.length > 140 ? `${snippet.slice(0, 137)}...` : snippet)
 
   let summaryMessage: Message | undefined
   if (removedMessages.length > 0) {
-    const summaryContent = `[Previous conversation summary: ${removedMessages.length} messages covering earlier topics in this conversation]`
+    const summaryLines = [`[Previous conversation summary: ${removedMessages.length} messages were condensed to keep the latest context intact.]`]
+
+    if (highlightSnippets.length > 0) {
+      summaryLines.push('', 'Key themes touched on:', ...highlightSnippets.map(line => `• ${line}`))
+    }
+
+    summaryLines.push('', `Tokens removed: ~${tokensRemoved.toLocaleString()} | Tokens kept: ~${keptTokens.toLocaleString()}`)
+
+    const summaryContent = summaryLines.join('\n')
 
     summaryMessage = {
       id: `summary_${Date.now()}`,
@@ -260,14 +326,18 @@ export function optimizeConversationLength(
   }
 
   const optimizedMessages = summaryMessage
-    ? [summaryMessage, ...recentMessages]
-    : recentMessages
+    ? [...leadingSlice.map(entry => entry.message), summaryMessage, ...trailingSlice.map(entry => entry.message)]
+    : [...leadingSlice.map(entry => entry.message), ...trailingSlice.map(entry => entry.message)]
 
   return {
     optimizedMessages,
     summaryMessage,
     tokensRemoved,
-    tokensKept: currentTokens
+    tokensKept: keptTokens,
+    removedMessages,
+    keptLeading: leadingSlice.length,
+    keptTrailing: trailingSlice.length,
+    highlightSnippets
   }
 }
 
@@ -275,17 +345,11 @@ export function optimizeConversationLength(
  * Smart document context sizing based on conversation length
  */
 export function getOptimalDocumentContextSize(conversationTokens: number): number {
-  const remaining = CONTEXT_LIMITS.PRACTICAL_INPUT_MAX - conversationTokens
-  const buffer = remaining * TOKEN_ESTIMATION.BUFFER_PERCENTAGE
+  const remaining = Math.max(0, CONTEXT_LIMITS.PRACTICAL_INPUT_MAX - conversationTokens)
+  const reservedForResponse = 20000 // Buffer reserved for upcoming turns
+  const available = Math.max(0, remaining - reservedForResponse)
 
-  // Reserve space for user message and AI response
-  const reservedForResponse = 4000 // ~1000 word response
-  const reservedForUserMessage = 1000 // ~250 word user message
-
-  const availableForDocument = remaining - buffer - reservedForResponse - reservedForUserMessage
-
-  // Ensure minimum useful context
-  return Math.max(10000, Math.min(availableForDocument, CONTEXT_LIMITS.PRACTICAL_INPUT_MAX * 0.7))
+  return Math.max(20000, Math.min(available, 100000))
 }
 
 /**

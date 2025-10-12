@@ -13,7 +13,7 @@ function isValidRedirect(url: string | null): url is string {
 /**
  * OAuth Callback Route Handler
  *
- * Handles the OAuth redirect after Google sign-in.
+ * Handles the OAuth redirect after Google login.
  * Exchanges the authorization code for a session and redirects the user.
  *
  * @param request - The incoming request with code and optional next parameter
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     if (!code) {
       console.error('OAuth callback error: Missing authorization code')
       return NextResponse.redirect(
-        `${requestUrl.origin}/auth/sign-in?error=missing_code`
+        `${requestUrl.origin}/auth/login?error=missing_code`
       )
     }
 
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('OAuth callback error:', error.message)
       return NextResponse.redirect(
-        `${requestUrl.origin}/auth/sign-in?error=auth_callback_error`
+        `${requestUrl.origin}/auth/login?error=auth_callback_error`
       )
     }
 
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Unexpected error in OAuth callback:', error)
     return NextResponse.redirect(
-      `${new URL(request.url).origin}/auth/sign-in?error=auth_callback_error`
+      `${new URL(request.url).origin}/auth/login?error=auth_callback_error`
     )
   }
 }

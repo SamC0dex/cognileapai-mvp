@@ -36,6 +36,9 @@ import { Button } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import type { ConversationTokens } from '@/lib/token-manager'
+import { ChatErrorPanel } from './chat-error-panel'
+import type { ErrorAction } from '@/lib/errors/types'
 
 // Enhanced chat area width variants for coordinated layout
 const layoutVariants = {
@@ -85,11 +88,13 @@ export const ChatContainer: React.FC<{
   conversationId?: string
   selectedModel?: GeminiModelKey
   onModelChange?: (model: GeminiModelKey) => void
+  onTokenUsageChange?: (payload: { tokens: ConversationTokens | null; isCalculating: boolean }) => void
 }> = React.memo(({
   documentId,
   conversationId,
   selectedModel = 'FLASH',
-  onModelChange
+  onModelChange,
+  onTokenUsageChange
 }) => {
   const {
     selectedDocuments,
@@ -118,14 +123,19 @@ export const ChatContainer: React.FC<{
     messages,
     isLoading,
     error,
+    friendlyError,
     documentContext,
     sendMessage,
     regenerateLastMessage,
     setError,
     conversationTokens,
     contextWarning,
+    autoRetryState,
+    rateLimitUntil,
+    pendingMessage,
     updateTokenTracking,
-    resetState
+    resetState,
+    clearErrorStates
   } = useChat(effectiveDocumentId, conversationId, selectedDocuments)
 
   const [showScrollButton, setShowScrollButton] = useState(false)
@@ -137,6 +147,8 @@ export const ChatContainer: React.FC<{
     processing_status?: string
   } | null>(null)
   const lastUploadedDocumentRef = useRef<DocumentUploadedDetail['document'] | null>(null)
+  const [isTokenCalculating, setIsTokenCalculating] = useState(false)
+  const [rateLimitCountdown, setRateLimitCountdown] = useState<number | null>(null)
 
   // Handle scroll state changes from ChatMessages
   const handleScrollStateChange = useCallback((userScrolled: boolean, showButton: boolean) => {
@@ -279,9 +291,42 @@ export const ChatContainer: React.FC<{
   // Update token tracking when messages change
   useEffect(() => {
     if (messages.length > 0) {
+      setIsTokenCalculating(true)
       updateTokenTracking()
+    } else {
+      setIsTokenCalculating(false)
     }
   }, [messages, updateTokenTracking])
+
+  useEffect(() => {
+    if (isTokenCalculating && conversationTokens) {
+      const handle = requestAnimationFrame(() => setIsTokenCalculating(false))
+      return () => cancelAnimationFrame(handle)
+    }
+  }, [conversationTokens, isTokenCalculating])
+
+  useEffect(() => {
+    if (!rateLimitUntil) {
+      setRateLimitCountdown(null)
+      return
+    }
+
+    const updateCountdown = () => {
+      const remaining = Math.max(0, Math.ceil((rateLimitUntil - Date.now()) / 1000))
+      setRateLimitCountdown(remaining)
+      if (remaining <= 0) {
+        clearErrorStates()
+      }
+    }
+
+    updateCountdown()
+    const timer = window.setInterval(updateCountdown, 1000)
+    return () => window.clearInterval(timer)
+  }, [rateLimitUntil, clearErrorStates])
+
+  useEffect(() => {
+    onTokenUsageChange?.({ tokens: conversationTokens, isCalculating: isTokenCalculating })
+  }, [conversationTokens, isTokenCalculating, onTokenUsageChange])
 
   // Handle document removal
   const handleRemoveDocument = useCallback((documentId: string) => {
@@ -300,6 +345,7 @@ export const ChatContainer: React.FC<{
 
   // Check if any message is currently streaming
   const hasStreamingMessage = messages.some(msg => msg.role === 'assistant' && msg.isStreaming)
+  const isRateLimited = Boolean(rateLimitUntil && (!rateLimitCountdown || rateLimitCountdown > 0))
 
   // Get suggested questions based on document context
   const suggestedQuestions = useMemo(() => {
@@ -317,6 +363,51 @@ export const ChatContainer: React.FC<{
       setError(error instanceof Error ? error.message : 'Failed to send message')
     }
   }, [sendMessage, selectedModel, setError])
+
+  const retryPendingMessage = useCallback(() => {
+    if (!pendingMessage) return
+    clearErrorStates()
+    void handleSendMessage(pendingMessage)
+  }, [pendingMessage, handleSendMessage, clearErrorStates])
+
+  const handleErrorAction = useCallback((action: ErrorAction) => {
+    switch (action.intent) {
+      case 'retry':
+        if (pendingMessage) {
+          retryPendingMessage()
+        } else {
+          clearErrorStates()
+        }
+        break
+      case 'signin':
+        clearErrorStates()
+        if (typeof window !== 'undefined') {
+          window.location.href = '/auth/login'
+        }
+        break
+      case 'reload':
+        clearErrorStates()
+        if (typeof window !== 'undefined') {
+          window.location.reload()
+        }
+        break
+      case 'support':
+        if (typeof window !== 'undefined') {
+          window.open('mailto:support@cognileap.ai?subject=CogniLeap%20Support', '_blank', 'noopener')
+        }
+        break
+      case 'upload':
+        clearErrorStates()
+        if (typeof window !== 'undefined') {
+          document.querySelector('[data-dashboard-upload-trigger]')?.dispatchEvent(new Event('click'))
+        }
+        break
+      case 'dismiss':
+      default:
+        clearErrorStates()
+        break
+    }
+  }, [pendingMessage, retryPendingMessage, clearErrorStates])
 
   const handleCitationClick = useCallback((citation: Citation) => {
     // Handle citation click - could navigate to document section, show popup, etc.
@@ -395,6 +486,14 @@ export const ChatContainer: React.FC<{
           onStartNewChat={() => resetState()}
         />
 
+        {friendlyError && (
+          <ChatErrorPanel
+            error={friendlyError}
+            countdownSeconds={rateLimitCountdown}
+            onAction={handleErrorAction}
+          />
+        )}
+
         {/* Messages or Empty State */}
         {messages.length === 0 && !isLoading && !error ? (
           <div className="flex-1 overflow-y-auto">
@@ -407,7 +506,7 @@ export const ChatContainer: React.FC<{
           <ChatMessages
             messages={messages}
             isLoading={isLoading}
-            error={error}
+            error={friendlyError ? null : error}
             onCitationClick={handleCitationClick}
             onScrollStateChange={handleScrollStateChange}
             onRegenerate={handleRegenerate}

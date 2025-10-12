@@ -487,6 +487,42 @@ html.theme-instant, html.theme-instant *, html.theme-instant *::before, html.the
   animation: shimmer 1.5s infinite;
 }
 
+/* Professional skeleton shimmer animation for loading states */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -468px 0;
+  }
+  100% {
+    background-position: 468px 0;
+  }
+}
+
+.skeleton-shimmer {
+  animation: skeleton-shimmer 1.2s ease-in-out infinite;
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted) / 0.8) 0%,
+    hsl(var(--muted-foreground) / 0.08) 20%,
+    hsl(var(--muted-foreground) / 0.12) 40%,
+    hsl(var(--muted-foreground) / 0.08) 60%,
+    hsl(var(--muted) / 0.8) 100%
+  );
+  background-size: 936px 100%;
+  will-change: background-position;
+}
+
+.dark .skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted) / 0.4) 0%,
+    hsl(var(--primary) / 0.06) 20%,
+    hsl(var(--primary) / 0.1) 40%,
+    hsl(var(--primary) / 0.06) 60%,
+    hsl(var(--muted) / 0.4) 100%
+  );
+  background-size: 936px 100%;
+}
+
 /* High-performance animation keyframes */
 @keyframes fadeInUp {
   from {

@@ -34,6 +34,7 @@ import { useStudyToolsStore, STUDY_TOOLS, type StudyToolContent } from '@/lib/st
 import { useFlashcardStore } from '@/lib/flashcard-store'
 import { FlashcardsStackIcon } from '@/components/icons/flashcards-stack-icon'
 import { useAuth } from '@/contexts/auth-context'
+import { DashboardSkeleton } from '@/components/dashboard-skeleton'
 
 interface DashboardTabsProps {
   onViewModeChange?: (mode: 'grid' | 'list') => void
@@ -214,7 +215,7 @@ export function DashboardTabs({
   onUpload
 }: DashboardTabsProps) {
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
 
   const {
     generatedContent,
@@ -222,33 +223,58 @@ export function DashboardTabs({
     openCanvas,
     expandPanel,
     clearGeneratedContent,
-    setLastLoadedUserId
+    setLastLoadedUserId,
+    _hasHydrated: studyToolsHydrated
   } = useStudyToolsStore()
-  const { flashcardSets, openViewer, clearFlashcardSets } = useFlashcardStore()
+  const {
+    flashcardSets,
+    openViewer,
+    clearFlashcardSets,
+    _hasHydrated: flashcardsHydrated
+  } = useFlashcardStore()
 
   const [activeTab, setActiveTab] = useState('all')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [searchQuery, setSearchQuery] = useState('')
   const [isSearchExpanded, setIsSearchExpanded] = useState(false)
-  const [isInitialLoading, setIsInitialLoading] = useState(() =>
-    generatedContent.length === 0 && flashcardSets.length === 0
-  )
 
-  // Clear stores and reload data when user changes (handles account switching)
+  // Show loading skeleton until we've completed first data check
+  // Start with true to prevent empty state flash
+  const [isInitialLoad, setIsInitialLoad] = useState(true)
+
+  // Track if stores have hydrated
+  const storesHydrated = studyToolsHydrated && flashcardsHydrated
+
+  // Load data on mount or when user changes
   useEffect(() => {
+    if (authLoading) {
+      setIsInitialLoad(true)
+      return
+    }
+
     if (!user) {
       clearGeneratedContent()
       clearFlashcardSets()
       setLastLoadedUserId(null)
-      setIsInitialLoading(false)
+      setIsInitialLoad(false)
       return
     }
 
-    const hasLocalData = generatedContent.length > 0 || flashcardSets.length > 0
-    if (!hasLocalData) {
-      setIsInitialLoading(true)
-    } else {
-      setLastLoadedUserId(user.id)
+    if (!storesHydrated) {
+      setIsInitialLoad(true)
+      return
+    }
+
+    const hasCachedData = generatedContent.length > 0 || flashcardSets.length > 0
+
+    if (hasCachedData) {
+      setIsInitialLoad(false)
+      void loadStudyToolsFromDatabase().then(() => {
+        setLastLoadedUserId(user.id)
+      }).catch((error) => {
+        console.error('[Dashboard] Failed to refresh study tools:', error)
+      })
+      return
     }
 
     let cancelled = false
@@ -263,7 +289,7 @@ export function DashboardTabs({
         console.error('[Dashboard] Failed to load study tools:', error)
       } finally {
         if (!cancelled) {
-          setIsInitialLoading(false)
+          setIsInitialLoad(false)
         }
       }
     })()
@@ -272,7 +298,7 @@ export function DashboardTabs({
       cancelled = true
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id])
+  }, [authLoading, user?.id, storesHydrated])
 
   // Filter data based on active tab
   const getFilteredData = () => {
@@ -304,12 +330,6 @@ export function DashboardTabs({
 
   const { studyTools, flashcards } = getFilteredData()
   const totalItems = studyTools.length + flashcards.length
-
-  useEffect(() => {
-    if (generatedContent.length > 0 || flashcardSets.length > 0) {
-      setIsInitialLoading(false)
-    }
-  }, [generatedContent.length, flashcardSets.length])
 
   // Click handlers that navigate to chat page and open the content
   const handleStudyToolClick = (content: StudyToolContent) => {
@@ -538,9 +558,24 @@ export function DashboardTabs({
           {tabs.map((tab) => (
             <TabsContent key={tab.id} value={tab.id} className="mt-0">
               <div className="min-h-[400px] rounded-xl border border-border/50 bg-card/50 p-6">
-                {!isInitialLoading && totalItems === 0 ? (
+                {isInitialLoad ? (
+                  /* Loading State - Show beautiful skeleton */
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <DashboardSkeleton count={6} viewMode={viewMode} />
+                  </motion.div>
+                ) : totalItems === 0 ? (
                   /* Empty State - Only show when loading is complete and no content */
-                  <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="flex flex-col items-center justify-center h-full text-center py-12"
+                  >
                     <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center mb-6">
                       <tab.icon className="h-10 w-10 text-muted-foreground" />
                     </div>
@@ -554,53 +589,77 @@ export function DashboardTabs({
                       {tab.id === 'documents' && "Transform your documents into study guides, smart summaries, and organized notes using advanced AI"}
                       {tab.id === 'flashcards' && "Create interactive flashcard sets from your study materials for effective memorization and review"}
                     </p>
-                  </div>
-                ) : !isInitialLoading ? (
+                  </motion.div>
+                ) : (
                   /* Content Display - Show when loading complete and has content */
-                  <div className="space-y-4">
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.3, delay: 0.1 }}
+                    className="space-y-4"
+                  >
                     {viewMode === 'grid' ? (
                       /* Grid View */
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {studyTools.map((content) => (
-                          <StudyToolCard
+                        {studyTools.map((content, index) => (
+                          <motion.div
                             key={content.id}
-                            content={content}
-                            onClick={() => handleStudyToolClick(content)}
-                          />
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.3, delay: index * 0.05 }}
+                          >
+                            <StudyToolCard
+                              content={content}
+                              onClick={() => handleStudyToolClick(content)}
+                            />
+                          </motion.div>
                         ))}
-                        {flashcards.map((flashcardSet) => (
-                          <FlashcardCard
+                        {flashcards.map((flashcardSet, index) => (
+                          <motion.div
                             key={flashcardSet.id}
-                            flashcardSet={flashcardSet}
-                            onClick={() => handleFlashcardClick(flashcardSet)}
-                          />
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.3, delay: (studyTools.length + index) * 0.05 }}
+                          >
+                            <FlashcardCard
+                              flashcardSet={flashcardSet}
+                              onClick={() => handleFlashcardClick(flashcardSet)}
+                            />
+                          </motion.div>
                         ))}
                       </div>
                     ) : (
                       /* List View */
                       <div className="space-y-2">
-                        {studyTools.map((content) => (
-                          <StudyToolListItem
+                        {studyTools.map((content, index) => (
+                          <motion.div
                             key={content.id}
-                            content={content}
-                            onClick={() => handleStudyToolClick(content)}
-                          />
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.2, delay: index * 0.03 }}
+                          >
+                            <StudyToolListItem
+                              content={content}
+                              onClick={() => handleStudyToolClick(content)}
+                            />
+                          </motion.div>
                         ))}
-                        {flashcards.map((flashcardSet) => (
-                          <FlashcardListItem
+                        {flashcards.map((flashcardSet, index) => (
+                          <motion.div
                             key={flashcardSet.id}
-                            flashcardSet={flashcardSet}
-                            onClick={() => handleFlashcardClick(flashcardSet)}
-                          />
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.2, delay: (studyTools.length + index) * 0.03 }}
+                          >
+                            <FlashcardListItem
+                              flashcardSet={flashcardSet}
+                              onClick={() => handleFlashcardClick(flashcardSet)}
+                            />
+                          </motion.div>
                         ))}
                       </div>
                     )}
-                  </div>
-                ) : (
-                  /* Loading State - Show nothing during initial load to prevent flash */
-                  <div className="min-h-[400px] flex items-center justify-center">
-                    {/* Intentionally minimal or empty during loading */}
-                  </div>
+                  </motion.div>
                 )}
               </div>
             </TabsContent>

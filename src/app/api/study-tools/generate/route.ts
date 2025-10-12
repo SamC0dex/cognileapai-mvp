@@ -305,7 +305,7 @@ export async function POST(req: NextRequest) {
 
     if (authError || !user) {
       return NextResponse.json(
-        { error: 'Unauthorized - Please sign in to generate study tools' },
+        { error: 'Unauthorized - Please log in to generate study tools' },
         { status: 401 }
       )
     }

@@ -32,7 +32,7 @@ import { ClientOnly } from '@/components/client-only'
 import { Logo } from './logo'
 import { ChatDuotoneIcon } from '@/components/icons/chat-duotone'
 import { useUser } from '@/hooks/use-user'
-import { signOutAndClear } from '@/lib/auth-utils'
+import { logOutAndClear } from '@/lib/auth-utils'
 
 interface SidebarProps {
   isCollapsed?: boolean
@@ -45,21 +45,21 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange, isDocumentsPan
   const pathname = usePathname()
   const { theme, setTheme } = useTheme()
   const { user, profile, loading } = useUser()
-  const [signingOut, setSigningOut] = React.useState(false)
+  const [loggingOut, setLoggingOut] = React.useState(false)
 
   const handleToggle = () => {
     const newState = !isCollapsed
     onCollapsedChange?.(newState)
   }
 
-  const handleSignOut = async () => {
+  const handleLogOut = async () => {
     try {
-      setSigningOut(true)
-      await signOutAndClear('/auth/sign-in')
+      setLoggingOut(true)
+      await logOutAndClear('/auth/login')
     } catch (error) {
-      console.error('Sign out error:', error)
+      console.error('Log out error:', error)
     } finally {
-      setSigningOut(false)
+      setLoggingOut(false)
     }
   }
 
@@ -362,11 +362,11 @@ export function Sidebar({ isCollapsed = false, onCollapsedChange, isDocumentsPan
               <Separator />
               <DropdownMenuItem
                 className="text-red-600"
-                onClick={handleSignOut}
-                disabled={signingOut}
+                onClick={handleLogOut}
+                disabled={loggingOut}
               >
                 <LogOut className="h-4 w-4 mr-2" />
-                {signingOut ? 'Signing out...' : 'Sign Out'}
+                {loggingOut ? 'Logging out...' : 'Log Out'}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

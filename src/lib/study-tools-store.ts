@@ -34,6 +34,9 @@ export const normalizeStudyToolMarkdown = (value: string): string => tightenMark
 type FlashcardStoreModule = typeof import('@/lib/flashcard-store')
 
 interface StudyToolsStore {
+  // Hydration state (not persisted)
+  _hasHydrated: boolean
+
   // Panel state
   isPanelExpanded: boolean
   expandPanel: () => void
@@ -87,6 +90,9 @@ interface StudyToolsStore {
 export const useStudyToolsStore = create<StudyToolsStore>()(
   persist(
     (set, get) => ({
+  // Hydration state (not persisted)
+  _hasHydrated: false,
+
   // Panel state
   isPanelExpanded: false,
   expandPanel: () => set({ isPanelExpanded: true }),
@@ -2017,6 +2023,8 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
         }
         if (state) {
           state.lastLoadedUserId = state.lastLoadedUserId ?? null
+          // Mark as hydrated
+          state._hasHydrated = true
         }
       }
     }

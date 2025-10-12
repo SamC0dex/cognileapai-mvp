@@ -43,7 +43,7 @@ export default function UpdatePasswordPage() {
       }, 1000)
       return () => clearTimeout(timer)
     } else if (success && countdown === 0) {
-      router.push('/auth/sign-in')
+      router.push('/auth/login')
     }
   }, [success, countdown, router])
 
@@ -106,14 +106,14 @@ export default function UpdatePasswordPage() {
             </div>
 
             <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 text-primary text-sm">
-              Redirecting to sign in page in {countdown} second{countdown !== 1 ? 's' : ''}...
+              Redirecting to log in page in {countdown} second{countdown !== 1 ? 's' : ''}...
             </div>
 
             <Link
-              href="/auth/sign-in"
+              href="/auth/login"
               className="inline-block text-sm text-primary hover:underline font-medium"
             >
-              Continue to Sign In
+              Continue to Log In
             </Link>
             </div>
           ) : (
@@ -228,11 +228,11 @@ export default function UpdatePasswordPage() {
               </button>
             </form>
 
-              {/* Back to Sign In */}
+              {/* Back to Log In */}
               <p className="text-center text-sm text-muted-foreground">
                 Remember your password?{' '}
-                <Link href="/auth/sign-in" className="text-primary hover:underline font-medium">
-                  Sign in
+                <Link href="/auth/login" className="text-primary hover:underline font-medium">
+                  Log in
                 </Link>
               </p>
             </div>

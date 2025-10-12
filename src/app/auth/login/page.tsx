@@ -15,7 +15,7 @@ function isValidRedirect(url: string): boolean {
   return true
 }
 
-function SignInForm() {
+function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -67,7 +67,7 @@ function SignInForm() {
     }
   }, [router])
 
-  const handleEmailSignIn = async (e: React.FormEvent) => {
+  const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
@@ -97,7 +97,7 @@ function SignInForm() {
     }
   }
 
-  const handleGoogleSignIn = async () => {
+  const handleGoogleLogin = async () => {
     setLoading(true)
     setError(null)
 
@@ -132,7 +132,7 @@ function SignInForm() {
           <div className="text-center space-y-2">
             <h1 className="text-3xl font-bold tracking-tight">Welcome Back</h1>
             <p className="text-sm text-muted-foreground">
-              Sign in to continue your learning journey
+              Log in to continue your learning journey
             </p>
           </div>
 
@@ -143,11 +143,11 @@ function SignInForm() {
             </div>
           )}
 
-          {/* Sign In Form */}
+          {/* Log In Form */}
           <div className="space-y-4">
           {/* Google OAuth Button */}
           <button
-            onClick={handleGoogleSignIn}
+            onClick={handleGoogleLogin}
             disabled={loading}
             className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-lg border border-border bg-card hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -183,7 +183,7 @@ function SignInForm() {
           </div>
 
           {/* Email/Password Form */}
-          <form onSubmit={handleEmailSignIn} className="space-y-4">
+          <form onSubmit={handleEmailLogin} className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium">
                 Email
@@ -232,10 +232,10 @@ function SignInForm() {
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Signing in...</span>
+                  <span>Logging in...</span>
                 </>
               ) : (
-                'Sign In'
+                'Log In'
               )}
             </button>
           </form>
@@ -254,14 +254,14 @@ function SignInForm() {
   )
 }
 
-export default function SignInPage() {
+export default function LoginPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     }>
-      <SignInForm />
+      <LoginForm />
     </Suspense>
   )
 }

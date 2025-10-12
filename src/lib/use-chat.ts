@@ -33,7 +33,7 @@ export function useChat(documentId?: string, conversationId?: string, selectedDo
 
     try {
       await store.sendMessage(content.trim(), documentId, modelOverride, selectedDocuments)
-      store.setError(null)
+      store.clearErrorStates()
     } catch (error) {
       console.error('Failed to send message:', error)
       store.setError(error instanceof Error ? error.message : 'Failed to send message')
@@ -46,7 +46,7 @@ export function useChat(documentId?: string, conversationId?: string, selectedDo
   const regenerateLastMessage = useCallback(async (modelOverride?: import('./ai-config').GeminiModelKey) => {
     try {
       await store.regenerateLastMessage(modelOverride, selectedDocuments)
-      store.setError(null)
+      store.clearErrorStates()
     } catch (error) {
       console.error('Failed to regenerate message:', error)
       store.setError(error instanceof Error ? error.message : 'Failed to regenerate message')
@@ -77,8 +77,12 @@ export function useChat(documentId?: string, conversationId?: string, selectedDo
     isStreaming,
     streamingMessage: store.streamingMessage,
     error: store.error,
+    friendlyError: store.friendlyError,
     documentContext: store.documentContext,
     currentConversation: store.currentConversation,
+    autoRetryState: store.autoRetryState,
+    rateLimitUntil: store.rateLimitUntil,
+    pendingMessage: store.pendingMessage,
 
     // Token tracking
     conversationTokens: store.conversationTokens,
@@ -95,7 +99,9 @@ export function useChat(documentId?: string, conversationId?: string, selectedDo
     regenerateLastMessage,
     createConversation,
     setError: store.setError,
+    setFriendlyError: store.setFriendlyError,
     resetState: store.resetState,
+    clearErrorStates: store.clearErrorStates,
     updateTokenTracking: store.updateTokenTracking,
     canAddMessage: store.canAddMessage,
     

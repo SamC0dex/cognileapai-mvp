@@ -1641,8 +1641,12 @@ export const StudyToolsPanel: React.FC<{
   })
 
   // Flashcard customization dialog state
-  const [flashcardDialog, setFlashcardDialog] = React.useState({
-    isOpen: false
+  const [flashcardDialog, setFlashcardDialog] = React.useState<{
+    isOpen: boolean
+    context: 'document' | 'conversation' | null
+  }>({
+    isOpen: false,
+    context: null
   })
 
   // Flashcard store (placeholder for future features)
@@ -1660,8 +1664,12 @@ export const StudyToolsPanel: React.FC<{
 
     // Special handling for flashcards - always show customization dialog
     if (type === 'flashcards') {
-      // Check if we have context first
-      if (!hasContext) {
+      if (hasDocumentSelected) {
+        setFlashcardDialog({ isOpen: true, context: 'document' })
+        return
+      }
+
+      if (hasMessages && conversationId) {
         setConfirmationDialog({
           isOpen: true,
           studyToolType: type
@@ -1669,8 +1677,10 @@ export const StudyToolsPanel: React.FC<{
         return
       }
 
-      // Open flashcard customization dialog
-      setFlashcardDialog({ isOpen: true })
+      setConfirmationDialog({
+        isOpen: true,
+        studyToolType: type
+      })
       return
     }
 
@@ -1695,14 +1705,30 @@ export const StudyToolsPanel: React.FC<{
       isOpen: true,
       studyToolType: type
     })
-  }, [generateStudyTool, documentId, conversationId, hasDocumentSelected, hasMessages, hasContext])
+  }, [generateStudyTool, documentId, conversationId, hasDocumentSelected, hasMessages])
 
   const handleConfirmConversationGeneration = React.useCallback(() => {
-    if (confirmationDialog.studyToolType) {
-      generateStudyTool(confirmationDialog.studyToolType, undefined, conversationId)
+    const studyToolType = confirmationDialog.studyToolType
+
+    if (!studyToolType) {
+      return
     }
+
+    if (studyToolType === 'flashcards') {
+      if (!conversationId) {
+        console.warn('Attempted to generate flashcards from conversation without a conversationId')
+        setConfirmationDialog({ isOpen: false, studyToolType: null })
+        return
+      }
+
+      setFlashcardDialog({ isOpen: true, context: 'conversation' })
+      setConfirmationDialog({ isOpen: false, studyToolType: null })
+      return
+    }
+
+    generateStudyTool(studyToolType, undefined, conversationId)
     setConfirmationDialog({ isOpen: false, studyToolType: null })
-  }, [generateStudyTool, conversationId, confirmationDialog.studyToolType])
+  }, [confirmationDialog.studyToolType, conversationId, generateStudyTool])
 
   const handleSelectDocument = React.useCallback(() => {
     // Close dialog and focus on document selection
@@ -1720,12 +1746,29 @@ export const StudyToolsPanel: React.FC<{
   }, [])
 
   const handleFlashcardGenerate = React.useCallback((options: FlashcardOptions) => {
-    setFlashcardDialog({ isOpen: false })
-    generateStudyTool('flashcards', documentId, conversationId, options)
-  }, [generateStudyTool, documentId, conversationId])
+    const context = flashcardDialog.context
+    setFlashcardDialog({ isOpen: false, context: null })
+
+    if (context === 'document') {
+      generateStudyTool('flashcards', documentId, conversationId, options)
+      return
+    }
+
+    if (context === 'conversation') {
+      if (!conversationId) {
+        console.warn('Attempted to generate flashcards from conversation without a conversationId')
+        return
+      }
+
+      generateStudyTool('flashcards', undefined, conversationId, options)
+      return
+    }
+
+    console.warn('Flashcard generation invoked without a valid context')
+  }, [flashcardDialog.context, generateStudyTool, documentId, conversationId])
 
   const handleCloseFlashcardDialog = React.useCallback(() => {
-    setFlashcardDialog({ isOpen: false })
+    setFlashcardDialog({ isOpen: false, context: null })
   }, [])
 
   return (

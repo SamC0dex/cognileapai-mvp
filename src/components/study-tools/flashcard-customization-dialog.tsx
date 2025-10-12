@@ -55,7 +55,7 @@ export const FlashcardCustomizationDialog: React.FC<FlashcardCustomizationDialog
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4 sm:p-6 lg:p-8"
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[500] flex items-center justify-center p-4 sm:p-6 lg:p-8"
         onClick={handleClose}
       >
         <motion.div
@@ -63,7 +63,7 @@ export const FlashcardCustomizationDialog: React.FC<FlashcardCustomizationDialog
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-          className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-3xl xl:max-w-4xl max-h-[90vh] overflow-y-auto mx-auto relative"
+          className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-3xl xl:max-w-4xl max-h-[90vh] overflow-y-auto mx-auto relative z-[510]"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}

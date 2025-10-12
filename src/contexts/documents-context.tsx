@@ -34,6 +34,33 @@ const DocumentsContext = createContext<DocumentsContextValue | null>(null)
 
 const DOCUMENTS_CACHE_KEY = 'cognileap-documents-cache-v1'
 const DOCUMENTS_CACHE_TTL = 2 * 60 * 1000 // 2 minutes
+const SELECTED_DOCUMENTS_STORAGE_PREFIX = 'cognileap-selected-documents-v1'
+
+const getSelectedDocumentsStorageKey = (userId: string) => `${SELECTED_DOCUMENTS_STORAGE_PREFIX}:${userId}`
+
+const parseStoredSelectedDocuments = (raw: string | null): SelectedDocument[] => {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .map((item) => {
+        if (!item || typeof item !== 'object' || typeof (item as { id?: unknown }).id !== 'string') {
+          return null
+        }
+        const candidate = item as Partial<SelectedDocument> & { id: string }
+        return {
+          id: candidate.id,
+          title: typeof candidate.title === 'string' ? candidate.title : 'Untitled Document',
+          size: typeof candidate.size === 'number' ? candidate.size : undefined,
+          processing_status: typeof candidate.processing_status === 'string' ? candidate.processing_status : undefined
+        }
+      })
+      .filter((item): item is SelectedDocument => Boolean(item))
+  } catch {
+    return []
+  }
+}
 
 const toSelectedDocument = (doc: DocumentItem): SelectedDocument => ({
   id: doc.id,
@@ -46,6 +73,8 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
   const supabase = useMemo(() => createClient(), [])
   const cacheRef = useRef<DocumentItem[]>([])
+  const selectedDocsStorageKeyRef = useRef<string | null>(null)
+  const hasLoadedStoredSelectionRef = useRef(false)
 
   const readCache = () => {
     if (typeof window === 'undefined') return []
@@ -151,15 +180,43 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!user) {
+      if (typeof window !== 'undefined' && selectedDocsStorageKeyRef.current) {
+        window.localStorage.removeItem(selectedDocsStorageKeyRef.current)
+      }
+      selectedDocsStorageKeyRef.current = null
+      hasLoadedStoredSelectionRef.current = false
       applyDocumentsUpdate(() => [])
       setSelectedDocuments([])
       setDocumentsLoading(false)
       return
     }
 
+    const storageKey = getSelectedDocumentsStorageKey(user.id)
+    selectedDocsStorageKeyRef.current = storageKey
+    hasLoadedStoredSelectionRef.current = false
+
+    const storedSelection = typeof window !== 'undefined'
+      ? parseStoredSelectedDocuments(window.localStorage.getItem(storageKey))
+      : []
+
+    setSelectedDocuments(storedSelection)
+    hasLoadedStoredSelectionRef.current = true
+
     void refreshDocuments({ force: cacheRef.current.length === 0 })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!selectedDocsStorageKeyRef.current) return
+    if (!hasLoadedStoredSelectionRef.current) return
+
+    try {
+      window.localStorage.setItem(selectedDocsStorageKeyRef.current, JSON.stringify(selectedDocuments))
+    } catch {
+      // ignore storage errors
+    }
+  }, [selectedDocuments])
 
   useEffect(() => {
     if (typeof window === 'undefined') return

@@ -113,7 +113,7 @@ export default function SignUpPage() {
       setError(signUpError.message)
     } else if (data?.user) {
       if (data.user.identities?.length === 0) {
-        setError('Email already registered. Please sign in.')
+        setError('Email already registered. Please log in.')
       } else {
         setMessage('Account created! Check your email to confirm.')
         setTimeout(() => router.push(redirect), 2000)
@@ -317,11 +317,11 @@ export default function SignUpPage() {
             </button>
           </form>
 
-          {/* Sign In Link */}
+          {/* Log In Link */}
           <p className="text-center text-sm text-muted-foreground">
             Already have an account?{' '}
-            <Link href="/auth/sign-in" className="text-primary hover:underline font-medium">
-              Sign in
+            <Link href="/auth/login" className="text-primary hover:underline font-medium">
+              Log in
             </Link>
           </p>
         </div>

@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
 
     if (authError || !user) {
       return NextResponse.json(
-        { error: 'Unauthorized - Please sign in to fetch study tools' },
+        { error: 'Unauthorized - Please log in to fetch study tools' },
         { status: 401 }
       )
     }

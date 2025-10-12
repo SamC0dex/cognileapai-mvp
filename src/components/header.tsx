@@ -25,7 +25,7 @@ export function Header() {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    const routes = ['/auth/sign-in', '/auth/sign-up', '/dashboard', '/chat']
+    const routes = ['/auth/login', '/auth/sign-up', '/dashboard', '/chat']
     const win = window as typeof window & {
       requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number
       cancelIdleCallback?: (handle: number) => void
@@ -126,7 +126,7 @@ export function Header() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem asChild>
-                  <Link href="/auth/sign-in">Sign in</Link>
+                  <Link href="/auth/login">Log in</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/auth/sign-up">Sign up</Link>

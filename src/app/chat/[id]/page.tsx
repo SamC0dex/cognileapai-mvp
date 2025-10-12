@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, use } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Settings as SettingsIcon } from 'lucide-react'
 import { DashboardLayout } from '@/components/dashboard-layout'
 import { ChatContainer } from '@/components/chat/chat-container'
 import { ChatHistoryDrawer } from '@/components/chat-history-drawer'
@@ -12,6 +11,8 @@ import { useStudyToolsStore } from '@/components/study-tools'
 import type { GeminiModelKey } from '@/lib/ai-config'
 import type { DocumentUploadedDetail } from '@/types/documents'
 import { GeminiLogo } from '@/components/icons/gemini-logo'
+import type { ConversationTokens } from '@/lib/token-manager'
+import { ChatSettingsPopover } from '@/components/chat/chat-settings-popover'
 
 interface ChatPageProps {
   params: Promise<{ id: string }>
@@ -30,6 +31,7 @@ export default function ChatPage({ params }: ChatPageProps) {
   const [chatType, setChatType] = useState<'course' | 'lesson' | 'document' | null>(null)
   const [isInitialized, setIsInitialized] = useState(false)
   const [initTimeout, setInitTimeout] = useState(false)
+  const [tokenUsage, setTokenUsage] = useState<{ tokens: ConversationTokens | null; isCalculating: boolean }>({ tokens: null, isCalculating: false })
   const { isViewerOpen, isFullscreen } = useFlashcardStore()
   const { isCanvasOpen, isCanvasFullscreen } = useStudyToolsStore()
   const isFlashcardFullscreen = isViewerOpen && isFullscreen
@@ -297,15 +299,7 @@ export default function ChatPage({ params }: ChatPageProps) {
                 </button>
 
                 {/* Settings */}
-                <button
-                  onClick={() => console.log('Open settings')}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-background hover:bg-muted text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-                  title="Settings"
-                  aria-label="Settings"
-                  type="button"
-                >
-                  <SettingsIcon className="w-[18px] h-[18px]" />
-                </button>
+                <ChatSettingsPopover tokenUsage={tokenUsage} onStartNewChat={handleNewChat} />
               </div>
             </div>
           </div>
@@ -320,6 +314,7 @@ export default function ChatPage({ params }: ChatPageProps) {
             conversationId={conversationId || undefined}
             selectedModel={selectedModel}
             onModelChange={setSelectedModel}
+            onTokenUsageChange={setTokenUsage}
           />
         </div>
 
