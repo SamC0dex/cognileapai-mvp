@@ -414,6 +414,12 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
     const startTime = resumeOptions?.startedAt ?? Date.now()
     const cleanupGeneration = get()._cleanupGenerationTracking
     let isTimeout = false // Track if abort was due to timeout
+    let isLongRunning = false
+    let longRunningStartedAt: number | null = null
+    const SOFT_TIMEOUT_MS = 90000
+    const HARD_TIMEOUT_MS = 300000
+    let softTimeoutId: ReturnType<typeof setTimeout> | null = null
+    let hardTimeoutId: ReturnType<typeof setTimeout> | null = null
 
     console.log('[StudyToolsStore] Starting generation:', {
       type,
@@ -490,6 +496,73 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
         flashcardOptions
       }
       activeGenerationRecord = activeGeneration
+
+      const markAsLongRunning = async () => {
+        if (isLongRunning) return
+
+        isLongRunning = true
+        longRunningStartedAt = Date.now()
+
+        console.warn(
+          `[StudyToolsStore] Generation ${generationId} exceeded ${SOFT_TIMEOUT_MS / 1000}s, entering fallback wait state`
+        )
+
+        set(state => {
+          const newActiveGenerations = new Map(state.activeGenerations)
+          const generation = newActiveGenerations.get(generationId)
+
+          if (generation) {
+            newActiveGenerations.set(generationId, {
+              ...generation,
+              status: 'generating',
+              progress: Math.max(generation.progress, 75)
+            })
+          }
+
+          const updatedContent = state.generatedContent.map(content =>
+            content.id === placeholderContent.id && content.isGenerating !== false
+              ? {
+                  ...content,
+                  generationProgress: Math.max(content.generationProgress ?? 0, 75),
+                  statusMessage: 'Fallback model is processing... this may take a little longer.'
+                }
+              : content
+          )
+
+          return {
+            activeGenerations: newActiveGenerations,
+            generatedContent: updatedContent
+          }
+        })
+
+        get()._updateGenerationState()
+
+        if (type === 'flashcards' && useFlashcardStoreRef) {
+          const flashcardStore = useFlashcardStoreRef.getState()
+          const updatedSets = flashcardStore.flashcardSets.map((set: FlashcardSet) =>
+            set.id === placeholderContent.id
+              ? {
+                  ...set,
+                  metadata: {
+                    ...set.metadata,
+                    isGenerating: true,
+                    generationProgress: Math.max(set.metadata?.generationProgress ?? 0, 75),
+                    statusMessage: 'Fallback model is processing... this may take a little longer.'
+                  }
+                }
+              : set
+          )
+
+          useFlashcardStoreRef.setState({ flashcardSets: updatedSets })
+        }
+
+        if (!get().activePollIntervals.has(generationId)) {
+          startStatusPolling()
+        } else {
+          // Force a fresh sync so UI reflects backend retries
+          await get().loadStudyToolsFromDatabase(effectiveDocumentId, effectiveConversationId)
+        }
+      }
 
       // Update state with new generation
       set(state => {
@@ -578,7 +651,7 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
         }
 
         const pollStartTime = Date.now()
-        const MAX_POLL_DURATION = 120000 // 120 seconds
+        const MAX_POLL_DURATION = 600000 // 10 minutes to allow for fallback retries
 
         const pollStatus = async () => {
           try {
@@ -686,7 +759,12 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
       }
 
       // Realistic AI generation progress simulation
-      const getRealisticProgress = (elapsedSeconds: number, generationType: StudyToolType) => {
+      const getRealisticProgress = (
+        elapsedSeconds: number,
+        generationType: StudyToolType,
+        longRunning: boolean,
+        longRunningStart: number | null
+      ) => {
         // Simple, reliable progress calculation designed for 30-45 second generations
         // Phase messages based on study tool type
         const messages = {
@@ -744,6 +822,17 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
           }
         }
 
+        if (longRunning) {
+          const longRunningElapsed = longRunningStart
+            ? (Date.now() - longRunningStart) / 1000
+            : Math.max(0, elapsedSeconds - SOFT_TIMEOUT_MS / 1000)
+
+          const plateauBase = Math.max(progress, 78)
+          const plateauIncrement = Math.min(18, longRunningElapsed / 15) // roughly +1% every 15s
+          progress = Math.min(plateauBase + plateauIncrement, 96)
+          currentMessage = 'Fallback model is processing...'
+        }
+
         // Ensure progress never exceeds 97% during generation
         progress = Math.min(progress, 97)
 
@@ -759,7 +848,12 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
       const progressInterval = setInterval(() => {
         const now = Date.now()
         const elapsedSeconds = (now - startTime) / 1000
-        const { progress: newProgress, message } = getRealisticProgress(elapsedSeconds, type)
+        const { progress: newProgress, message } = getRealisticProgress(
+          elapsedSeconds,
+          type,
+          isLongRunning,
+          longRunningStartedAt
+        )
         
         // Ensure progress never goes backwards
         const progress = Math.max(lastProgress, newProgress)
@@ -833,10 +927,14 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
 
       // Create AbortController with 90 second timeout (API has 60s maxDuration + buffer)
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => {
+      softTimeoutId = setTimeout(() => {
+        void markAsLongRunning()
+      }, SOFT_TIMEOUT_MS)
+
+      hardTimeoutId = setTimeout(() => {
         isTimeout = true
-        controller.abort(new Error('Request timeout after 90 seconds'))
-      }, 90000)
+        controller.abort(new Error('Request timeout after 5 minutes'))
+      }, HARD_TIMEOUT_MS)
 
       let response: Response
       try {
@@ -855,7 +953,12 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
           signal: controller.signal
         })
       } finally {
-        clearTimeout(timeoutId)
+        if (softTimeoutId) {
+          clearTimeout(softTimeoutId)
+        }
+        if (hardTimeoutId) {
+          clearTimeout(hardTimeoutId)
+        }
       }
 
       // Clean up interval
@@ -1027,6 +1130,12 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
       }
 
     } catch (error) {
+      if (softTimeoutId) {
+        clearTimeout(softTimeoutId)
+      }
+      if (hardTimeoutId) {
+        clearTimeout(hardTimeoutId)
+      }
       console.error('[StudyToolsStore] Generation failed:', error)
       const errorMessage = error instanceof Error ? error.message : 'Generation failed'
 

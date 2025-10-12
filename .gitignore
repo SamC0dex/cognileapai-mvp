@@ -21,6 +21,30 @@ prompts/
 docs/EXECUTION_PLAYBOOK.md
 docs/COORDINATOR_GUIDE.md
 docs/TESTING_GUIDE.md
+docs/
+
+# Project-specific configuration (contains project references)
+opencode.json
+.mcp.json
+PHASE_1_DEPLOYMENT_GUIDE.md
+PHASE_1_DEPLOYMENT_COMPLETE.md
+PHASE_1_COMPLETE.md
+PHASE_2_COMPLETE.md
+OAUTH_CALLBACK_IMPLEMENTATION.md
+CONVERSATION_STUDY_TOOLS_FIX.md
+
+# AI agent reference files (not needed for public/project)
+CLAUDE.md
+AGENTS.md
+GITHUB_DEPLOYMENT_READY.md
+PRE_PUSH_SECURITY_CHECKLIST.md
+Landing page tips/
+.claude/
+.playwright-mcp/
+clear-storage.html
+
+# Build artifacts
+tsconfig.tsbuildinfo
 
 # OS
 .DS_Store

@@ -1,377 +1,307 @@
-# CogniLeapAI MVP
+# CogniLeapAI
 
-**Transform PDFs into intelligent study materials with advanced AI-powered learning tools**
+**Modern learning platform that transforms documents into interactive study materials**
 
-A comprehensive web application designed for students, researchers, and professionals who need to extract maximum value from their documents. CogniLeapAI processes PDFs and generates structured study materials including intelligent summaries, comprehensive notes, study guides, and interactive flashcards, all powered by advanced AI and enterprise-grade search capabilities.
+CogniLeapAI is a web application built for students, researchers, and professionals. Upload PDFs and generate comprehensive study materials including summaries, notes, study guides, and flashcards. Features an intelligent chat system for document Q&A, advanced token management for long conversations, and a professional interface designed for focused learning.
 
-## 🚀 Key Features
+## Features
 
-### User Authentication & Management
-- **Secure Authentication** - Complete Supabase Auth integration with email/password and Google OAuth
-- **Multi-Tenant Architecture** - Row Level Security (RLS) with 26+ policies for data isolation
-- **Session Management** - Persistent user sessions with automatic refresh and route protection
-- **User Profiles** - Automatic profile creation and management
-- **Password Reset** - Complete password recovery flow with secure email links
-- **Protected Routes** - Middleware-based authentication for secure access control
+### Authentication & Security
+- **Email/Password Authentication** - Secure user registration and login
+- **Google OAuth Integration** - Quick sign-in with Google accounts
+- **Password Recovery** - Self-service password reset flow
+- **Row Level Security** - Database-level user data isolation
+- **Protected Routes** - Middleware-based access control for authenticated pages
+- **Session Persistence** - Automatic session refresh and state management
 
-### Document Intelligence
-- **Advanced PDF Processing** - Intelligent extraction from text-based PDFs with structure detection
-- **Smart Outline Recognition** - Automatically identifies document hierarchy and section organization
-- **Enterprise RAG System** - Production-ready retrieval augmented generation with hybrid search
-- **Free Semantic Search** - Cost-effective semantic search using Transformers.js (no API dependencies)
-- **Context-Aware Responses** - Document-specific interactions with relevant section citations
-- **User Isolation** - Each user's documents are completely isolated with RLS policies
+### Document Processing
+- **PDF Upload & Parsing** - Extract text and structure from PDF documents
+- **Section Detection** - Automatic identification of document hierarchy and organization
+- **Document Management** - Upload, organize, and delete documents with isolated user storage
+- **Content Extraction Pipeline** - Asynchronous processing with status tracking
+- **Secure File Storage** - Private Supabase storage with time-limited access URLs
 
-### AI-Powered Study Materials
-- **Structured Study Guides** - Multi-level learning paths: Foundation → Connections → Applications → Mastery
-- **Intelligent Summaries** - Hierarchical summaries with strategic insights and practical implications
-- **Smart Notes** - Active learning methodology with interconnected knowledge mapping
-- **Interactive Flashcards** - Advanced flashcard system with study sessions, progress tracking, and engaging animations
-- **Export Capabilities** - Professional PDF and DOCX exports with custom formatting
+### Intelligent Chat System
+- **Contextual Conversations** - Chat with documents using relevant sections as context
+- **Streaming Responses** - Real-time AI responses with smooth character-by-character display
+- **Conversation History** - Persistent chat sessions with database and local storage backup
+- **Token Management** - Smart tracking of conversation length with context window monitoring
+- **Context Optimization** - Automatic conversation summarization to maintain quality in long chats
+- **Multi-Document Support** - Select and chat with multiple documents simultaneously
+- **Model Selection** - Choose between Gemini models based on response speed vs quality needs
+- **Keyboard Shortcuts** - Efficient navigation (Enter to send, Shift+Enter for newline, Cmd/Ctrl+K to focus)
 
-### Advanced Chat System
-- **Document-Contextual Chat** - Intelligent conversations grounded in document content
-- **Stateful Sessions** - Database-persistent chat sessions with conversation memory that survives server restarts
-- **Real-Time Streaming** - Server-sent events with smooth, character-by-character response rendering
-- **Conversation Persistence** - Automatic storage with both database and local caching (Dexie/IndexedDB)
-- **Session Management** - In-memory caching with automatic database persistence and session restoration
-- **Optimistic UI Updates** - Immediate feedback with graceful error handling
-- **Keyboard Shortcuts** - Productivity-focused shortcuts (Enter to send, Shift+Enter for newline, Cmd/Ctrl+K to focus)
+### Study Tools Generation
+- **Study Guides** - Structured learning paths with foundation, connections, applications, and mastery sections
+- **Smart Summaries** - Hierarchical overviews with key insights and strategic implications
+- **Smart Notes** - Active learning notes with interconnected concepts and knowledge networks
+- **Interactive Flashcards** - Q&A cards with swipe animations, study sessions, and progress tracking
+- **Conversation-Based Generation** - Create study materials from chat conversations, not just documents
+- **Concurrent Generation** - Generate multiple study tools simultaneously without blocking
+- **Export Options** - Download as PDF, DOCX, or copy to clipboard
 
-### User Experience
-- **Desktop-First Design** - Optimized for professional productivity workflows
-- **Accessibility Compliance** - WCAG AA standards with full keyboard navigation and screen reader support
-- **Dual Theme Support** - Professional light and dark themes with system preference detection
-- **Responsive Interface** - Adaptive design with emphasis on desktop productivity
-- **Performance Optimized** - Efficient rendering, lazy loading, and optimized bundle sizes
+### Token & Context Management
+- **Real-Time Token Tracking** - Monitor conversation token usage with visual indicators
+- **Context Window Warnings** - Progressive alerts (caution → warning → critical) as conversation grows
+- **Smart Optimization** - Automatic conversation summarization retaining recent context
+- **Document Context Sizing** - Dynamic adjustment of document context based on conversation length
+- **Quality Preservation** - Maintain AI response quality through intelligent context management
+- **Multi-Level Indicators** - Visual feedback (green → yellow → red) for context usage
 
-## 🛠️ Technology Stack
+### Semantic Search
+- **Free Embeddings** - Client-side semantic search using Transformers.js (no API costs)
+- **Hybrid Search** - Combines semantic similarity with keyword matching for optimal results
+- **Intelligent Chunking** - Structure-aware document segmentation with configurable overlap
+- **Relevance Scoring** - Cosine similarity calculations for accurate context retrieval
+- **Performance Caching** - Multi-layer caching for embeddings and search results
 
-### Core Framework
-- **Next.js 15** - App Router with TypeScript for type safety and modern development
-- **React 19** - Latest React features with concurrent rendering
-- **TypeScript** - Strict mode enabled for maximum type safety
-- **Tailwind CSS** - Utility-first styling with custom design system
+### User Interface
+- **Modern Design** - Clean, professional interface with teal/amber color scheme
+- **Dark/Light Themes** - System-aware theme switching with persistent preferences
+- **Responsive Layout** - Desktop-first design that adapts to different screen sizes
+- **Accessibility** - WCAG AA compliance with keyboard navigation and screen reader support
+- **Loading States** - Smooth transitions and skeleton loaders for async operations
+- **Toast Notifications** - Non-intrusive feedback for user actions
+
+## Technology Stack
+
+### Frontend
+- **Next.js 15.5** - React framework with App Router for server-side rendering and API routes
+- **React 19** - UI library with latest concurrent features
+- **TypeScript 5.6** - Static type checking for reliability and developer experience
+- **Tailwind CSS 3.4** - Utility-first CSS framework with custom design system
+- **Framer Motion** - Animation library for smooth transitions and interactive elements
 
 ### Backend & Database
-- **Next.js API Routes** - RESTful endpoints with Server-Sent Events for streaming
-- **Supabase PostgreSQL** - Production database with Row Level Security (26+ RLS policies)
-- **Supabase Auth** - Complete authentication with email/password and Google OAuth
-- **Supabase Storage** - Secure file storage with private access and signed URLs
-- **@supabase/ssr** - Server-side rendering support with session management
-- **Dexie (IndexedDB)** - Client-side storage for offline capabilities and caching
+- **Supabase PostgreSQL** - Database with Row Level Security for user data isolation
+- **Supabase Auth** - Authentication service supporting email/password and OAuth providers
+- **Supabase Storage** - Secure file storage with private buckets and signed URLs
+- **@supabase/ssr** - Server-side Supabase client for Next.js integration
+- **Next.js API Routes** - RESTful endpoints with Server-Sent Events for response streaming
 
-### AI & Machine Learning
-- **Google Gemini AI** - Multiple models (Pro/Flash/Lite) with intelligent selection based on task complexity
-- **Vercel AI SDK** - Streamlined AI integration with streaming support
-- **Transformers.js** - Client-side machine learning for semantic embeddings
-- **mixedbread-ai/mxbai-embed-xsmall-v1** - Efficient embedding model (22MB, 384 dimensions)
+### AI & Embeddings
+- **Google Gemini** - Large language models (2.5 Pro, Flash, Lite) via @google/genai SDK
+- **Transformers.js** - In-browser ML library for client-side semantic embeddings
+- **mixedbread-ai/mxbai-embed-xsmall-v1** - Lightweight embedding model (384 dimensions, 22MB)
+- **Smart Context System** - Custom RAG implementation with hybrid search and relevance scoring
 
-### State Management & Performance
-- **Zustand** - Lightweight state management for chat, study tools, and flashcard systems
-- **React Query** - Server state management with intelligent caching
-- **Framer Motion** - Smooth animations and transitions
-- **React Hook Form** - Performant form handling with validation
+### State Management
+- **Zustand 5.0** - Lightweight state management with middleware support
+- **Dexie 4.2** - IndexedDB wrapper for client-side chat history and offline support
+- **React Hook Form** - Form state management with validation
+- **Zustand Persist** - Automatic state persistence to localStorage
 
-### UI Components & Styling
-- **Radix UI** - Accessible, unstyled components as building blocks
-- **Lucide React** - Consistent iconography
-- **Sonner** - Toast notifications
-- **next-themes** - Theme management with system preference detection
+### UI Components
+- **Radix UI** - Headless, accessible component primitives (Dialog, Dropdown, Tabs, etc.)
+- **Lucide React** - Icon library with 1000+ consistent icons
+- **React Markdown** - Markdown rendering with GitHub-flavored markdown support
+- **Sonner** - Toast notification system
+- **next-themes** - Dark/light theme management with system detection
 
-### Development & Build Tools
-- **pnpm 9.10.0** - Fast, disk space efficient package manager
-- **ESLint** - Code quality and style consistency
-- **Bundle Analyzer** - Performance monitoring and optimization
-- **cross-env** - Cross-platform environment variable handling
+### PDF Processing
+- **pdfjs-dist** - PDF.js for browser-based PDF parsing and text extraction
+- **pdf-parse** - Server-side PDF content extraction
+- **html2pdf.js** - Client-side PDF generation from HTML
+- **@mohtasham/md-to-docx** - Markdown to DOCX conversion for exports
 
-## 🚀 Getting Started
+### Development Tools
+- **pnpm 9.10** - Fast, disk-efficient package manager
+- **ESLint** - Code linting with Next.js configuration
+- **TypeScript Compiler** - Type checking (pnpm typecheck)
+- **@next/bundle-analyzer** - Bundle size analysis and optimization
+- **cross-env** - Cross-platform environment variables
+
+## Getting Started
 
 ### Prerequisites
-- **Node.js** 18+
-- **pnpm** 9.10.0 (recommended package manager)
-- **Google Gemini API Key** - [Get your API key](https://makersuite.google.com/app/apikey)
-- **Supabase Project** - [Create a project](https://supabase.com)
+- Node.js 18 or higher
+- pnpm 9.10 (package manager)
+- Google Gemini API key ([get one here](https://makersuite.google.com/app/apikey))
+- Supabase account ([create free account](https://supabase.com))
 
 ### Installation
 
-1. **Clone the repository**
+1. Clone the repository and install dependencies:
    ```bash
    git clone <repository-url>
-   cd CogniLeapAI-MVP
-   ```
-
-2. **Install dependencies**
-   ```bash
+   cd cognileapai-mvp
    pnpm install
    ```
 
-3. **Environment Configuration**
-
-   Create a `.env.local` file in the root directory:
+2. Create `.env.local` in the project root:
    ```env
-   # AI Configuration
-   GOOGLE_GENERATIVE_AI_API_KEY=your_gemini_api_key
+   # Google Gemini API
+   GOOGLE_GENERATIVE_AI_API_KEY=your_api_key_here
 
-   # Database Configuration
-   NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-   SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+   # Supabase Configuration
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+   SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
    ```
 
-4. **Database Setup**
-   - Create a new Supabase project
-   - Run the provided migration scripts in `supabase/migrations/`
-   - Configure Row Level Security policies (26+ policies for data isolation)
-   - Set up storage bucket for PDF files (private access)
-   
-5. **Authentication Configuration**
-   - Navigate to Authentication > Providers in Supabase Dashboard
-   - Enable Email provider with confirmation emails (optional)
-   - For Google OAuth:
-     - Enable Google provider
-     - Create OAuth credentials in Google Cloud Console
-     - Add authorized redirect URIs: `https://your-project-ref.supabase.co/auth/v1/callback`
-     - Copy Client ID and Client Secret to Supabase
-   - Configure email templates for password reset and confirmation
+3. Set up Supabase:
+   - Create a new project in Supabase dashboard
+   - Run migrations from `supabase/migrations/` directory
+   - Configure Row Level Security policies (automatic with migrations)
+   - Create a private storage bucket named `documents`
+   - Enable email authentication in Authentication > Providers
+   - (Optional) Configure Google OAuth with your credentials
 
-6. **Start Development Server**
+4. Start the development server:
    ```bash
-   # Standard development server
    pnpm dev
-
-   # Development server with Turbopack (faster builds)
+   # or for faster builds with Turbopack
    pnpm dev:turbo
    ```
 
-7. **Access the Application**
-   - Open [http://localhost:3000](http://localhost:3000) in your browser
-   - Create your account at `/auth/sign-up`
-   - Sign in at `/auth/sign-in` (or use Google OAuth)
-   - Access the dashboard at `/dashboard` after authentication
+5. Open [http://localhost:3000](http://localhost:3000) and create an account
 
-## 📋 Development Commands
+## Development Commands
 
 ```bash
 # Development
-pnpm dev                # Start development server
-pnpm dev:turbo         # Start development server with Turbopack
-pnpm build             # Build for production
-pnpm build:analyze     # Build with bundle analyzer
-pnpm start             # Start production server
+pnpm dev              # Start development server (http://localhost:3000)
+pnpm dev:turbo        # Start with Turbopack (faster HMR)
+pnpm build            # Production build
+pnpm build:analyze    # Build with bundle size analysis
+pnpm start            # Start production server
 
-# Quality Assurance
-pnpm lint              # Run ESLint code quality checks
-pnpm typecheck         # Run TypeScript type checking
+# Code Quality
+pnpm lint             # Run ESLint
+pnpm typecheck        # TypeScript type checking (no emit)
 ```
 
-## 🏗️ Architecture Overview
+## Architecture
 
-### Core Systems Architecture
-
-#### Authentication & Authorization
-- **Multi-Tenant Architecture** - Complete user isolation with Row Level Security
-- **Session Management** - Browser and server-side authentication with automatic refresh
-- **Route Protection** - Middleware-based authentication for protected routes
-- **OAuth Integration** - Google OAuth with PKCE flow for secure third-party authentication
-- **Profile Management** - Automatic user profile creation with trigger-based setup
-- **RLS Policies** - 26+ database policies ensuring users only access their own data
-
-#### Chat System
-- **Centralized State** - Zustand store managing all chat operations and state
-- **Streaming Integration** - Server-Sent Events for real-time AI response streaming
-- **Context Management** - Intelligent document context retrieval and injection
-- **Persistence Layer** - Dual storage with Supabase database and IndexedDB caching
-- **Optimistic Updates** - Immediate UI feedback with error rollback mechanisms
-
-#### Study Tools Generation
-- **Multi-Modal AI Processing** - Dynamic model selection based on document complexity
-- **Structured Output Generation** - Hierarchical content creation with consistent formatting
-- **Interactive Components** - Flashcard viewer with study session tracking and animations
-- **Export System** - Professional document generation (PDF/DOCX/Markdown)
-- **Canvas Interface** - Full-screen content viewer with editing capabilities
-
-#### Semantic Search System
-- **Hybrid Retrieval** - Combines semantic search with traditional keyword matching
-- **Free Embeddings** - Client-side embedding generation using Transformers.js
-- **Intelligent Chunking** - Structure-aware document segmentation with overlap optimization
-- **Performance Caching** - Multi-layer caching for embeddings and search results
-- **Relevance Scoring** - Cosine similarity with keyword boost for optimal results
-
-#### Data Architecture
-- **Database Schema** - Normalized PostgreSQL schema with hierarchical document sections
-- **Security Model** - Row Level Security with user-based access control
-- **Storage Strategy** - Private file storage with secure, time-limited access URLs
-- **Caching Strategy** - Multi-tier caching with browser storage and memory optimization
-
-### Key Implementation Details
-
-#### AI Model Selection Strategy
-```typescript
-// Intelligent model selection based on task complexity
-- Gemini Flash Lite: Quick responses, simple queries (< 150ms)
-- Gemini Flash: Balanced performance for study materials (~ 500ms)
-- Gemini Pro: Complex analysis, large documents (> 1s response time)
-```
-
-#### Performance Optimizations
-- **Component Memoization** - React.memo for expensive components
-- **Lazy Loading** - Code splitting for study tools and flashcard components
-- **Virtual Scrolling** - Efficient rendering for large document sections
-- **Bundle Optimization** - Tree shaking and dynamic imports for reduced bundle size
-
-#### Security Implementation
-- **API Key Protection** - Server-side API key management, never exposed to client
-- **Database Security** - Row Level Security policies enforced at database level
-- **Input Validation** - Comprehensive sanitization on all user inputs
-- **File Access Control** - Private storage with signed URLs and access controls
-
-## 📖 Project Structure
-
+### Project Structure
 ```
 src/
-├── app/                     # Next.js App Router
-│   ├── api/                # API endpoints with streaming support
-│   │   ├── chat/           # Chat system endpoints
-│   │   ├── upload/         # Document upload processing
-│   │   ├── extract-content/# Content extraction pipeline
-│   │   └── study-tools/    # Study materials generation
-│   ├── auth/               # Authentication pages
-│   │   ├── sign-up/        # User registration page
-│   │   ├── sign-in/        # User login page
-│   │   ├── forgot-password/# Password reset request
-│   │   ├── update-password/# Password reset completion
-│   │   └── callback/       # OAuth callback handler
-│   ├── dashboard/          # Main application interface
-│   └── chat/[id]/         # Individual conversation pages
+├── app/                      # Next.js App Router
+│   ├── api/                  # API endpoints
+│   │   ├── chat/            # Chat system endpoints
+│   │   ├── documents/       # Document management
+│   │   ├── extract-content/ # PDF processing
+│   │   ├── study-tools/     # Study tools generation
+│   │   └── upload/          # File upload handler
+│   ├── auth/                 # Authentication pages
+│   ├── dashboard/            # Main app interface
+│   └── page.tsx              # Landing page
 │
-├── components/             # React components
-│   ├── chat/              # Chat system components
-│   │   ├── chat-container.tsx    # Main chat interface
-│   │   ├── chat-messages.tsx     # Message list with virtual scrolling
-│   │   ├── chat-input.tsx        # Enhanced input with shortcuts
-│   │   └── memoized-markdown.tsx # Optimized markdown rendering
-│   ├── study-tools/       # Study tools components
-│   │   ├── study-tools-panel.tsx  # Tool selection interface
-│   │   ├── study-tools-canvas.tsx # Content viewer/editor
-│   │   └── flashcard-viewer.tsx   # Interactive flashcard system
-│   └── ui.tsx             # Comprehensive UI component library
+├── components/               # React components
+│   ├── chat/                # Chat system components
+│   ├── study-tools/         # Study tools components
+│   ├── landing/             # Landing page sections
+│   ├── error-management/    # Error handling UI
+│   └── ui.tsx               # Shared UI components
 │
-├── lib/                    # Core utilities and configurations
-│   ├── chat-store.ts      # Zustand chat state management
-│   ├── study-tools-store.ts # Study tools state management
-│   ├── smart-context.ts   # RAG system with semantic search
-│   ├── embeddings.ts      # Free semantic embedding generation
-│   ├── genai-client.ts    # Google Gemini AI client configuration
-│   └── supabase/          # Supabase client configurations
-│       ├── client.ts      # Browser-side Supabase client
-│       ├── server.ts      # Server-side Supabase client
-│       └── middleware.ts  # Session management & route protection
+├── lib/                      # Core utilities
+│   ├── supabase/            # Supabase clients (client, server, middleware)
+│   ├── chat-store.ts        # Chat state management
+│   ├── study-tools-store.ts # Study tools state
+│   ├── flashcard-store.ts   # Flashcard state
+│   ├── token-manager.ts     # Token tracking & optimization
+│   ├── smart-context.ts     # RAG and semantic search
+│   ├── embeddings.ts        # Client-side embeddings
+│   ├── genai-client.ts      # Gemini API integration
+│   └── errors/              # Error handling system
 │
-├── contexts/               # React contexts
-│   ├── auth-context.tsx   # Authentication state provider
-│   └── documents-context.tsx # Document management state
-│
-├── hooks/                  # Custom React hooks
-│   └── use-user.ts        # User session management hook
-│
-├── middleware.ts           # Next.js route protection middleware
-└── types/                  # TypeScript type definitions
+├── contexts/                 # React contexts
+├── hooks/                    # Custom hooks
+├── types/                    # TypeScript definitions
+└── middleware.ts             # Authentication middleware
 ```
 
-## 🔒 Security & Privacy
+### Key Systems
 
-### Authentication Security
-- **Supabase Auth** - Enterprise-grade authentication with email/password and Google OAuth
-- **Password Security** - Bcrypt hashing with secure password policies (8+ characters)
-- **Session Management** - HTTP-only cookies with automatic token refresh
-- **OAuth Security** - PKCE flow for secure third-party authentication
-- **Route Protection** - Middleware-based authentication for all protected routes
-- **Password Reset** - Secure email-based password recovery with expiring links
+#### Token Management System
+**File**: `src/lib/token-manager.ts`
 
-### Data Protection
-- **Multi-Tenant Isolation** - 26+ Row Level Security policies for complete data isolation
-- **Private Storage** - All documents stored in private Supabase storage buckets
-- **Access Control** - Time-limited signed URLs for secure file access
-- **User Isolation** - RLS ensures users only access their own data across all tables
-- **Cascade Policies** - Related tables (sections, messages) inherit parent access controls
-- **No Data Logging** - User content never logged or stored in telemetry
+Intelligent conversation length tracking with progressive warnings:
+- Real-time token estimation (character + word-based algorithms)
+- Context window monitoring (200K practical limit, 1M+ technical limit)
+- Progressive warning levels: Caution (150K) → Warning (180K) → Critical (200K)
+- Automatic conversation optimization with summarization
+- Dynamic document context sizing based on conversation length
 
-### API Security
-- **Server-Side Keys** - API keys never exposed to client-side code
-- **Input Validation** - Comprehensive sanitization and validation on all endpoints
-- **Rate Limiting** - Built-in protection against API abuse
-- **HTTPS Enforcement** - Secure transmission of all data
-- **CSRF Protection** - OAuth state parameter and session token validation
+#### Smart Context System  
+**File**: `src/lib/smart-context.ts`
 
-### Compliance
-- **GDPR Ready** - User data control and deletion capabilities
-- **SOC 2 Compatible** - Following security best practices
-- **Accessibility Standards** - WCAG AA compliance throughout the application
+RAG implementation with free semantic search:
+- Hybrid search (semantic + keyword matching)
+- Client-side embeddings via Transformers.js (no API costs)
+- Structure-aware document chunking with configurable overlap
+- Cosine similarity for relevance scoring
+- Multi-layer caching for performance (embeddings + search results)
 
-## 🎨 Design Philosophy
+#### Chat System
+**Files**: `src/lib/chat-store.ts`, `src/lib/use-chat.ts`
 
-### User-Centered Design
-- **Professional Interface** - Clean, distraction-free design for focused productivity
-- **Accessibility First** - Comprehensive keyboard navigation and screen reader support
-- **Performance Focused** - Fast loading times and smooth interactions
-- **Desktop Optimized** - Layout and interactions designed for desktop productivity workflows
+State management with Zustand:
+- Server-Sent Events for response streaming
+- Dual persistence (Supabase + IndexedDB)
+- Optimistic UI updates with rollback
+- Conversation optimization for long chats
+- Multi-document context support
 
-### Visual Design System
-- **Consistent Typography** - Hierarchical text styles with optimal readability
-- **Color Palette** - Professional teal and amber accents with neutral foundations
-- **Spacing System** - Consistent spacing scale for visual harmony
-- **Component Library** - Reusable components with consistent behavior and styling
+#### Study Tools System
+**File**: `src/lib/study-tools-store.ts` (2800+ lines)
 
-## 🚀 Advanced Features
+Advanced generation system:
+- Concurrent generation support (multiple tools simultaneously)
+- Progress tracking with realistic simulation
+- Conversation-based generation (not just documents)
+- Auto-open queue system for sequential viewing
+- Flashcard integration with dedicated store
+- Export system (PDF/DOCX/clipboard)
 
-### Intelligent Context Management
-```typescript
-// Smart context retrieval for large documents
-- Structure-aware chunking with configurable overlap
-- Hybrid semantic and keyword search
-- Performance caching for embeddings (1 hour TTL)
-- Relevance scoring with cosine similarity + keyword matching
-- Automatic fallback to keyword-only search if needed
-```
+#### Error Management
+**Files**: `src/lib/errors/translator.ts`, `src/lib/errors/logger.ts`
 
-### Study Session Tracking
-```typescript
-// Comprehensive flashcard study sessions
-- Progress tracking with accuracy metrics
-- Time-based performance analytics
-- Spaced repetition algorithm support
-- Custom study session configurations
-- Export capabilities for study data
-```
+Comprehensive error handling:
+- User-friendly error translation
+- Structured error logging
+- Retry logic with exponential backoff
+- Context-aware error messages
 
-### Export System
-```typescript
-// Professional document generation
-- PDF export with custom styling and branding
-- DOCX export with proper formatting and structure
-- Markdown export for universal compatibility
-- Batch export capabilities for multiple materials
-```
+### Security
 
-## 📊 Performance Metrics
+- **Row Level Security** - Database policies enforce user data isolation
+- **Protected Routes** - Middleware checks authentication before page access
+- **Secure File Storage** - Private buckets with time-limited signed URLs
+- **Server-Side API Keys** - Gemini API key never exposed to client
+- **Input Sanitization** - All user inputs validated and sanitized
+- **OAuth Security** - PKCE flow for Google authentication
 
-### Bundle Optimization
-- **Initial Bundle Size** - Optimized for fast loading
-- **Code Splitting** - Dynamic imports for study tools and flashcard systems
-- **Tree Shaking** - Elimination of unused code
-- **Image Optimization** - Next.js automatic image optimization
+### Performance
 
-### Runtime Performance
-- **First Contentful Paint** - Optimized for quick initial render
-- **Largest Contentful Paint** - Large content elements load efficiently
-- **Cumulative Layout Shift** - Minimal layout shifts during loading
-- **Time to Interactive** - Fast time to full interactivity
+- **Code Splitting** - Dynamic imports for study tools and flashcards
+- **Component Memoization** - React.memo for expensive renders
+- **State Persistence** - localStorage for offline access
+- **Efficient Streaming** - Smooth SSE with character-by-character display
+- **Bundle Optimization** - Tree shaking and optimized imports
+- **Caching** - Multi-layer caching for embeddings, search, and API responses
 
-## 📄 License
+## Database Schema
 
-MIT License - see [LICENSE](LICENSE) file for complete terms.
+Core tables in Supabase PostgreSQL:
+- **users** - User accounts and authentication
+- **documents** - PDF metadata and file storage references
+- **sections** - Hierarchical document sections with parent-child relationships
+- **conversations** - Chat session metadata
+- **messages** - Chat messages with role, content, and token counts
+- **outputs** - Generated study materials (guides, summaries, notes) stored as JSONB
+- **chat_sessions** - Stateful sessions for persistent conversation memory
+
+All tables protected by Row Level Security policies ensuring complete user data isolation.
+
+## Contributing
+
+This is a personal project and not currently accepting external contributions. Feel free to fork for your own use.
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-**CogniLeapAI MVP** - Empowering learners with intelligent document processing and AI-powered study tools for enhanced learning outcomes.
+Built with Next.js, TypeScript, Supabase, and Google Gemini
