@@ -8,29 +8,16 @@ const bundleAnalyzer = withBundleAnalyzer({
 const nextConfig = {
   reactStrictMode: false, // Temporarily disabled to avoid hydration issues with browser extensions
   outputFileTracingRoot: process.cwd(),
-  experimental: {
-    optimizePackageImports: [
-      'lucide-react',
-      'framer-motion',
-      '@radix-ui/react-accordion',
-      '@radix-ui/react-dialog',
-      '@radix-ui/react-dropdown-menu',
-      '@radix-ui/react-label',
-      '@radix-ui/react-popover',
-      '@radix-ui/react-scroll-area',
-      '@radix-ui/react-separator',
-      '@radix-ui/react-switch',
-      '@radix-ui/react-tabs',
-      '@radix-ui/react-toast',
-      'react-markdown',
-      'class-variance-authority',
-      'tailwind-merge',
-      'dexie'
-    ],
-  },
-  webpack: (config, { isServer }) => {
+  webpack: (config) => {
     // Fix case sensitivity issues on Windows
     config.resolve.symlinks = false
+
+    if (config.cache && typeof config.cache === 'object') {
+      config.cache = {
+        type: 'memory',
+        maxGenerations: 1,
+      }
+    }
 
     return config
   },

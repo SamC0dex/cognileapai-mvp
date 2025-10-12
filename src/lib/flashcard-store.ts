@@ -245,10 +245,20 @@ export const useFlashcardStore = create<FlashcardStore>()(
           return
         }
 
+        // Check if this flashcard set has a valid database ID
+        // Flashcards generated from conversations without documentId won't have a database ID
+        const hasValidDatabaseId = setToRemove.documentId !== undefined
+
         // Remove from local state immediately for responsive UI
         set(state => ({
           flashcardSets: state.flashcardSets.filter(set => set.id !== id)
         }))
+
+        // Only attempt database deletion if the flashcard was saved to database
+        if (!hasValidDatabaseId) {
+          console.log('[FlashcardStore] Flashcard set has no database ID (conversation-only), skipping database deletion')
+          return
+        }
 
         try {
           // Sync deletion with database
@@ -288,6 +298,10 @@ export const useFlashcardStore = create<FlashcardStore>()(
       renameFlashcardSet: async (id: string, newTitle: string) => {
         console.log('[FlashcardStore] Renaming flashcard set:', id, 'to:', newTitle)
 
+        // Find the flashcard set to check if it has a database ID
+        const currentSet = get().flashcardSets.find(set => set.id === id)
+        const hasValidDatabaseId = currentSet?.documentId !== undefined
+
         // Update locally first for immediate UI feedback
         set(state => ({
           flashcardSets: state.flashcardSets.map(set =>
@@ -295,10 +309,14 @@ export const useFlashcardStore = create<FlashcardStore>()(
           )
         }))
 
+        // Only attempt database update if the flashcard was saved to database
+        if (!hasValidDatabaseId) {
+          console.log('[FlashcardStore] Flashcard set has no database ID (conversation-only), skipping database update')
+          return
+        }
+
         // Sync with database
         try {
-          // First, let's see what flashcard set we're trying to rename
-          const currentSet = get().flashcardSets.find(set => set.id === id)
           console.log('[FlashcardStore] Attempting to sync rename to database:', {
             id,
             title: newTitle,

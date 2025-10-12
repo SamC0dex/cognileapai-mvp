@@ -4,7 +4,7 @@ import React from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Button } from '@/components/ui'
+import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui'
 import { useStudyToolsStore, STUDY_TOOLS, type StudyToolType } from '@/lib/study-tools-store'
 import { StudyToolsConfirmationDialog } from './study-tools-confirmation-dialog'
 import { FlashcardCustomizationDialog } from './flashcard-customization-dialog'
@@ -23,7 +23,6 @@ import {
   Zap,
   AlertCircle,
   Clock,
-  ExternalLink,
   MoreVertical,
   Edit3,
   Trash2,
@@ -36,6 +35,10 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FlashcardsStackIcon } from '@/components/icons/flashcards-stack-icon'
+import { ActionableErrorPanel } from '@/components/error-management/actionable-error-panel'
+import type { ErrorAction } from '@/lib/errors/types'
+import { ErrorBoundary } from '@/components/error-management'
+import { translateError } from '@/lib/errors/translator'
 
 // Enhanced animation variants
 const springTransition = {
@@ -307,29 +310,94 @@ const cleanAIIntroduction = (content: string): string => {
   return cleaned
 }
 
+interface DocumentDropdownMenuProps {
+  onRename: () => void
+  onCopy: () => Promise<void>
+  onDownload: () => Promise<void>
+  onDelete: () => Promise<void>
+}
+
+const DocumentDropdownMenuComponent: React.FC<DocumentDropdownMenuProps> = React.memo(({ onRename, onCopy, onDownload, onDelete }) => {
+  const handleTriggerPointerDown = React.useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+  }, [])
+
+  const handleTriggerClick = React.useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+  }, [])
+
+  const handleTriggerFocus = React.useCallback((event: React.FocusEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+  }, [])
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity focus-visible:ring-0 focus-visible:ring-offset-0"
+          type="button"
+          aria-label="Open study tool options"
+          onPointerDown={handleTriggerPointerDown}
+          onClick={handleTriggerClick}
+          onFocus={handleTriggerFocus}
+        >
+          <MoreVertical className="w-4 h-4 text-muted-foreground" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuItem
+          onClick={onRename}
+          className="text-sm cursor-pointer hover:bg-accent"
+        >
+          <Edit3 className="w-4 h-4 mr-2" />
+          Rename
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => {
+            void onCopy()
+          }}
+          className="text-sm cursor-pointer hover:bg-accent"
+        >
+          <Copy className="w-4 h-4 mr-2" />
+          Copy Content
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => {
+            void onDownload()
+          }}
+          className="text-sm cursor-pointer hover:bg-accent"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Download
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={() => {
+            void onDelete()
+          }}
+          className="text-sm cursor-pointer text-destructive hover:bg-destructive/10 focus:bg-destructive/10 focus:text-destructive"
+        >
+          <Trash2 className="w-4 h-4 mr-2" />
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+})
+
+DocumentDropdownMenuComponent.displayName = 'DocumentDropdownMenuComponent'
+
 const GeneratedDocumentsSection: React.FC = React.memo(() => {
   const { generatedContent, openCanvas, removeGeneratedContent, renameGeneratedContent, copyToClipboard, downloadAsDOCX } = useStudyToolsStore()
   const prefersReducedMotion = useReducedMotion()
-  const [activeDropdown, setActiveDropdown] = React.useState<string | null>(null)
   const [editingTitle, setEditingTitle] = React.useState<string | null>(null)
   const [editingValue, setEditingValue] = React.useState('')
-
-  // Close dropdown when clicking outside
-  React.useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Element
-      if (activeDropdown && !target.closest('[data-dropdown="true"]')) {
-        setActiveDropdown(null)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [activeDropdown])
 
   const handleRename = (content: StudyToolContent) => {
     setEditingTitle(content.id)
     setEditingValue(content.title)
-    setActiveDropdown(null)
   }
 
   const handleSaveRename = (id: string) => {
@@ -343,10 +411,8 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
   const handleDelete = async (id: string) => {
     try {
       await removeGeneratedContent(id)
-      setActiveDropdown(null)
     } catch (error) {
       console.error('Failed to delete study tool:', error)
-      setActiveDropdown(null)
       // Note: Error is logged but UI continues to work. The rollback in the store
       // will restore the item if database deletion failed.
     }
@@ -358,17 +424,14 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
       if (success) {
         console.log('Content copied successfully')
       }
-      setActiveDropdown(null)
     } catch (error) {
       console.error('Failed to copy content:', error)
-      setActiveDropdown(null)
     }
   }
 
   const handleDownloadContent = async (content: StudyToolContent) => {
     try {
       await downloadAsDOCX(content)
-      setActiveDropdown(null)
     } catch (error) {
       console.error('Failed to download content:', error)
       // Fallback to simple text download
@@ -381,102 +444,7 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-      setActiveDropdown(null)
     }
-  }
-
-  const DocumentDropdownMenu = ({ content }: { content: StudyToolContent }) => {
-    const isActive = activeDropdown === content.id
-
-    return (
-      <div className={cn("relative", isActive && "z-[9999]")} data-dropdown="true">
-        <motion.button
-          className={cn(
-            "p-1.5 rounded-md transition-colors duration-200",
-            "hover:bg-muted/70 focus:outline-none focus:bg-muted/70",
-            "opacity-0 group-hover:opacity-100 transition-opacity",
-            "pointer-events-auto relative z-[9998]",
-            isActive && "opacity-100 bg-muted/70"
-          )}
-          onClick={(e) => {
-            e.stopPropagation()
-            setActiveDropdown(isActive ? null : content.id)
-          }}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <MoreVertical className="w-4 h-4 text-muted-foreground" />
-        </motion.button>
-
-        <AnimatePresence>
-          {isActive && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.98, y: -3 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.98, y: -3 }}
-              transition={{ type: 'spring', stiffness: 500, damping: 40, mass: 0.8 }}
-              className="absolute right-0 top-full mt-1 w-48 bg-popover border border-border rounded-lg shadow-xl z-[9999] overflow-hidden"
-              data-dropdown="true"
-              style={{ zIndex: 9999 }}
-              onMouseEnter={(e) => e.stopPropagation()}
-              onMouseMove={(e) => e.stopPropagation()}
-            >
-              <div className="p-1">
-                <motion.button
-                  whileHover={{ backgroundColor: 'hsl(var(--accent))' }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    e.preventDefault()
-                    handleRename(content)
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left hover:bg-accent"
-                >
-                  <Edit3 className="w-4 h-4" />
-                  Rename
-                </motion.button>
-                <motion.button
-                  whileHover={{ backgroundColor: 'hsl(var(--accent))' }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    e.preventDefault()
-                    handleCopyContent(content.content)
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left hover:bg-accent"
-                >
-                  <Copy className="w-4 h-4" />
-                  Copy Content
-                </motion.button>
-                <motion.button
-                  whileHover={{ backgroundColor: 'hsl(var(--accent))' }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    e.preventDefault()
-                    handleDownloadContent(content)
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left hover:bg-accent"
-                >
-                  <Download className="w-4 h-4" />
-                  Download
-                </motion.button>
-                <div className="h-px bg-border my-1" />
-                <motion.button
-                  whileHover={{ backgroundColor: 'hsl(var(--destructive) / 0.1)' }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    e.preventDefault()
-                    handleDelete(content.id)
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left text-destructive hover:text-destructive hover:bg-destructive/10"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Delete
-                </motion.button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    )
   }
 
   if (generatedContent.length === 0) {
@@ -513,22 +481,6 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
         Generated Documents ({generatedContent.length})
       </h3>
 
-      {/* Backdrop overlay when dropdown is open */}
-      <AnimatePresence>
-        {activeDropdown && (
-          <motion.div
-            initial={{ opacity: 1 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0 }}
-            className="absolute inset-0 bg-transparent z-[9997] cursor-default"
-            onClick={() => setActiveDropdown(null)}
-            onMouseMove={(e) => e.stopPropagation()}
-            onMouseEnter={(e) => e.stopPropagation()}
-          />
-        )}
-      </AnimatePresence>
-
       <motion.div
         className="space-y-2 relative"
         variants={{
@@ -564,32 +516,43 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
                   }
                 }
               }}
-              whileHover={!prefersReducedMotion && !isGenerating && !activeDropdown ? {
-                y: -1,
-                scale: 1.01,
-                transition: { duration: 0.15 }
-              } : undefined}
-              whileTap={!prefersReducedMotion && !isGenerating && !activeDropdown ? {
-                scale: 0.98,
-                transition: { duration: 0.08 }
-              } : undefined}
               className={cn(
-                "group p-3 rounded-lg border transition-all duration-200",
+                "group relative p-3 rounded-lg border transition-all duration-200",
                 isGenerating
-                  ? "cursor-wait bg-gradient-to-r from-blue-50/50 to-teal-50/50 dark:from-blue-900/10 dark:to-teal-900/10 border-blue-200/50 dark:border-blue-700/50"
-                  : "cursor-pointer hover:shadow-md hover:shadow-black/5 bg-background/50 hover:bg-background/80",
+                  ? cn(tool.color, tool.borderColor, "opacity-80")
+                  : "hover:shadow-md hover:shadow-black/5 bg-background/50 hover:bg-background/80",
                 !isGenerating && tool.borderColor
               )}
-              onClick={() => !isGenerating && openCanvas(content)}
             >
-              <div className="flex items-start gap-3">
+              {/* Clickable content area */}
+              <div
+                role="button"
+                tabIndex={isGenerating ? -1 : 0}
+                aria-disabled={isGenerating}
+                onClick={() => {
+                  if (!isGenerating) {
+                    openCanvas(content)
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (isGenerating) return
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    openCanvas(content)
+                  }
+                }}
+                className={cn(
+                  "flex items-start gap-3 w-full text-left outline-none rounded-md",
+                  "focus-visible:ring-2 focus-visible:ring-brand-teal-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                  !isGenerating && "cursor-pointer",
+                  isGenerating && "cursor-default"
+                )}
+              >
                 {/* Icon with generation animation */}
                 <motion.div
                   className={cn(
                     "p-1.5 rounded-lg flex-shrink-0 relative",
-                    isGenerating
-                      ? "bg-gradient-to-r from-blue-100 to-teal-100 dark:from-blue-800/30 dark:to-teal-800/30"
-                      : tool.color
+                    tool.color
                   )}
                   animate={isGenerating ? {
                     scale: [1, 1.05, 1],
@@ -606,7 +569,7 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
                       animate={{ rotate: 360 }}
                       transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
                     >
-                      <Loader2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                      <Loader2 className={cn("w-3.5 h-3.5", tool.textColor)} />
                     </motion.div>
                   ) : (
                     <IconComponent className={cn("w-3.5 h-3.5", tool.textColor)} />
@@ -637,54 +600,46 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
                     ) : (
                       <h4 className={cn(
                         "font-medium text-sm truncate flex-1",
-                        isGenerating && "text-blue-700 dark:text-blue-300"
+                        isGenerating && tool.textColor
                       )}>
                         {content.title}
                       </h4>
                     )}
-
-                    <div className="flex items-center gap-1">
-                      {!isGenerating && (
-                        <motion.div
-                          className="opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                          whileHover={{ scale: 1.1 }}
-                        >
-                          <ExternalLink className="w-3 h-3 text-muted-foreground" />
-                        </motion.div>
-                      )}
-                      {!isGenerating && (
-                        <DocumentDropdownMenu content={content} />
-                      )}
-                    </div>
                   </div>
 
                   {isGenerating ? (
                     /* Generation progress */
                     <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400">
+                      <div className={cn("flex items-center gap-2 text-xs", tool.textColor)}>
                         <motion.div
                           animate={{ opacity: [0.5, 1, 0.5] }}
                           transition={{ duration: 1.5, repeat: Infinity }}
                         >
                           <Sparkles className="w-3 h-3" />
                         </motion.div>
-                        <span>{content.title.includes(':') ? content.title.split(':')[1].trim() : 'Generating with AI...'}</span>
+                    <span>{content.statusMessage || 'Generating with AI...'}</span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <div className="flex-1 bg-blue-100 dark:bg-blue-800/30 rounded-full h-1">
+                        <div className="flex-1 rounded-full h-1.5 bg-gray-200 dark:bg-gray-700 overflow-hidden">
                           <motion.div
-                            className="h-1 bg-gradient-to-r from-blue-500 to-teal-500 rounded-full"
+                            className={cn("h-1.5 rounded-full", tool.progressBarColor)}
                             initial={{ width: '0%' }}
                             animate={{ width: `${content.generationProgress || 0}%` }}
                             transition={{ duration: 0.3, ease: 'easeOut' }}
                           />
                         </div>
-                        <span className="text-xs">{Math.round(content.generationProgress || 0)}%</span>
+                        <span className={cn("text-xs font-medium", tool.textColor)}>{Math.round(content.generationProgress || 0)}%</span>
                       </div>
                     </div>
                   ) : (
                     /* Completed document info */
                     <>
+                      {content.statusMessage && (
+                        <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 mb-1">
+                          <AlertCircle className="w-3 h-3" />
+                          <span className="truncate">{content.statusMessage}</span>
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Clock className="w-3 h-3" />
                         <span>
@@ -698,6 +653,18 @@ const GeneratedDocumentsSection: React.FC = React.memo(() => {
                   )}
                 </div>
               </div>
+
+              {/* Dropdown menu - outside clickable area */}
+              {!isGenerating && (
+                <div className="absolute top-2 right-2">
+                  <DocumentDropdownMenuComponent
+                    onRename={() => handleRename(content)}
+                    onCopy={() => handleCopyContent(content.content)}
+                    onDownload={() => handleDownloadContent(content)}
+                    onDelete={() => handleDelete(content.id)}
+                  />
+                </div>
+              )}
             </motion.div>
           )
         })}
@@ -787,10 +754,60 @@ const ExpandedPanel: React.FC<{
   hasContext: boolean
 }> = ({ onCollapse, onGenerateStudyTool, hasContext }) => {
   const prefersReducedMotion = useReducedMotion()
-  const { isCanvasOpen, isCanvasFullscreen, canvasContent, closeCanvas, toggleCanvasFullscreen, copyToClipboard, downloadAsPDF, downloadAsDOCX, isGeneratingType } = useStudyToolsStore()
+  const {
+    isCanvasOpen,
+    isCanvasFullscreen,
+    canvasContent,
+    closeCanvas,
+    toggleCanvasFullscreen,
+    copyToClipboard,
+    downloadAsPDF,
+    downloadAsDOCX,
+    isGeneratingType,
+    friendlyError,
+    clearError,
+    retryLastGeneration,
+    lastFailedGeneration
+  } = useStudyToolsStore()
   const { isViewerOpen, currentFlashcardSet, isFullscreen, closeViewer, toggleFullscreen } = useFlashcardStore()
   const [isCopied, setIsCopied] = React.useState(false)
   const [showExportMenu, setShowExportMenu] = React.useState(false)
+
+  const handleErrorAction = React.useCallback((action: ErrorAction) => {
+    switch (action.intent) {
+      case 'retry':
+        clearError()
+        if (lastFailedGeneration) {
+          void retryLastGeneration()
+        }
+        break
+      case 'signin':
+        clearError()
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login'
+        }
+        break
+      case 'support':
+        if (typeof window !== 'undefined') {
+          window.open('mailto:support@cognileap.ai?subject=Study%20Tools%20Assistance', '_blank')
+        }
+        break
+      case 'upload':
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('open-document-upload'))
+        }
+        break
+      case 'reload':
+        if (typeof window !== 'undefined') {
+          window.location.reload()
+        }
+        break
+      case 'dismiss':
+      default:
+        clearError()
+        break
+    }
+  }, [clearError, lastFailedGeneration, retryLastGeneration])
 
   // Close export menu when clicking outside
   React.useEffect(() => {
@@ -902,6 +919,10 @@ const ExpandedPanel: React.FC<{
           </Button>
         </motion.div>
       </motion.div>
+
+      {friendlyError && (
+        <ActionableErrorPanel error={friendlyError} onAction={handleErrorAction} />
+      )}
 
       {/* Canvas Content or Tools Grid */}
       <AnimatePresence mode="wait">
@@ -1293,26 +1314,70 @@ const ExpandedPanel: React.FC<{
 }
 
 // Flashcard Sets Section Component
+interface FlashcardDropdownMenuProps {
+  onRename: () => void
+  onDelete: () => Promise<void>
+}
+
+const FlashcardDropdownMenuComponent: React.FC<FlashcardDropdownMenuProps> = React.memo(({ onRename, onDelete }) => {
+  const handleTriggerPointerDown = React.useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+  }, [])
+
+  const handleTriggerClick = React.useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+  }, [])
+
+  const handleTriggerFocus = React.useCallback((event: React.FocusEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+  }, [])
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity focus-visible:ring-0 focus-visible:ring-offset-0"
+          type="button"
+          aria-label="Open flashcard options"
+          onPointerDown={handleTriggerPointerDown}
+          onClick={handleTriggerClick}
+          onFocus={handleTriggerFocus}
+        >
+          <MoreVertical className="w-3 h-3 text-muted-foreground" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-36">
+        <DropdownMenuItem
+          onClick={onRename}
+          className="text-sm cursor-pointer hover:bg-accent"
+        >
+          <Edit3 className="w-4 h-4 mr-2" />
+          Rename
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={() => {
+            void onDelete()
+          }}
+          className="text-sm cursor-pointer text-destructive hover:bg-destructive/10 focus:bg-destructive/10 focus:text-destructive"
+        >
+          <Trash2 className="w-4 h-4 mr-2" />
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+})
+
+FlashcardDropdownMenuComponent.displayName = 'FlashcardDropdownMenuComponent'
+
 const FlashcardSetsSection: React.FC = () => {
   const { flashcardSets, openViewer, removeFlashcardSet, renameFlashcardSet } = useFlashcardStore()
   const prefersReducedMotion = useReducedMotion()
-  const [activeDropdown, setActiveDropdown] = React.useState<string | null>(null)
   const [editingTitle, setEditingTitle] = React.useState<string | null>(null)
   const [editingValue, setEditingValue] = React.useState('')
-
-  // Close dropdown when clicking outside
-  React.useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Element
-      if (activeDropdown && !target.closest('[data-flashcard-dropdown="true"]')) {
-        setActiveDropdown(null)
-      }
-    }
-    if (activeDropdown) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [activeDropdown])
 
   const handleStartRename = (flashcardSet: FlashcardSet) => {
     setEditingTitle(flashcardSet.id)
@@ -1345,74 +1410,6 @@ const FlashcardSetsSection: React.FC = () => {
   }
 
   // Flashcard Dropdown Menu Component
-  const FlashcardDropdownMenu: React.FC<{ flashcardSet: FlashcardSet }> = ({ flashcardSet }) => {
-    const isOpen = activeDropdown === flashcardSet.id
-
-    return (
-      <div className={cn("relative", isOpen && "z-[9999]")}>
-        <motion.button
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={(e) => {
-            e.stopPropagation()
-            setActiveDropdown(isOpen ? null : flashcardSet.id)
-          }}
-          className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-accent transition-colors pointer-events-auto relative z-[9998]"
-          data-flashcard-dropdown="true"
-        >
-          <MoreVertical className="w-3 h-3 text-muted-foreground" />
-        </motion.button>
-
-        <AnimatePresence>
-          {isOpen && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.98, y: -3 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.98, y: -3 }}
-              transition={{ type: 'spring', stiffness: 500, damping: 40, mass: 0.8 }}
-              className="absolute right-0 top-full mt-1 w-36 bg-popover border border-border rounded-lg shadow-xl z-[9999] overflow-hidden"
-              data-flashcard-dropdown="true"
-              style={{ zIndex: 9999 }}
-              onMouseEnter={(e) => e.stopPropagation()}
-              onMouseMove={(e) => e.stopPropagation()}
-            >
-              <div className="p-1">
-                <motion.button
-                  whileHover={{ backgroundColor: 'hsl(var(--accent))' }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    e.preventDefault()
-                    handleStartRename(flashcardSet)
-                    setActiveDropdown(null)
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left hover:bg-accent"
-                >
-                  <Edit3 className="w-4 h-4" />
-                  Rename
-                </motion.button>
-                {/* Copy button removed as per user request */}
-                <div className="h-px bg-border my-1" />
-                <motion.button
-                  whileHover={{ backgroundColor: 'hsl(var(--destructive) / 0.1)' }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    e.preventDefault()
-                    handleDelete(flashcardSet.id)
-                    setActiveDropdown(null)
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left text-destructive hover:text-destructive hover:bg-destructive/10"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Delete
-                </motion.button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    )
-  }
-
   if (flashcardSets.length === 0) {
     return null
   }
@@ -1428,22 +1425,6 @@ const FlashcardSetsSection: React.FC = () => {
         <FlashcardsStackIcon size={18} className="text-brand-teal-600" />
         Generated flashcards ({flashcardSets.length})
       </h3>
-
-      {/* Backdrop overlay when dropdown is open */}
-      <AnimatePresence>
-        {activeDropdown && (
-          <motion.div
-            initial={{ opacity: 1 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0 }}
-            className="absolute inset-0 bg-transparent z-[9997] cursor-default"
-            onClick={() => setActiveDropdown(null)}
-            onMouseMove={(e) => e.stopPropagation()}
-            onMouseEnter={(e) => e.stopPropagation()}
-          />
-        )}
-      </AnimatePresence>
 
       <motion.div
         className="space-y-2 relative"
@@ -1479,38 +1460,48 @@ const FlashcardSetsSection: React.FC = () => {
                   }
                 }
               }}
-              whileHover={!prefersReducedMotion && !isGenerating && !activeDropdown ? {
-                y: -1,
-                scale: 1.01,
-                transition: { duration: 0.15 }
-              } : undefined}
-              whileTap={!prefersReducedMotion && !isGenerating && !activeDropdown ? {
-                scale: 0.98,
-                transition: { duration: 0.08 }
-              } : undefined}
               className={cn(
-                "group p-3 rounded-lg border transition-all duration-200",
+                "group relative p-3 rounded-lg border transition-all duration-200",
                 isGenerating
-                  ? "bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800"
-                  : "cursor-pointer hover:shadow-md hover:shadow-black/5 bg-background/50 hover:bg-background/80 border-green-200 dark:border-green-800"
+                  ? cn("bg-green-50/50 dark:bg-green-900/10 border-green-200 dark:border-green-800")
+                  : "hover:shadow-md hover:shadow-black/5 bg-background/50 hover:bg-background/80 border-green-200 dark:border-green-800"
               )}
-              onClick={() => !isGenerating && openViewer(flashcardSet)}
             >
-              <div className="flex items-start gap-3">
+              <div
+                role="button"
+                tabIndex={isGenerating ? -1 : 0}
+                aria-disabled={isGenerating}
+                onClick={() => {
+                  if (!isGenerating) {
+                    openViewer(flashcardSet)
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (isGenerating) return
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    openViewer(flashcardSet)
+                  }
+                }}
+                className={cn(
+                  "flex items-start gap-3 w-full text-left outline-none rounded-md",
+                  "focus-visible:ring-2 focus-visible:ring-brand-teal-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                  !isGenerating && "cursor-pointer",
+                  isGenerating && "cursor-default"
+                )}
+              >
                 {/* Flashcard icon */}
                 <motion.div
                   className={cn(
                     "p-1.5 rounded-lg flex-shrink-0",
-                    isGenerating
-                      ? "bg-blue-50 dark:bg-blue-900/20"
-                      : "bg-green-50 dark:bg-green-900/20"
+                    "bg-green-50 dark:bg-green-900/20"
                   )}
                   whileHover={!prefersReducedMotion && !isGenerating ? { scale: 1.05, rotate: 1 } : undefined}
                   animate={isGenerating ? { rotate: [0, 360] } : undefined}
                   transition={isGenerating ? { duration: 2, repeat: Infinity, ease: "linear" } : { duration: 0.2 }}
                 >
                   {isGenerating ? (
-                    <Loader2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                    <Loader2 className="w-3.5 h-3.5 text-green-700 dark:text-green-300" />
                   ) : (
                     <FlashcardsStackIcon size={16} className="text-green-700 dark:text-green-300" strokeWidth={1.4} />
                   )}
@@ -1542,33 +1533,23 @@ const FlashcardSetsSection: React.FC = () => {
                         {flashcardSet.title}
                       </h4>
                     )}
-
-                    <div className="flex items-center gap-1">
-                      <motion.div
-                        className="opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                        whileHover={{ scale: 1.1 }}
-                      >
-                        <ExternalLink className="w-3 h-3 text-muted-foreground" />
-                      </motion.div>
-                      <FlashcardDropdownMenu flashcardSet={flashcardSet} />
-                    </div>
                   </div>
 
                   {/* Flashcard info */}
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     {isGenerating ? (
                       <>
-                        <span className="text-blue-600 dark:text-blue-400 font-medium">
+                        <span className="text-green-700 dark:text-green-300 font-medium">
                           {flashcardSet.title.includes(':') ? flashcardSet.title.split(':')[1].trim() : 'Generating...'}
                         </span>
                         <span className="flex items-center gap-1">
-                          <div className="w-16 h-1 bg-muted rounded-full overflow-hidden">
+                          <div className="w-16 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                             <div
-                              className="h-full bg-blue-600 dark:bg-blue-400 transition-all duration-300 rounded-full"
+                              className="h-full bg-green-500 dark:bg-green-400 transition-all duration-300 rounded-full"
                               style={{ width: `${generationProgress}%` }}
                             />
                           </div>
-                          <span className="text-xs">{Math.round(generationProgress)}%</span>
+                          <span className="text-xs font-medium text-green-700 dark:text-green-300">{Math.round(generationProgress)}%</span>
                         </span>
                       </>
                     ) : (
@@ -1597,6 +1578,16 @@ const FlashcardSetsSection: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Dropdown menu - outside clickable area */}
+              {!isGenerating && (
+                <div className="absolute top-2 right-2">
+                  <FlashcardDropdownMenuComponent
+                    onRename={() => handleStartRename(flashcardSet)}
+                    onDelete={() => handleDelete(flashcardSet.id)}
+                  />
+                </div>
+              )}
             </motion.div>
           )
         })}
@@ -1612,7 +1603,7 @@ interface SelectedDocument {
   processing_status?: string
 }
 
-export const StudyToolsPanel: React.FC<{
+const StudyToolsPanelContent: React.FC<{
   documentId?: string
   conversationId?: string
   selectedDocuments: SelectedDocument[]
@@ -1816,4 +1807,59 @@ export const StudyToolsPanel: React.FC<{
   )
 })
 
+StudyToolsPanelContent.displayName = 'StudyToolsPanelContent'
+
+const StudyToolsPanelErrorFallback: React.FC<{ error: Error; retry: () => void }> = ({ error, retry }) => {
+  const translated = React.useMemo(() => translateError(error, {
+    source: 'study-tools',
+    operation: 'render',
+    rawMessage: error.message,
+    payload: {
+      component: 'StudyToolsPanel'
+    }
+  }), [error])
+
+  const handleAction = React.useCallback((action: ErrorAction) => {
+    switch (action.intent) {
+      case 'retry':
+        retry()
+        break
+      case 'reload':
+        if (typeof window !== 'undefined') {
+          window.location.reload()
+        }
+        break
+      case 'support':
+        if (typeof window !== 'undefined') {
+          window.open('mailto:support@cognileap.ai?subject=Study%20Tools%20Issue', '_blank')
+        }
+        break
+      case 'upload':
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('open-document-upload'))
+        }
+        break
+      case 'dismiss':
+      default:
+        retry()
+        break
+    }
+  }, [retry])
+
+  return (
+    <div className="p-4">
+      <ActionableErrorPanel error={translated.userError} onAction={handleAction} />
+    </div>
+  )
+}
+
+type StudyToolsPanelProps = React.ComponentProps<typeof StudyToolsPanelContent>
+
+const StudyToolsPanelWithBoundary: React.FC<StudyToolsPanelProps> = (props) => (
+  <ErrorBoundary fallback={StudyToolsPanelErrorFallback}>
+    <StudyToolsPanelContent {...props} />
+  </ErrorBoundary>
+)
+
+export const StudyToolsPanel = React.memo(StudyToolsPanelWithBoundary)
 StudyToolsPanel.displayName = 'StudyToolsPanel'

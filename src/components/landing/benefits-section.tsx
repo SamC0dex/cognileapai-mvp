@@ -4,6 +4,7 @@ import { motion, useInView } from "framer-motion"
 import { ArrowRight, Zap, Target, TrendingUp, Award, Clock, BookOpen } from "lucide-react"
 import { useRef, useState } from "react"
 import { SectionBackground } from "./animated-background"
+import { cn } from "@/lib/utils"
 
 /**
  * Benefits Section - Learning Transformation Showcase
@@ -77,7 +78,7 @@ function TransformationTimeline() {
           className="h-full rounded-full bg-gradient-to-r from-red-500/30 via-amber-500/30 to-teal-500/30"
           initial={{ scaleX: 0 }}
           animate={isInView ? { scaleX: 1 } : { scaleX: 0 }}
-          transition={{ duration: 1.5, delay: 0.5 }}
+          transition={{ duration: 1, delay: 0.3 }}
         />
 
         {/* Animated arrow */}
@@ -85,7 +86,7 @@ function TransformationTimeline() {
           className="absolute right-0 top-1/2 -translate-y-1/2"
           initial={{ x: -20, opacity: 0 }}
           animate={isInView ? { x: 0, opacity: 1 } : { x: -20, opacity: 0 }}
-          transition={{ duration: 0.6, delay: 1.5 }}
+          transition={{ duration: 0.3, delay: 0.5 }}
         >
           <ArrowRight className="h-6 w-6 text-teal-500" />
         </motion.div>
@@ -96,26 +97,30 @@ function TransformationTimeline() {
         {TRANSFORMATION_STAGES.map((stage, index) => (
           <motion.div
             key={stage.state}
-            initial={{ opacity: 0, x: index === 0 ? -50 : 50 }}
-            animate={isInView ? { opacity: 1, x: 0 } : { opacity: 0, x: index === 0 ? -50 : 50 }}
-            transition={{ duration: 0.8, delay: index * 0.3 }}
+            initial={{ opacity: 0, x: index === 0 ? -30 : 30 }}
+            animate={isInView ? { opacity: 1, x: 0 } : { opacity: 0, x: index === 0 ? -30 : 30 }}
+            transition={{ duration: 0.4, delay: index * 0.1 }}
             onMouseEnter={() => setHoveredStage(stage.state)}
             onMouseLeave={() => setHoveredStage(null)}
             className="group relative"
           >
             <div
-              className={`relative overflow-hidden rounded-2xl border p-8 backdrop-blur-sm transition-all duration-500 ${
+              className={cn(
+                "relative overflow-hidden rounded-2xl border p-8 backdrop-blur-sm transition-all duration-500",
+                hoveredStage === stage.state
+                  ? "scale-105"
+                  : "shadow-[0_20px_40px_rgba(15,23,42,0.08)]",
                 stage.state === "before"
-                  ? "border-red-500/30 bg-red-500/5"
-                  : "border-teal-500/30 bg-teal-500/5"
-              } ${hoveredStage === stage.state ? "scale-105 shadow-2xl" : ""}`}
+                  ? "border-red-500/40 bg-gradient-to-br from-white/96 via-red-50/70 to-white/92 dark:from-[rgba(239,68,68,0.12)] dark:via-[rgba(15,23,42,0.88)] dark:to-[rgba(15,23,42,0.88)] dark:border-red-500/20"
+                  : "border-teal-500/40 bg-gradient-to-br from-white/96 via-teal-50/70 to-white/92 dark:from-[rgba(20,184,166,0.12)] dark:via-[rgba(15,23,42,0.88)] dark:to-[rgba(15,23,42,0.88)] dark:border-teal-500/20"
+              )}
               style={{
                 boxShadow:
                   hoveredStage === stage.state
                     ? stage.state === "before"
-                      ? "0 20px 60px rgba(239, 68, 68, 0.3)"
-                      : "0 20px 60px rgba(20, 184, 166, 0.3)"
-                    : "none",
+                      ? "0 24px 60px rgba(239, 68, 68, 0.28)"
+                      : "0 24px 60px rgba(20, 184, 166, 0.28)"
+                    : undefined,
               }}
             >
               {/* Icon badge */}
@@ -126,7 +131,7 @@ function TransformationTimeline() {
                     : "bg-gradient-to-br from-teal-500 to-emerald-500"
                 } text-white shadow-lg`}
                 whileHover={{ rotate: 360, scale: 1.1 }}
-                transition={{ duration: 0.6 }}
+                transition={{ duration: 0.4 }}
               >
                 {stage.icon}
               </motion.div>
@@ -138,16 +143,13 @@ function TransformationTimeline() {
               {/* Metrics */}
               <div className="space-y-3">
                 {stage.metrics.map((metric, i) => (
-                  <motion.div
+                  <div
                     key={i}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
-                    transition={{ delay: index * 0.3 + i * 0.1 }}
-                    className="flex items-center justify-between rounded-lg border border-border/50 bg-card/50 px-4 py-2"
+                    className="flex items-center justify-between rounded-lg border px-4 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.05)] border-white/70 bg-white/90 dark:border-white/10 dark:bg-[rgba(15,23,42,0.75)] dark:shadow-[0_12px_30px_rgba(2,6,23,0.45)]"
                   >
                     <span className="text-sm text-muted-foreground">{metric.label}</span>
                     <span className={`text-lg font-bold ${metric.color}`}>{metric.value}</span>
-                  </motion.div>
+                  </div>
                 ))}
               </div>
 
@@ -171,29 +173,31 @@ function TransformationTimeline() {
 
 function ImpactMetricCard({ metric, index }: { metric: typeof IMPACT_METRICS[number]; index: number }) {
   const ref = useRef(null)
-  const isInView = useInView(ref, { once: true, margin: "-100px" })
+  const isInView = useInView(ref, { once: true, margin: "-80px" })
   const [isHovered, setIsHovered] = useState(false)
 
   return (
     <motion.div
       ref={ref}
-      initial={{ opacity: 0, y: 50, scale: 0.9 }}
-      animate={isInView ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 50, scale: 0.9 }}
+      initial={{ opacity: 0, y: 30 }}
+      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
       transition={{
-        type: "spring",
-        stiffness: 100,
-        damping: 20,
-        delay: index * 0.15,
+        duration: 0.4,
+        delay: index * 0.1,
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className="group relative"
     >
       <div
-        className="relative overflow-hidden rounded-2xl border border-border/50 bg-card/80 p-8 text-center backdrop-blur-sm transition-all duration-300"
+        className={cn(
+          "relative overflow-hidden rounded-2xl border p-8 text-center backdrop-blur-sm transition-all duration-300",
+          "bg-white/95 shadow-[0_24px_48px_rgba(15,23,42,0.08)] border-white/70",
+          "dark:bg-[rgba(15,23,42,0.82)] dark:border-white/10 dark:shadow-[0_22px_48px_rgba(2,6,23,0.55)]"
+        )}
         style={{
-          borderColor: isHovered ? metric.glow : "hsl(var(--border) / 0.5)",
-          boxShadow: isHovered ? `0 20px 60px ${metric.glow}` : "none",
+          borderColor: isHovered ? metric.glow : undefined,
+          boxShadow: isHovered ? `0 20px 60px ${metric.glow}` : undefined,
         }}
       >
         {/* Icon */}
@@ -246,7 +250,7 @@ function ImpactMetricCard({ metric, index }: { metric: typeof IMPACT_METRICS[num
 
 export default function BenefitsSection() {
   return (
-    <section className="relative overflow-hidden py-20 sm:py-32">
+    <section className="relative overflow-hidden py-10 sm:py-16">
       <SectionBackground />
 
       <div className="relative mx-auto max-w-7xl px-6">
@@ -254,19 +258,14 @@ export default function BenefitsSection() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 0.5 }}
           className="mx-auto max-w-4xl text-center"
         >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm backdrop-blur-sm"
-          >
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm backdrop-blur-sm">
             <BookOpen className="h-3.5 w-3.5 text-primary" />
             <span className="font-medium">Learning Transformation</span>
-          </motion.div>
+          </div>
 
           <h2 className="text-balance text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
             From{" "}
@@ -292,8 +291,8 @@ export default function BenefitsSection() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.3 }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 0.4 }}
           className="mt-20"
         >
           <div className="mb-12 text-center">

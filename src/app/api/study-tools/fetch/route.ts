@@ -76,49 +76,62 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      // For conversation-based fetch, get outputs from the associated document if it exists
-      if (conversation.document_id) {
-        const { data, error } = await supabase
-          .from('outputs')
-          .select('*')
-          .eq('document_id', conversation.document_id)
-          .eq('overall', true)
-          .order('created_at', { ascending: false })
+      // Fetch outputs directly linked to this conversation OR from the associated document
+      // This supports both conversation-only study tools and document-based study tools
+      const { data, error } = await supabase
+        .from('outputs')
+        .select('*')
+        .or(`conversation_id.eq.${conversationId}${conversation.document_id ? `,document_id.eq.${conversation.document_id}` : ''}`)
+        .eq('overall', true)
+        .order('created_at', { ascending: false })
 
-        if (error) {
-          console.error('[StudyTools] Database fetch error:', error)
-          return NextResponse.json(
-            { error: 'Failed to fetch study tools from database' },
-            { status: 500 }
-          )
-        }
-
-        // Filter by conversationId in payload if needed
-        outputs = (data || []).filter(output =>
-          output.payload?.conversationId === conversationId ||
-          output.payload?.documentId === conversation.document_id
+      if (error) {
+        console.error('[StudyTools] Database fetch error:', error)
+        return NextResponse.json(
+          { error: 'Failed to fetch study tools from database' },
+          { status: 500 }
         )
       }
+
+      outputs = data || []
+      console.log('[StudyTools] Found', outputs.length, 'outputs for conversation:', conversationId)
     }
 
-    // If no documentId or conversationId provided, or no outputs found,
-    // fetch all study tools from user's documents (dashboard view)
-    if (outputs.length === 0 || (!documentId && !conversationId)) {
+    // If no documentId or conversationId provided,
+    // fetch all study tools for user (dashboard view)
+    if (!documentId && !conversationId) {
       console.log('[StudyTools] Fetching all study tools for user\'s dashboard view')
 
-      // Get user's document IDs first
+      // Get user's document IDs and conversation IDs
       const { data: userDocs } = await supabase
         .from('documents')
         .select('id')
         .eq('user_id', user.id)
 
-      const userDocIds = (userDocs || []).map(d => d.id)
+      const { data: userConvs } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('user_id', user.id)
 
-      if (userDocIds.length > 0) {
+      const userDocIds = (userDocs || []).map(d => d.id)
+      const userConvIds = (userConvs || []).map(c => c.id)
+
+      // Fetch outputs from both documents and conversations
+      if (userDocIds.length > 0 || userConvIds.length > 0) {
+        const conditions: string[] = []
+
+        if (userDocIds.length > 0) {
+          conditions.push(`document_id.in.(${userDocIds.join(',')})`)
+        }
+        
+        if (userConvIds.length > 0) {
+          conditions.push(`conversation_id.in.(${userConvIds.join(',')})`)
+        }
+
         const { data, error } = await supabase
           .from('outputs')
           .select('*')
-          .in('document_id', userDocIds)
+          .or(conditions.join(','))
           .eq('overall', true)
           .order('created_at', { ascending: false })
 
@@ -131,9 +144,9 @@ export async function POST(req: NextRequest) {
         }
 
         outputs = data || []
-        console.log('[StudyTools] Loaded', outputs.length, 'study tools for user dashboard')
+        console.log('[StudyTools] Loaded', outputs.length, 'study tools for user dashboard (', userDocIds.length, 'docs,', userConvIds.length, 'convs)')
       } else {
-        console.log('[StudyTools] User has no documents yet')
+        console.log('[StudyTools] User has no documents or conversations yet')
       }
     }
 
@@ -152,8 +165,9 @@ export async function POST(req: NextRequest) {
         title: payload.title || 'Untitled',
         content: payload.content || '',
         createdAt: output.created_at, // Keep as ISO string from database
-        documentId: payload.documentId || null,
-        conversationId: payload.conversationId || null,
+        // Use database columns as source of truth, fall back to payload
+        documentId: output.document_id || payload.documentId || null,
+        conversationId: output.conversation_id || payload.conversationId || null,
         isGenerating: false,
         generationProgress: 100,
         metadata: payload.metadata || {}

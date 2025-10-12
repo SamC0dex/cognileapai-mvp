@@ -97,14 +97,22 @@ export function estimateTokensFromText(text: string): TokenCount {
 
 /**
  * Estimate tokens for multiple messages (conversation context)
+ * @param messages - Array of messages to count
+ * @param externalTokens - Optional external token counts (e.g., from API metadata)
  */
-export function estimateConversationTokens(messages: Message[]): ConversationTokens {
+export function estimateConversationTokens(
+  messages: Message[],
+  externalTokens?: {
+    systemPrompt?: number
+    documentContext?: number
+  }
+): ConversationTokens {
   let totalTokens = 0
   let messageTokens = 0
   let userTokens = 0
   let assistantTokens = 0
-  let documentTokens = 0
-  let systemTokens = 0
+  let documentTokens = externalTokens?.documentContext || 0
+  let systemTokens = externalTokens?.systemPrompt || 0
 
   for (const message of messages) {
     const tokenCount = message.tokenCount || estimateTokensFromText(message.content)
@@ -122,15 +130,18 @@ export function estimateConversationTokens(messages: Message[]): ConversationTok
         messageTokens += tokens
         break
       case 'system':
-        // System messages often contain document context
-        if (message.content.includes('You have access to the following content')) {
+        // System messages often contain document context (fallback if externalTokens not provided)
+        if (!externalTokens && message.content.includes('You have access to the following content')) {
           documentTokens += tokens
-        } else {
+        } else if (!externalTokens) {
           systemTokens += tokens
         }
         break
     }
   }
+
+  // Add external tokens to total
+  totalTokens += systemTokens + documentTokens
 
   // Determine warning level
   let warningLevel: 'none' | 'caution' | 'warning' | 'critical' = 'none'
@@ -264,8 +275,8 @@ export function optimizeConversationLength(
   const headCount = Math.min(leadingMessages, tokenizedMessages.length)
   const leadingSlice = tokenizedMessages.slice(0, headCount)
 
-  let trailingStart = Math.max(headCount, tokenizedMessages.length - trailingMessages)
-  let trailingSlice = tokenizedMessages.slice(trailingStart)
+  const trailingStart = Math.max(headCount, tokenizedMessages.length - trailingMessages)
+  const trailingSlice = tokenizedMessages.slice(trailingStart)
 
   const middleSlice = tokenizedMessages.slice(headCount, trailingStart)
 

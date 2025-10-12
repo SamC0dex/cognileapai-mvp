@@ -13,6 +13,7 @@ import type { DocumentUploadedDetail } from '@/types/documents'
 import { GeminiLogo } from '@/components/icons/gemini-logo'
 import type { ConversationTokens } from '@/lib/token-manager'
 import { ChatSettingsPopover } from '@/components/chat/chat-settings-popover'
+import { TokenUsageBadge } from '@/components/chat/token-usage-indicator'
 
 interface ChatPageProps {
   params: Promise<{ id: string }>
@@ -278,8 +279,10 @@ export default function ChatPage({ params }: ChatPageProps) {
                   aria-label="New Chat"
                   type="button"
                 >
-                  <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v12m6-6H6" />
+                  <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    <line x1="9" y1="10" x2="15" y2="10" />
+                    <line x1="12" y1="7" x2="12" y2="13" />
                   </svg>
                   <span className="hidden sm:inline">New Chat</span>
                 </button>
@@ -298,8 +301,14 @@ export default function ChatPage({ params }: ChatPageProps) {
                   <span className="hidden sm:inline">History</span>
                 </button>
 
+                {/* Context Window Indicator */}
+                <TokenUsageBadge
+                  tokens={tokenUsage.tokens}
+                  isCalculating={tokenUsage.isCalculating}
+                />
+
                 {/* Settings */}
-                <ChatSettingsPopover tokenUsage={tokenUsage} onStartNewChat={handleNewChat} />
+                <ChatSettingsPopover />
               </div>
             </div>
           </div>

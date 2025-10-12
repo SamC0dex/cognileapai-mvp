@@ -2,245 +2,456 @@
 
 import React, { useMemo } from 'react'
 import { motion } from 'framer-motion'
+import * as Popover from '@radix-ui/react-popover'
 import type { ConversationTokens } from '@/lib/token-manager'
 import { TokenManager } from '@/lib/token-manager'
 import { cn } from '@/lib/utils'
-import { AlertTriangle, Gauge, Sparkles, Zap } from 'lucide-react'
+import {
+  AlertTriangle,
+  Zap,
+  MessageSquare,
+  FileText,
+  Cpu,
+  Sparkles,
+  TrendingUp,
+  Info,
+  Lightbulb,
+  BookOpen,
+  Database
+} from 'lucide-react'
 
-interface ContextUsageCardProps {
+interface TokenUsageIndicatorProps {
   tokens: ConversationTokens | null
   isCalculating?: boolean
+  className?: string
 }
 
 const LIMIT = TokenManager.LIMITS.PRACTICAL_INPUT_MAX
-const RESERVED_FOR_RESPONSE = TokenManager.LIMITS.PRACTICAL_OUTPUT_MAX
 const FORMATTER = new Intl.NumberFormat('en-US')
 
-type UsageStatus = 'idle' | 'healthy' | 'caution' | 'warning' | 'critical'
+// Status configuration based on user requirements
+type StatusLevel = 'healthy' | 'caution' | 'warning' | 'critical'
 
-const STATUS_DETAILS: Record<UsageStatus, {
+interface StatusConfig {
+  level: StatusLevel
   label: string
-  tone: string
-  accent: string
-  subtext: string
+  message: string
+  color: string
+  bgColor: string
+  borderColor: string
   icon: React.ElementType
-}> = {
-  idle: {
-    label: 'Calibrating',
-    tone: 'text-muted-foreground',
-    accent: 'from-slate-500/20 via-slate-500/10 to-transparent',
-    subtext: 'Gathering usage details…',
-    icon: Gauge
-  },
-  healthy: {
+  iconColor: string
+}
+
+const getStatusConfig = (percentage: number): StatusConfig => {
+  if (percentage >= 100) {
+    return {
+      level: 'critical',
+      label: 'Critical',
+      message: 'Context limit reached. Start a new chat to continue effectively.',
+      color: 'text-red-600 dark:text-red-400',
+      bgColor: 'bg-red-50 dark:bg-red-950/30',
+      borderColor: 'border-red-300 dark:border-red-800',
+      icon: AlertTriangle,
+      iconColor: 'text-red-600 dark:text-red-400'
+    }
+  }
+
+  if (percentage >= 90) {
+    return {
+      level: 'warning',
+      label: 'Warning',
+      message: 'Approaching context limit. Consider starting a fresh chat soon.',
+      color: 'text-orange-600 dark:text-orange-400',
+      bgColor: 'bg-orange-50 dark:bg-orange-950/30',
+      borderColor: 'border-orange-300 dark:border-orange-800',
+      icon: AlertTriangle,
+      iconColor: 'text-orange-600 dark:text-orange-400'
+    }
+  }
+
+  if (percentage >= 75) {
+    return {
+      level: 'caution',
+      label: 'Caution',
+      message: 'Context usage is growing. Monitor your conversation length.',
+      color: 'text-amber-600 dark:text-amber-400',
+      bgColor: 'bg-amber-50 dark:bg-amber-950/30',
+      borderColor: 'border-amber-300 dark:border-amber-800',
+      icon: Zap,
+      iconColor: 'text-amber-600 dark:text-amber-400'
+    }
+  }
+
+  return {
+    level: 'healthy',
     label: 'Healthy',
-    tone: 'text-emerald-300',
-    accent: 'from-emerald-500/25 via-emerald-400/15 to-transparent',
-    subtext: 'Plenty of runway for deeper context.',
-    icon: Sparkles
-  },
-  caution: {
-    label: 'Caution',
-    tone: 'text-amber-300',
-    accent: 'from-amber-500/20 via-amber-400/10 to-transparent',
-    subtext: 'Consider trimming earlier turns soon.',
-    icon: Zap
-  },
-  warning: {
-    label: 'Warning',
-    tone: 'text-orange-300',
-    accent: 'from-orange-500/25 via-orange-400/15 to-transparent',
-    subtext: 'Optimization recommended before long prompts.',
-    icon: AlertTriangle
-  },
-  critical: {
-    label: 'Critical',
-    tone: 'text-red-300',
-    accent: 'from-red-500/25 via-red-400/15 to-transparent',
-    subtext: 'Start a fresh thread to recover quality.',
-    icon: AlertTriangle
+    message: 'Plenty of context space available. Chat away!',
+    color: 'text-emerald-600 dark:text-emerald-400',
+    bgColor: 'bg-emerald-50 dark:bg-emerald-950/30',
+    borderColor: 'border-emerald-300 dark:border-emerald-800',
+    icon: Database,
+    iconColor: 'text-emerald-600 dark:text-emerald-400'
   }
 }
 
-const RADIUS = 42
-const CIRCUMFERENCE = 2 * Math.PI * RADIUS
-
-export const ContextUsageCard: React.FC<ContextUsageCardProps> = ({ tokens, isCalculating = false }) => {
-  const usagePercentage = useMemo(() => {
+// Compact badge component
+export const TokenUsageBadge: React.FC<TokenUsageIndicatorProps> = ({
+  tokens,
+  isCalculating = false,
+  className
+}) => {
+  const percentage = useMemo(() => {
     if (!tokens) return 0
     return Math.min(100, Math.round((tokens.totalTokens / LIMIT) * 100))
   }, [tokens])
 
-  const remainingTokens = useMemo(() => {
+  const status = useMemo(() => getStatusConfig(percentage), [percentage])
+  const StatusIcon = status.icon
+
+  return (
+    <Popover.Root>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "relative inline-flex items-center gap-2 h-10 px-3 rounded-xl",
+            "border bg-background/80 backdrop-blur-sm",
+            "transition-all duration-300 hover:scale-105",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1",
+            status.borderColor,
+            status.bgColor,
+            "focus-visible:ring-primary/40",
+            isCalculating && "animate-pulse",
+            className
+          )}
+          aria-label={`Token usage: ${percentage}% - ${status.label}`}
+        >
+          {/* Status icon - no circle */}
+          <div className="flex-shrink-0">
+            <StatusIcon className={cn("w-5 h-5", status.iconColor)} />
+          </div>
+
+          {/* Percentage display */}
+          <motion.span
+            key={percentage}
+            initial={{ opacity: 0, y: -2 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className={cn("text-sm font-semibold tabular-nums", status.color)}
+          >
+            {percentage}%
+          </motion.span>
+        </button>
+      </Popover.Trigger>
+
+      <Popover.Portal>
+        <Popover.Content
+          sideOffset={8}
+          align="end"
+          className="z-50 w-[380px] max-w-[95vw] rounded-2xl border border-border/80 bg-background/95 backdrop-blur-xl shadow-2xl focus:outline-none animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
+        >
+          <DetailedTokenView tokens={tokens} isCalculating={isCalculating} />
+          <Popover.Arrow className="fill-background/95" width={16} height={8} />
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  )
+}
+
+// Detailed view in popover
+const DetailedTokenView: React.FC<{ tokens: ConversationTokens | null; isCalculating: boolean }> = ({
+  tokens,
+  isCalculating
+}) => {
+  const percentage = useMemo(() => {
+    if (!tokens) return 0
+    return Math.min(100, Math.round((tokens.totalTokens / LIMIT) * 100))
+  }, [tokens])
+
+  const remaining = useMemo(() => {
     if (!tokens) return LIMIT
     return Math.max(0, LIMIT - tokens.totalTokens)
   }, [tokens])
 
-  const status: UsageStatus = useMemo(() => {
-    if (!tokens) return 'idle'
-    if (usagePercentage >= 100) return 'critical'
-    if (usagePercentage >= 90) return 'warning'
-    if (usagePercentage >= 75) return 'caution'
-    return 'healthy'
-  }, [tokens, usagePercentage])
+  const status = useMemo(() => getStatusConfig(percentage), [percentage])
+  const StatusIcon = status.icon
 
   const breakdown = useMemo(() => {
     if (!tokens) {
       return [
-        { label: 'Document context', value: 0, accent: 'border-sky-500/40 text-sky-300/80' },
-        { label: 'Conversation messages', value: 0, accent: 'border-primary/40 text-primary/80' },
-        { label: 'System prompt', value: 0, accent: 'border-purple-500/40 text-purple-300/80' }
+        { label: 'Document context', value: 0, icon: FileText, color: 'text-sky-600 dark:text-sky-400', percentage: '0.0' },
+        { label: 'User messages', value: 0, icon: MessageSquare, color: 'text-primary', percentage: '0.0' },
+        { label: 'AI responses', value: 0, icon: Sparkles, color: 'text-emerald-600 dark:text-emerald-400', percentage: '0.0' },
+        { label: 'System prompt', value: 0, icon: Cpu, color: 'text-purple-600 dark:text-purple-400', percentage: '0.0' }
       ]
     }
 
+    const total = tokens.totalTokens || 1
+
     return [
-      { label: 'Document context', value: tokens.documentTokens, accent: 'border-sky-500/40 text-sky-300' },
-      { label: 'Conversation messages', value: tokens.messageTokens, accent: 'border-primary/40 text-primary' },
-      { label: 'System prompt', value: tokens.systemTokens, accent: 'border-purple-500/40 text-purple-300' }
+      {
+        label: 'Document context',
+        value: tokens.documentTokens,
+        icon: FileText,
+        color: 'text-sky-600 dark:text-sky-400',
+        percentage: ((tokens.documentTokens / total) * 100).toFixed(1)
+      },
+      {
+        label: 'User messages',
+        value: tokens.userTokens,
+        icon: MessageSquare,
+        color: 'text-primary',
+        percentage: ((tokens.userTokens / total) * 100).toFixed(1)
+      },
+      {
+        label: 'AI responses',
+        value: tokens.assistantTokens,
+        icon: Sparkles,
+        color: 'text-emerald-600 dark:text-emerald-400',
+        percentage: ((tokens.assistantTokens / total) * 100).toFixed(1)
+      },
+      {
+        label: 'System prompt',
+        value: tokens.systemTokens,
+        icon: Cpu,
+        color: 'text-purple-600 dark:text-purple-400',
+        percentage: ((tokens.systemTokens / total) * 100).toFixed(1)
+      }
     ]
   }, [tokens])
 
-  const historyBars = useMemo(() => {
-    const base = usagePercentage / 100
-    const template = [0.2, 0.35, 0.48, 0.58, 0.66, 0.72, 0.78, 0.82, 0.86, 0.9, 0.93, 0.95]
-    return template.map((value, index) => Math.max(0.08, Math.min(1, value * (0.6 + base * 0.8 + index * 0.01))))
-  }, [usagePercentage])
-
-  const statusDetails = STATUS_DETAILS[status]
-  const StatusIcon = statusDetails.icon
-
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-white/5 bg-gradient-to-br from-slate-950/90 via-slate-950/85 to-slate-900/80 p-5 text-sm shadow-[0_25px_60px_-35px_rgba(12,148,136,0.45)]">
-      <div className={cn('pointer-events-none absolute inset-0 opacity-90 blur-3xl', `bg-gradient-to-br ${statusDetails.accent}`)} />
-      <div className="relative flex flex-col gap-5">
-        <div className="flex items-start justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <svg width="110" height="110" viewBox="0 0 110 110" className="rotate-[-90deg]">
-                <circle
-                  cx="55"
-                  cy="55"
-                  r={RADIUS}
-                  strokeWidth="12"
-                  className="text-white/10"
-                  stroke="currentColor"
-                  fill="transparent"
-                />
-                <motion.circle
-                  cx="55"
-                  cy="55"
-                  r={RADIUS}
-                  strokeWidth="12"
-                  strokeLinecap="round"
-                  stroke="url(#context-progress-line)"
-                  fill="transparent"
-                  style={{ strokeDasharray: CIRCUMFERENCE }}
-                  initial={{ strokeDashoffset: CIRCUMFERENCE }}
-                  animate={{ strokeDashoffset: CIRCUMFERENCE - (CIRCUMFERENCE * usagePercentage) / 100 }}
-                  transition={{ duration: 0.8, ease: 'easeOut' }}
-                />
-                <defs>
-                  <linearGradient id="context-progress-line" x1="0%" x2="100%" y1="0%" y2="100%">
-                    <stop offset="0%" stopColor="#2dd4bf" />
-                    <stop offset="45%" stopColor="#38bdf8" />
-                    <stop offset="100%" stopColor="#a855f7" />
-                  </linearGradient>
-                </defs>
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <motion.span
-                  key={usagePercentage}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.35, ease: 'easeOut' }}
-                  className="text-3xl font-semibold leading-none text-white"
-                >
-                  {tokens ? `${usagePercentage}%` : '--'}
-                </motion.span>
-              </div>
-            </div>
+    <div className="p-4 space-y-4">
+      {/* Header with status */}
+      <div className="flex items-start gap-3">
+        <div className={cn(
+          "flex items-center justify-center w-10 h-10 rounded-xl",
+          status.bgColor,
+          status.borderColor,
+          "border"
+        )}>
+          <StatusIcon className={cn("w-5 h-5", status.iconColor)} />
+        </div>
 
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-white/80 backdrop-blur">
-                <StatusIcon className="h-3.5 w-3.5" />
-                <span>{statusDetails.label}</span>
-              </div>
-              <p className="mt-3 text-base font-semibold text-white">Context window</p>
-              <p className="mt-1 text-xs text-white/70">
-                {isCalculating ? 'Refreshing usage metrics…' : statusDetails.subtext}
-              </p>
-              <div className="mt-4 grid grid-cols-3 gap-3 text-xs">
-                <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-white/80">
-                  <p className="text-[11px] uppercase tracking-wide text-white/50">Used</p>
-                  <p className="mt-1 text-lg font-semibold text-white">{tokens ? FORMATTER.format(tokens.totalTokens) : '—'}</p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-white/80">
-                  <p className="text-[11px] uppercase tracking-wide text-white/50">Remaining</p>
-                  <p className="mt-1 text-lg font-semibold text-white">{FORMATTER.format(remainingTokens)}</p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-white/80">
-                  <p className="text-[11px] uppercase tracking-wide text-white/50">Total</p>
-                  <p className="mt-1 text-lg font-semibold text-white">{FORMATTER.format(LIMIT)}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col items-end gap-2 text-right text-[11px] uppercase tracking-[0.2em] text-white/40">
-            <span>Last updated</span>
-            <span className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-sm font-semibold text-white">
-              {tokens ? tokens.lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-foreground">Context Usage</h3>
+            <span className={cn(
+              "px-2 py-0.5 text-xs font-medium rounded-full",
+              status.bgColor,
+              status.color
+            )}>
+              {status.label}
             </span>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+            {isCalculating ? 'Calculating token usage...' : status.message}
+          </p>
+        </div>
+
+        {/* Info icon with tooltip */}
+        <Popover.Root>
+          <Popover.Trigger asChild>
+            <button
+              type="button"
+              className="flex-shrink-0 p-1.5 rounded-lg hover:bg-muted/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              aria-label="What are tokens?"
+            >
+              <Info className="w-4 h-4 text-muted-foreground hover:text-foreground transition-colors" />
+            </button>
+          </Popover.Trigger>
+
+          <Popover.Portal>
+            <Popover.Content
+              sideOffset={8}
+              align="end"
+              className="z-[60] w-[320px] max-w-[95vw] rounded-xl border border-border/80 bg-background/95 backdrop-blur-xl shadow-2xl focus:outline-none animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
+            >
+              <div className="p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <Lightbulb className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-semibold text-foreground">What are tokens?</h4>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Tokens are small pieces of text that AI uses to read and understand. Everything gets counted: words, word parts, spaces, punctuation, even emojis!
+                    </p>
+                    <div className="text-xs space-y-1.5 pt-1">
+                      <div className="font-medium text-foreground/90">Real examples:</div>
+                      <div className="text-muted-foreground pl-2 space-y-1">
+                        <div>&quot;Hi&quot; = 1 token</div>
+                        <div>&quot;I love pizza!&quot; = 5 tokens (&quot;I&quot; + &quot; love&quot; + &quot; pizza&quot; + &quot;!&quot; + spaces)</div>
+                        <div>&quot;Can you help me?&quot; = 6 tokens (&quot;Can&quot; + &quot; you&quot; + &quot; help&quot; + &quot; me&quot; + &quot;?&quot; + spaces)</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-border/50 space-y-2">
+                  <div className="text-xs font-medium text-foreground/90">Your 200K token limit:</div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    This includes all your messages, AI responses, and document content. That&apos;s about <strong className="text-foreground">150,000 words</strong> or roughly <strong className="text-foreground">400-500 pages</strong> of text — plenty of room for long conversations!
+                  </p>
+                </div>
+
+                <div className="pt-2 border-t border-border/50">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Staying under this limit ensures fast and accurate AI responses. Start a new chat if you&apos;re getting close to 100%.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <Popover.Arrow className="fill-background/95" width={12} height={6} />
+            </Popover.Content>
+          </Popover.Portal>
+        </Popover.Root>
+      </div>
+
+      {/* Progress bar */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-muted-foreground">Usage</span>
+          <motion.span
+            key={percentage}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className={cn("font-semibold tabular-nums", status.color)}
+          >
+            {percentage}%
+          </motion.span>
+        </div>
+
+        <div className="relative h-2.5 bg-muted/50 rounded-full overflow-hidden border border-border/40">
+          <motion.div
+            className={cn(
+              "absolute inset-y-0 left-0 rounded-full",
+              percentage >= 100 ? "bg-gradient-to-r from-red-500 to-red-600 dark:from-red-500 dark:to-red-600" :
+              percentage >= 90 ? "bg-gradient-to-r from-orange-500 to-orange-600 dark:from-orange-500 dark:to-orange-600" :
+              percentage >= 75 ? "bg-gradient-to-r from-amber-500 to-amber-600 dark:from-amber-500 dark:to-amber-600" :
+              "bg-gradient-to-r from-emerald-500 to-emerald-600 dark:from-emerald-400 dark:to-emerald-500"
+            )}
+            style={{
+              boxShadow: percentage >= 75 ? '0 0 8px currentColor' : 'none',
+              opacity: 0.9
+            }}
+            initial={{ width: 0 }}
+            animate={{ width: `${percentage}%` }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+          />
+        </div>
+      </div>
+
+      {/* Token stats */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="px-3 py-2 rounded-lg bg-muted/50 border border-border/50">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Used</div>
+          <div className="mt-1 text-sm font-semibold text-foreground tabular-nums">
+            {FORMATTER.format(tokens?.totalTokens || 0)}
           </div>
         </div>
 
-        <div className="grid gap-3 text-xs text-white/80">
-          <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/40">Breakdown</p>
-            <div className="mt-3 space-y-2">
-              {breakdown.map(item => (
-                <div key={item.label} className="flex items-center justify-between">
-                  <span className={cn('flex items-center gap-2 font-medium', item.accent)}>
-                    <span className="h-2.5 w-2.5 rounded-full border" />
-                    {item.label}
-                  </span>
-                  <span className="tabular-nums text-white/70">
-                    {FORMATTER.format(item.value)}
-                  </span>
-                </div>
-              ))}
-              <div className="flex items-center justify-between text-white/60">
-                <span className="flex items-center gap-2 text-xs font-medium text-emerald-200">
-                  <span className="h-2.5 w-2.5 rounded-full border border-emerald-500/40" />
-                  Reserved for AI response
-                </span>
-                <span className="tabular-nums">{FORMATTER.format(RESERVED_FOR_RESPONSE)}</span>
-              </div>
-            </div>
+        <div className="px-3 py-2 rounded-lg bg-muted/50 border border-border/50">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Free</div>
+          <div className="mt-1 text-sm font-semibold text-foreground tabular-nums">
+            {FORMATTER.format(remaining)}
           </div>
+        </div>
 
-          <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-            <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.25em] text-white/40">
-              <span>Usage Trend</span>
-              <span>{tokens ? `${usagePercentage}% of limit` : 'Awaiting data'}</span>
-            </div>
-            <div className="mt-3 flex items-end gap-1">
-              {historyBars.map((value, index) => (
-                <span
-                  key={index}
-                  className="flex-1 rounded-full bg-gradient-to-t from-cyan-500/10 via-emerald-400/30 to-teal-200/70"
-                  style={{ height: `${Math.round(value * 42)}px` }}
-                />
-              ))}
-            </div>
-            <p className="mt-3 text-xs text-white/60">
-              We automatically reserve <span className="text-white/90">{FORMATTER.format(RESERVED_FOR_RESPONSE)} tokens</span> for the next AI answer to prevent cut-offs.
-            </p>
+        <div className="px-3 py-2 rounded-lg bg-muted/50 border border-border/50">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Limit</div>
+          <div className="mt-1 text-sm font-semibold text-foreground tabular-nums">
+            {FORMATTER.format(LIMIT / 1000)}K
           </div>
         </div>
       </div>
+
+      {/* Breakdown */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <TrendingUp className="w-3 h-3" />
+          <span className="font-medium">Token Breakdown</span>
+        </div>
+
+        <div className="space-y-1.5">
+          {breakdown.map((item) => {
+            const ItemIcon = item.icon
+            return (
+              <div key={item.label} className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <ItemIcon className={cn("w-3.5 h-3.5 flex-shrink-0", item.color)} />
+                  <span className="text-muted-foreground truncate">{item.label}</span>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {tokens && item.percentage && (
+                    <span className="text-[10px] text-muted-foreground/70 tabular-nums">
+                      {item.percentage}%
+                    </span>
+                  )}
+                  <span className="font-medium text-foreground tabular-nums min-w-[60px] text-right">
+                    {FORMATTER.format(item.value)}
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+
+          {/* Total */}
+          <div className="flex items-center justify-between text-xs pt-1.5 border-t border-border/50">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-3.5 h-3.5 text-foreground flex-shrink-0" />
+              <span className="text-foreground font-semibold">Total</span>
+            </div>
+            <span className="font-semibold text-foreground tabular-nums">
+              {FORMATTER.format(tokens?.totalTokens || 0)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Best Practices */}
+      <div className="pt-3 border-t border-border/50">
+        <div className="rounded-xl border border-border/60 bg-muted/30 p-3 space-y-2">
+          <div className="flex items-center gap-2 text-xs font-semibold text-foreground/90">
+            <Lightbulb className="w-3.5 h-3.5" />
+            <span>Best Practices</span>
+          </div>
+          <ul className="space-y-1.5 text-xs text-muted-foreground">
+            <li className="flex items-start gap-2">
+              <MessageSquare className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
+              <span>Keep conversations focused on specific topics for better AI responses</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <BookOpen className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
+              <span>Upload documents for context instead of pasting large texts</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <Zap className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
+              <span>Start a new chat when context usage approaches 75% for optimal quality</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      {/* Last updated */}
+      {tokens && (
+        <div className="text-center text-[10px] text-muted-foreground/70">
+          Last updated: {tokens.lastUpdated.toLocaleString('en-US', { 
+            month: 'short', 
+            day: 'numeric', 
+            year: 'numeric',
+            hour: 'numeric', 
+            minute: '2-digit', 
+            hour12: true 
+          })}
+        </div>
+      )}
     </div>
   )
 }
 
-ContextUsageCard.displayName = 'ContextUsageCard'
+// Legacy export for backward compatibility
+export const ContextUsageCard = TokenUsageBadge
+
+TokenUsageBadge.displayName = 'TokenUsageBadge'

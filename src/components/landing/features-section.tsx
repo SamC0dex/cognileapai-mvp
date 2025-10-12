@@ -1,9 +1,10 @@
 "use client"
 
-import { motion, useMotionValue, useSpring, useTransform } from "framer-motion"
+import { motion } from "framer-motion"
 import { Brain, MessageSquare, Zap, Sparkles, FileText, Search } from "lucide-react"
-import { useRef, useState, MouseEvent } from "react"
+import { useState } from "react"
 import { SectionBackground } from "./animated-background"
+import { cn } from "@/lib/utils"
 
 const FEATURES = [
   {
@@ -51,200 +52,59 @@ const FEATURES = [
 ] as const
 
 function FeatureCard3D({ feature, index }: { feature: typeof FEATURES[number]; index: number }) {
-  const cardRef = useRef<HTMLDivElement>(null)
   const [isHovered, setIsHovered] = useState(false)
-
-  // Motion values for 3D tilt effect
-  const mouseX = useMotionValue(0)
-  const mouseY = useMotionValue(0)
-
-  // Spring animations for smooth movement
-  const rotateX = useSpring(useTransform(mouseY, [-0.5, 0.5], [10, -10]), {
-    stiffness: 300,
-    damping: 30,
-  })
-  const rotateY = useSpring(useTransform(mouseX, [-0.5, 0.5], [-10, 10]), {
-    stiffness: 300,
-    damping: 30,
-  })
-
-  const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
-    if (!cardRef.current) return
-
-    const rect = cardRef.current.getBoundingClientRect()
-    const centerX = rect.left + rect.width / 2
-    const centerY = rect.top + rect.height / 2
-
-    const percentX = (e.clientX - centerX) / (rect.width / 2)
-    const percentY = (e.clientY - centerY) / (rect.height / 2)
-
-    mouseX.set(percentX)
-    mouseY.set(percentY)
-  }
-
-  const handleMouseLeave = () => {
-    setIsHovered(false)
-    mouseX.set(0)
-    mouseY.set(0)
-  }
 
   return (
     <motion.div
-      ref={cardRef}
-      initial={{ opacity: 0, y: 50, scale: 0.9 }}
-      whileInView={{ opacity: 1, y: 0, scale: 1 }}
-      viewport={{ once: true, margin: "-100px" }}
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-50px" }}
       transition={{
-        type: "spring",
-        stiffness: 100,
-        damping: 20,
-        delay: index * 0.1,
+        duration: 0.4,
+        delay: index * 0.05,
       }}
-      onMouseMove={handleMouseMove}
       onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={handleMouseLeave}
+      onMouseLeave={() => setIsHovered(false)}
       className="group relative h-full"
-      style={{
-        perspective: "1000px",
-      }}
     >
-      <motion.div
-        className="relative h-full"
-        style={{
-          rotateX: isHovered ? rotateX : 0,
-          rotateY: isHovered ? rotateY : 0,
-          transformStyle: "preserve-3d",
-        }}
-        whileHover={{ scale: 1.05, z: 50 }}
-        transition={{ type: "spring", stiffness: 300, damping: 20 }}
-      >
-        {/* Dynamic particle burst on hover */}
-        {isHovered && (
-          <>
-            {[...Array(6)].map((_, i) => (
-              <motion.div
-                key={i}
-                className="absolute h-1 w-1 rounded-full"
-                style={{
-                  background: feature.glow,
-                  left: "50%",
-                  top: "50%",
-                }}
-                initial={{ scale: 0, x: 0, y: 0 }}
-                animate={{
-                  scale: [0, 1.5, 0],
-                  x: Math.cos((i * Math.PI * 2) / 6) * 60,
-                  y: Math.sin((i * Math.PI * 2) / 6) * 60,
-                  opacity: [0, 1, 0],
-                }}
-                transition={{
-                  duration: 0.6,
-                  ease: "easeOut",
-                }}
-              />
-            ))}
-          </>
+
+      {/* Card content */}
+      <div
+        className={cn(
+          "relative h-full overflow-hidden rounded-2xl border p-6 backdrop-blur-sm transition-all duration-300",
+          "bg-white/95 shadow-[0_24px_48px_rgba(15,23,42,0.08)] border-white/70",
+          "dark:bg-[rgba(15,23,42,0.82)] dark:border-white/10 dark:shadow-[0_22px_48px_rgba(2,6,23,0.55)]",
+          isHovered && "scale-105 shadow-2xl"
         )}
+        style={{
+          borderColor: isHovered ? feature.glow : undefined,
+        }}
+      >
+        {/* Icon */}
+        <div className={`relative mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br ${feature.color} text-white shadow-lg transition-transform duration-300 ${isHovered ? 'scale-110' : ''}`}>
+          {feature.icon}
+        </div>
 
-        {/* Card content with advanced effects */}
-        <div
-          className="relative h-full rounded-2xl border bg-card/90 p-6 backdrop-blur-sm transition-all duration-300 overflow-hidden"
-          style={{
-            transform: "translateZ(20px)",
-            borderColor: isHovered ? feature.glow : "hsl(var(--border) / 0.5)",
-            boxShadow: isHovered ? `0 20px 60px ${feature.glow}, 0 0 30px ${feature.glow}` : "none",
-          }}
-        >
-          {/* Animated icon background */}
-          <motion.div
-            className={`relative mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br ${feature.color} text-white shadow-lg`}
-            animate={{
-              boxShadow: isHovered
-                ? `0 20px 40px ${feature.glow}, 0 0 20px ${feature.glow}`
-                : "0 10px 20px rgba(0, 0, 0, 0.1)",
-            }}
-            transition={{ duration: 0.3 }}
+        <h3 className="mb-2 text-lg font-semibold">{feature.title}</h3>
+        <p className="text-sm leading-relaxed text-muted-foreground">{feature.desc}</p>
+
+        {/* Hover glow */}
+        {isHovered && (
+          <div
+            className="pointer-events-none absolute inset-0 rounded-2xl opacity-30 transition-opacity"
             style={{
-              transform: "translateZ(40px)",
-            }}
-          >
-            <motion.div
-              animate={{
-                rotate: isHovered ? 360 : 0,
-                scale: isHovered ? 1.1 : 1,
-              }}
-              transition={{
-                rotate: { duration: 0.6, ease: "easeInOut" },
-                scale: { duration: 0.2 },
-              }}
-            >
-              {feature.icon}
-            </motion.div>
-
-            {/* Orbiting particles */}
-            {isHovered && (
-              <>
-                <motion.div
-                  className="absolute h-1.5 w-1.5 rounded-full bg-white"
-                  animate={{
-                    rotate: 360,
-                    scale: [1, 1.5, 1],
-                  }}
-                  transition={{
-                    rotate: { duration: 2, repeat: Infinity, ease: "linear" },
-                    scale: { duration: 1, repeat: Infinity, ease: "easeInOut" },
-                  }}
-                  style={{
-                    offsetPath: "circle(30px)",
-                  }}
-                />
-              </>
-            )}
-          </motion.div>
-
-          <motion.h3
-            className="mb-2 text-lg font-semibold"
-            style={{
-              transform: "translateZ(30px)",
-            }}
-          >
-            {feature.title}
-          </motion.h3>
-
-          <motion.p
-            className="text-sm leading-relaxed text-muted-foreground"
-            style={{
-              transform: "translateZ(20px)",
-            }}
-          >
-            {feature.desc}
-          </motion.p>
-
-          {/* Animated gradient border on hover */}
-          <motion.div
-            className="pointer-events-none absolute inset-0 rounded-2xl"
-            style={{
-              background: `linear-gradient(135deg, ${feature.glow}, transparent, ${feature.glow})`,
-              backgroundSize: "200% 200%",
-            }}
-            animate={{
-              backgroundPosition: isHovered ? ["0% 0%", "100% 100%"] : "0% 0%",
-              opacity: isHovered ? 0.3 : 0,
-            }}
-            transition={{
-              backgroundPosition: { duration: 2, repeat: Infinity, ease: "linear" },
-              opacity: { duration: 0.3 },
+              background: `radial-gradient(circle at center, ${feature.glow}, transparent)`,
             }}
           />
-        </div>
-      </motion.div>
+        )}
+      </div>
     </motion.div>
   )
 }
 
 export default function FeaturesSection() {
   return (
-    <section id="features" className="relative py-20 sm:py-32 overflow-hidden">
+    <section id="features" className="relative py-10 sm:py-16 overflow-hidden">
       <SectionBackground />
 
       <div className="relative mx-auto max-w-7xl px-6">
@@ -252,19 +112,14 @@ export default function FeaturesSection() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 0.5 }}
           className="mx-auto max-w-3xl text-center"
         >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm backdrop-blur-sm"
-          >
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm backdrop-blur-sm">
             <Sparkles className="h-3.5 w-3.5 text-primary" />
             <span className="font-medium">Powered by AI</span>
-          </motion.div>
+          </div>
 
           <h2 className="text-balance text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
             Everything You Need to{" "}
@@ -289,8 +144,8 @@ export default function FeaturesSection() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.6 }}
+          viewport={{ once: true, margin: "0px" }}
+          transition={{ duration: 0.4, delay: 0.3 }}
           className="mt-16 text-center"
         >
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-6 py-3 text-sm font-medium backdrop-blur-sm">

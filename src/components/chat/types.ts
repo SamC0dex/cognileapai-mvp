@@ -1,6 +1,8 @@
+import type { Role } from '@/lib/chat-store'
+
 export interface Message {
   id: string
-  role: 'user' | 'assistant'
+  role: Role
   content: string
   timestamp: Date
   isStreaming?: boolean

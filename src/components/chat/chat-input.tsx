@@ -8,6 +8,7 @@ import { GeminiLogo } from '@/components/icons/gemini-logo'
 import { toast } from 'sonner'
 import type { ChatInputProps } from './types'
 import type { DocumentRecord, DocumentUploadedDetail } from '@/types/documents'
+import { useDocuments } from '@/contexts/documents-context'
 
 const MIN_HEIGHT = 44 // Minimum height for textarea
 const MAX_HEIGHT = 144 // Maximum height (4 lines * 36px)
@@ -16,6 +17,9 @@ const LINE_HEIGHT = 24 // Approximate line height
 export const ChatInput: React.FC<ChatInputProps & {
   selectedModel?: GeminiModelKey
   onModelChange?: (model: GeminiModelKey) => void
+  disabledReason?: string
+  rateLimitCountdown?: number | null
+  initialValue?: string
 }> = React.memo(({
   onSendMessage,
   disabled = false,
@@ -26,7 +30,10 @@ export const ChatInput: React.FC<ChatInputProps & {
   onModelChange,
   selectedDocuments = [],
   urlSelectedDocument = null,
-  onRemoveDocument
+  onRemoveDocument,
+  disabledReason,
+  rateLimitCountdown = null,
+  initialValue
 }) => {
   const [inputValue, setInputValue] = useState('')
   const [textareaHeight, setTextareaHeight] = useState(MIN_HEIGHT)
@@ -39,12 +46,38 @@ export const ChatInput: React.FC<ChatInputProps & {
   const { streamingMessage, messages } = useChatStore()
   const isSending = Boolean(streamingMessage)
 
+  // Calculate textarea height based on content
+  const calculateHeight = useCallback(() => {
+    if (textareaRef.current) {
+      // Reset height to get accurate scrollHeight
+      textareaRef.current.style.height = `${MIN_HEIGHT}px`
+
+      const scrollHeight = textareaRef.current.scrollHeight
+      const newHeight = Math.min(Math.max(scrollHeight, MIN_HEIGHT), MAX_HEIGHT)
+
+      setTextareaHeight(newHeight)
+      textareaRef.current.style.height = `${newHeight}px`
+    }
+  }, [])
+
   // Auto-focus on mount
   useEffect(() => {
     if (autoFocus && textareaRef.current) {
       textareaRef.current.focus()
     }
   }, [autoFocus])
+
+  useEffect(() => {
+    if (typeof initialValue === 'string' && initialValue !== inputValue) {
+      setInputValue(initialValue)
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.style.height = `${MIN_HEIGHT}px`
+        }
+        calculateHeight()
+      }, 0)
+    }
+  }, [initialValue, inputValue, calculateHeight])
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -78,20 +111,6 @@ export const ChatInput: React.FC<ChatInputProps & {
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [])
-
-  // Calculate textarea height based on content
-  const calculateHeight = useCallback(() => {
-    if (textareaRef.current) {
-      // Reset height to get accurate scrollHeight
-      textareaRef.current.style.height = `${MIN_HEIGHT}px`
-      
-      const scrollHeight = textareaRef.current.scrollHeight
-      const newHeight = Math.min(Math.max(scrollHeight, MIN_HEIGHT), MAX_HEIGHT)
-      
-      setTextareaHeight(newHeight)
-      textareaRef.current.style.height = `${newHeight}px`
-    }
   }, [])
 
   // Clear function
@@ -214,8 +233,21 @@ export const ChatInput: React.FC<ChatInputProps & {
 
 
 
+  // Use documents context for consistent upload experience
+  const {
+    addUploadingDocument,
+    updateUploadingDocument,
+    removeUploadingDocument,
+    addSelectedDocument
+  } = useDocuments()
+
   const handleFileUpload = useCallback(async () => {
     if (isUploading) return
+
+    // First expand the documents panel to show upload progress
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('expand-documents-panel'))
+    }
 
     // Create file input dynamically
     const input = document.createElement('input')
@@ -226,8 +258,29 @@ export const ChatInput: React.FC<ChatInputProps & {
       const files = Array.from((e.target as HTMLInputElement).files || [])
       if (files.length > 0) {
         setIsUploading(true)
+        const file = files[0]
+        
+        // Generate temporary ID for optimistic update
+        const tempId = `uploading-${Date.now()}-${Math.random()}`
+        const documentTitle = file.name.replace(/\.pdf$/i, '')
+        
+        // Mark upload intent for auto-select after refresh
         try {
-          const file = files[0]
+          sessionStorage.setItem('cognileap-pending-chatbox-upload', documentTitle)
+        } catch {
+          // Ignore storage errors
+        }
+        
+        // Add uploading document to context immediately
+        addUploadingDocument({
+          id: tempId,
+          title: documentTitle,
+          size: file.size,
+          isUploading: true,
+          progress: 0
+        })
+
+        try {
           const formData = new FormData()
           formData.append('file', file)
 
@@ -243,13 +296,32 @@ export const ChatInput: React.FC<ChatInputProps & {
               document?: DocumentRecord
             }
 
+            // Remove uploading document
+            removeUploadingDocument(tempId)
+
             const uploadedDocument = result.document
 
             if (uploadedDocument) {
+              // Clear pending upload and store completed document ID
+              try {
+                sessionStorage.removeItem('cognileap-pending-chatbox-upload')
+                sessionStorage.setItem('cognileap-chatbox-uploaded-doc', uploadedDocument.id)
+              } catch {
+                // Ignore storage errors
+              }
+
+              // Auto-select the uploaded document in chat
+              addSelectedDocument({
+                id: uploadedDocument.id,
+                title: uploadedDocument.title,
+                size: uploadedDocument.bytes || undefined,
+                processing_status: uploadedDocument.processing_status || undefined
+              })
+
               if (result.alreadyExists) {
-                toast.info(`"${uploadedDocument.title || file.name}" is already uploaded. Reusing the existing document.`)
+                toast.info(`"${uploadedDocument.title || file.name}" is already uploaded and selected for chat.`)
               } else {
-                toast.success(`"${file.name}" uploaded successfully! You can now chat with this document.`)
+                toast.success(`"${file.name}" uploaded successfully and selected for chat!`)
               }
 
               if (typeof window !== 'undefined') {
@@ -264,18 +336,39 @@ export const ChatInput: React.FC<ChatInputProps & {
             }
           } else {
             const error = await response.json()
+            
+            // Update uploading document with error
+            updateUploadingDocument(tempId, {
+              error: error.error || 'Upload failed'
+            })
+
             toast.error(error.error || 'Upload failed')
+
+            // Remove failed upload after 3 seconds
+            setTimeout(() => {
+              removeUploadingDocument(tempId)
+            }, 3000)
           }
         } catch (error) {
+          // Update uploading document with error
+          updateUploadingDocument(tempId, {
+            error: 'Network error'
+          })
+
           toast.error('Upload failed')
           console.error('Upload error:', error)
+
+          // Remove failed upload after 3 seconds
+          setTimeout(() => {
+            removeUploadingDocument(tempId)
+          }, 3000)
         } finally {
           setIsUploading(false)
         }
       }
     }
     input.click()
-  }, [isUploading])
+  }, [isUploading, addUploadingDocument, updateUploadingDocument, removeUploadingDocument, addSelectedDocument])
 
   return (
     <div className="border-t border-border/50 bg-background/80 backdrop-blur-xl mb-[0.3rem]">
@@ -529,6 +622,13 @@ export const ChatInput: React.FC<ChatInputProps & {
             </div>
           </div>
         </div>
+
+        {disabled && disabledReason && (
+          <div className="px-2 pt-2 text-xs text-amber-600 dark:text-amber-400">
+            {disabledReason}
+            {typeof rateLimitCountdown === 'number' && rateLimitCountdown > 0 && ` (${rateLimitCountdown}s)`}
+          </div>
+        )}
 
         {/* Footer */}
         {(showCharacterCount || isSending) && (

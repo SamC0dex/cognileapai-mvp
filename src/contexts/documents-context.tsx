@@ -1,12 +1,20 @@
 'use client'
 
-import React, { createContext, useContext, useState, useCallback, useMemo, useRef, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import type { Database } from '@/lib/supabase'
 import type { DocumentUploadedDetail } from '@/types/documents'
 import { useAuth } from '@/contexts/auth-context'
 
 type DocumentItem = Database['public']['Tables']['documents']['Row']
+
+interface UploadingDocument {
+  id: string // temporary ID
+  title: string
+  size?: number
+  isUploading: true
+  progress?: number
+  error?: string
+}
 
 interface SelectedDocument {
   id: string
@@ -18,6 +26,10 @@ interface SelectedDocument {
 interface DocumentsContextValue {
   documents: DocumentItem[]
   documentsLoading: boolean
+  uploadingDocuments: UploadingDocument[]
+  addUploadingDocument: (doc: UploadingDocument) => void
+  updateUploadingDocument: (id: string, updates: Partial<UploadingDocument>) => void
+  removeUploadingDocument: (id: string) => void
   refreshDocuments: (options?: { force?: boolean }) => Promise<void>
   upsertDocument: (document: DocumentItem) => void
   removeDocumentFromContext: (documentId: string) => void
@@ -34,6 +46,8 @@ const DocumentsContext = createContext<DocumentsContextValue | null>(null)
 
 const DOCUMENTS_CACHE_KEY = 'cognileap-documents-cache-v1'
 const DOCUMENTS_CACHE_TTL = 2 * 60 * 1000 // 2 minutes
+const UPLOADING_DOCUMENTS_CACHE_KEY = 'cognileap-uploading-documents-v1'
+const UPLOADING_DOCUMENTS_CACHE_TTL = 10 * 60 * 1000 // 10 minutes (longer for upload persistence)
 const SELECTED_DOCUMENTS_STORAGE_PREFIX = 'cognileap-selected-documents-v1'
 
 const getSelectedDocumentsStorageKey = (userId: string) => `${SELECTED_DOCUMENTS_STORAGE_PREFIX}:${userId}`
@@ -44,7 +58,7 @@ const parseStoredSelectedDocuments = (raw: string | null): SelectedDocument[] =>
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
     return parsed
-      .map((item) => {
+      .map((item): SelectedDocument | null => {
         if (!item || typeof item !== 'object' || typeof (item as { id?: unknown }).id !== 'string') {
           return null
         }
@@ -56,7 +70,7 @@ const parseStoredSelectedDocuments = (raw: string | null): SelectedDocument[] =>
           processing_status: typeof candidate.processing_status === 'string' ? candidate.processing_status : undefined
         }
       })
-      .filter((item): item is SelectedDocument => Boolean(item))
+      .filter((item): item is SelectedDocument => item !== null)
   } catch {
     return []
   }
@@ -69,9 +83,12 @@ const toSelectedDocument = (doc: DocumentItem): SelectedDocument => ({
   processing_status: doc.processing_status ?? undefined
 })
 
+interface DocumentsApiResponse {
+  documents?: DocumentItem[]
+}
+
 export function DocumentsProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
-  const supabase = useMemo(() => createClient(), [])
   const cacheRef = useRef<DocumentItem[]>([])
   const selectedDocsStorageKeyRef = useRef<string | null>(null)
   const hasLoadedStoredSelectionRef = useRef(false)
@@ -105,8 +122,44 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const readUploadingCache = () => {
+    if (typeof window === 'undefined') return []
+    try {
+      const cached = window.sessionStorage.getItem(UPLOADING_DOCUMENTS_CACHE_KEY)
+      if (!cached) return []
+      const parsed = JSON.parse(cached) as { timestamp: number; uploadingDocuments: UploadingDocument[] }
+      if (!parsed?.uploadingDocuments || !Array.isArray(parsed.uploadingDocuments)) return []
+      if (Date.now() - (parsed.timestamp || 0) > UPLOADING_DOCUMENTS_CACHE_TTL) {
+        // Clear expired uploading documents
+        window.sessionStorage.removeItem(UPLOADING_DOCUMENTS_CACHE_KEY)
+        return []
+      }
+      return parsed.uploadingDocuments
+    } catch {
+      return []
+    }
+  }
+
+  const persistUploadingCache = (uploadingDocs: UploadingDocument[]) => {
+    if (typeof window === 'undefined') return
+    try {
+      if (uploadingDocs.length === 0) {
+        // Remove cache when no uploading documents
+        window.sessionStorage.removeItem(UPLOADING_DOCUMENTS_CACHE_KEY)
+      } else {
+        window.sessionStorage.setItem(
+          UPLOADING_DOCUMENTS_CACHE_KEY,
+          JSON.stringify({ timestamp: Date.now(), uploadingDocuments: uploadingDocs })
+        )
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }
+
   const [documents, setDocuments] = useState<DocumentItem[]>(() => readCache())
   const [documentsLoading, setDocumentsLoading] = useState(() => cacheRef.current.length === 0)
+  const [uploadingDocuments, setUploadingDocuments] = useState<UploadingDocument[]>(() => readUploadingCache())
   const [selectedDocuments, setSelectedDocuments] = useState<SelectedDocument[]>([])
 
   const applyDocumentsUpdate = useCallback((updater: (current: DocumentItem[]) => DocumentItem[]) => {
@@ -137,6 +190,13 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
   const removeDocumentFromContext = useCallback((documentId: string) => {
     applyDocumentsUpdate(prev => prev.filter(doc => doc.id !== documentId))
     setSelectedDocuments(prev => prev.filter(doc => doc.id !== documentId))
+    
+    // Also notify about document removal so chat can update URL-based selections
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('document-removed', { 
+        detail: { documentId } 
+      }))
+    }
   }, [applyDocumentsUpdate])
 
   const refreshDocuments = useCallback(async (options?: { force?: boolean }) => {
@@ -152,17 +212,18 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('documents')
-        .select('*')
-        .order('created_at', { ascending: false })
+      const response = await fetch('/api/documents', {
+        cache: 'no-store'
+      })
 
-      if (error) {
-        console.error('[Documents] Failed to fetch documents:', error)
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({})) as { error?: string }
+        console.error('[Documents] Failed to fetch documents:', errorBody?.error || response.statusText)
         return
       }
 
-      const nextDocs = data ?? []
+      const payload = await response.json() as DocumentsApiResponse
+      const nextDocs = Array.isArray(payload?.documents) ? payload.documents : []
       applyDocumentsUpdate(() => nextDocs)
 
       setSelectedDocuments(prev =>
@@ -176,7 +237,7 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setDocumentsLoading(false)
     }
-  }, [applyDocumentsUpdate, supabase, user])
+  }, [applyDocumentsUpdate, user])
 
   useEffect(() => {
     if (!user) {
@@ -187,6 +248,8 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
       hasLoadedStoredSelectionRef.current = false
       applyDocumentsUpdate(() => [])
       setSelectedDocuments([])
+      setUploadingDocuments([])
+      persistUploadingCache([]) // Clear uploading documents cache
       setDocumentsLoading(false)
       return
     }
@@ -218,6 +281,39 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [selectedDocuments])
 
+  // Auto-cleanup old uploading documents on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    
+    const cleanup = () => {
+      const cached = readUploadingCache()
+      if (cached.length > 0) {
+        // Check for very old uploading documents (more than 5 minutes)
+        const now = Date.now()
+        const staleThreshold = 5 * 60 * 1000 // 5 minutes
+        const validUploads = cached.filter(doc => {
+          // Parse timestamp from temp ID if possible
+          const match = doc.id.match(/uploading-(\d+)/)
+          if (match) {
+            const uploadTime = parseInt(match[1])
+            return (now - uploadTime) < staleThreshold
+          }
+          return true // Keep if we can't determine age
+        })
+        
+        if (validUploads.length !== cached.length) {
+          setUploadingDocuments(validUploads)
+          persistUploadingCache(validUploads)
+        }
+      }
+    }
+    
+    // Run cleanup on mount and periodically
+    cleanup()
+    const interval = setInterval(cleanup, 60000) // Every minute
+    return () => clearInterval(interval)
+  }, [])
+
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -226,11 +322,12 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
       const uploadedDocument = customEvent.detail?.document
       if (!uploadedDocument) return
       upsertDocument(uploadedDocument as DocumentItem)
+      void refreshDocuments({ force: true })
     }
 
     window.addEventListener('document-uploaded', handleDocumentUploaded as EventListener)
     return () => window.removeEventListener('document-uploaded', handleDocumentUploaded as EventListener)
-  }, [upsertDocument])
+  }, [refreshDocuments, upsertDocument])
 
   const addSelectedDocument = useCallback((doc: SelectedDocument) => {
     setSelectedDocuments(prev => {
@@ -263,11 +360,84 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
     )
   }, [])
 
+  const addUploadingDocument = useCallback((doc: UploadingDocument) => {
+    setUploadingDocuments(prev => {
+      const next = [...prev, doc]
+      persistUploadingCache(next)
+      return next
+    })
+  }, [])
+
+  const updateUploadingDocument = useCallback((id: string, updates: Partial<UploadingDocument>) => {
+    setUploadingDocuments(prev => {
+      const next = prev.map(doc => (doc.id === id ? { ...doc, ...updates } : doc))
+      persistUploadingCache(next)
+      return next
+    })
+  }, [])
+
+  const removeUploadingDocument = useCallback((id: string) => {
+    setUploadingDocuments(prev => {
+      const next = prev.filter(doc => doc.id !== id)
+      persistUploadingCache(next)
+      return next
+    })
+  }, [])
+
   const primaryDocument = selectedDocuments.length > 0 ? selectedDocuments[0] : null
+
+  // Auto-select document uploaded from chatbox (handles refresh during upload)
+  useEffect(() => {
+    if (typeof window === 'undefined' || documents.length === 0) return
+
+    try {
+      // Check for completed upload (has document ID)
+      const uploadedDocId = sessionStorage.getItem('cognileap-chatbox-uploaded-doc')
+      if (uploadedDocId) {
+        const doc = documents.find(d => d.id === uploadedDocId)
+        if (doc && !isDocumentSelected(doc.id)) {
+          addSelectedDocument({
+            id: doc.id,
+            title: doc.title,
+            size: doc.bytes || undefined,
+            processing_status: doc.processing_status || undefined
+          })
+        }
+        sessionStorage.removeItem('cognileap-chatbox-uploaded-doc')
+        return
+      }
+
+      // Check for pending upload (user refreshed during upload)
+      const pendingTitle = sessionStorage.getItem('cognileap-pending-chatbox-upload')
+      if (pendingTitle) {
+        // Find most recent document with matching title
+        const matchingDocs = documents
+          .filter(d => d.title === pendingTitle)
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        
+        const recentDoc = matchingDocs[0]
+        if (recentDoc && !isDocumentSelected(recentDoc.id)) {
+          addSelectedDocument({
+            id: recentDoc.id,
+            title: recentDoc.title,
+            size: recentDoc.bytes || undefined,
+            processing_status: recentDoc.processing_status || undefined
+          })
+          sessionStorage.removeItem('cognileap-pending-chatbox-upload')
+        }
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }, [documents, isDocumentSelected, addSelectedDocument])
 
   const value: DocumentsContextValue = {
     documents,
     documentsLoading,
+    uploadingDocuments,
+    addUploadingDocument,
+    updateUploadingDocument,
+    removeUploadingDocument,
     refreshDocuments,
     upsertDocument,
     removeDocumentFromContext,

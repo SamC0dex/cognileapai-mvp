@@ -1,7 +1,18 @@
 'use client'
 
 import { useCallback, useEffect } from 'react'
-import { useChatStore, createNewConversation, getSuggestedQuestions } from './chat-store'
+import {
+  useChatStore,
+  createNewConversation,
+  getSuggestedQuestions
+} from './chat-store'
+
+export type {
+  ContextLevel,
+  WarningDecision,
+  WarningResolution,
+  OptimizationSummary
+} from './chat-store'
 
 /**
  * Custom hook for chat functionality
@@ -83,6 +94,15 @@ export function useChat(documentId?: string, conversationId?: string, selectedDo
     autoRetryState: store.autoRetryState,
     rateLimitUntil: store.rateLimitUntil,
     pendingMessage: store.pendingMessage,
+    contextLevel: store.contextLevel,
+    cautionToastPending: store.cautionToastPending,
+    warningActive: store.warningActive,
+    warningDecision: store.warningDecision,
+    criticalActive: store.criticalActive,
+    isContextBlocked: store.isContextBlocked,
+    lastContextUpdate: store.lastContextUpdate,
+    isOptimizingConversation: store.isOptimizingConversation,
+    lastOptimization: store.lastOptimization,
 
     // Token tracking
     conversationTokens: store.conversationTokens,
@@ -104,6 +124,10 @@ export function useChat(documentId?: string, conversationId?: string, selectedDo
     clearErrorStates: store.clearErrorStates,
     updateTokenTracking: store.updateTokenTracking,
     canAddMessage: store.canAddMessage,
+    markCautionToastSeen: store.markCautionToastSeen,
+    acknowledgeWarning: store.acknowledgeWarning,
+    clearCriticalContext: store.clearCriticalContext,
+    optimizeConversation: store.optimizeConversation,
     
     // Advanced actions (direct store access)
     loadConversation: store.loadConversation,

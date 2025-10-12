@@ -4,6 +4,7 @@ import { motion, useInView, AnimatePresence } from "framer-motion"
 import { FileText, Sparkles, Brain, Zap, CheckCircle2, Loader2, MessageSquare } from "lucide-react"
 import { useRef, useState, useEffect } from "react"
 import { SectionBackground } from "./animated-background"
+import { useLandingAnimation } from "@/lib/landing/landing-animation-context"
 
 /**
  * Demo Showcase Section - Interactive AI Processing Visualization
@@ -12,15 +13,13 @@ import { SectionBackground } from "./animated-background"
  * Document Upload → AI Analysis → Study Materials Generation → Chat Interaction
  */
 
-type ProcessingStage = "upload" | "analyze" | "generate" | "complete"
-
 const PROCESSING_STAGES = [
   {
     id: "upload",
     icon: <FileText className="h-5 w-5" />,
     title: "Document Upload",
     description: "Parsing PDF structure and extracting content",
-    duration: 1500,
+    duration: 800,
     color: "from-blue-500 to-cyan-400",
   },
   {
@@ -28,7 +27,7 @@ const PROCESSING_STAGES = [
     icon: <Brain className="h-5 w-5" />,
     title: "AI Analysis",
     description: "Generating semantic embeddings and building knowledge graph",
-    duration: 2000,
+    duration: 1000,
     color: "from-purple-500 to-pink-400",
   },
   {
@@ -36,7 +35,7 @@ const PROCESSING_STAGES = [
     icon: <Sparkles className="h-5 w-5" />,
     title: "Content Generation",
     description: "Creating study materials with Gemini 2.5 Pro",
-    duration: 2500,
+    duration: 1200,
     color: "from-amber-500 to-orange-400",
   },
   {
@@ -44,7 +43,7 @@ const PROCESSING_STAGES = [
     icon: <CheckCircle2 className="h-5 w-5" />,
     title: "Ready to Learn",
     description: "All study materials generated and ready",
-    duration: 1000,
+    duration: 600,
     color: "from-teal-500 to-emerald-400",
   },
 ]
@@ -67,12 +66,15 @@ function ProcessingStageIndicator({
   isCompleted: boolean
   index: number
 }) {
+  const { shouldAnimate } = useLandingAnimation()
+
   return (
     <motion.div
-      initial={{ opacity: 0, x: -20 }}
+      initial={shouldAnimate ? { opacity: 0, x: -20 } : false}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.1 }}
       className="relative flex items-start gap-4"
+      suppressHydrationWarning
     >
       {/* Icon */}
       <motion.div
@@ -105,9 +107,10 @@ function ProcessingStageIndicator({
           <motion.div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
             <motion.div
               className={`h-full bg-gradient-to-r ${stage.color}`}
-              initial={{ width: "0%" }}
+              initial={shouldAnimate ? { width: "0%" } : false}
               animate={{ width: "100%" }}
               transition={{ duration: stage.duration / 1000, ease: "linear" }}
+              suppressHydrationWarning
             />
           </motion.div>
         )}
@@ -117,7 +120,7 @@ function ProcessingStageIndicator({
       <AnimatePresence>
         {isCompleted && (
           <motion.div
-            initial={{ scale: 0, opacity: 0 }}
+            initial={shouldAnimate ? { scale: 0, opacity: 0 } : false}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
             transition={{ type: "spring", stiffness: 500, damping: 30 }}
@@ -136,6 +139,7 @@ function InteractiveDemoShowcase() {
   const [hasCompleted, setHasCompleted] = useState(false)
   const ref = useRef(null)
   const isInView = useInView(ref, { once: false, margin: "-100px" })
+  const { shouldAnimate } = useLandingAnimation()
 
   // Reset and restart demo when coming into view
   useEffect(() => {
@@ -154,7 +158,7 @@ function InteractiveDemoShowcase() {
 
       return () => clearTimeout(startDelay)
     }
-  }, [isInView])
+  }, [isInView, hasCompleted, isRunning])
 
   // Progress through stages
   useEffect(() => {
@@ -178,10 +182,11 @@ function InteractiveDemoShowcase() {
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
         {/* Left: Processing Stages */}
         <motion.div
-          initial={{ opacity: 0, x: -50 }}
+          initial={shouldAnimate ? { opacity: 0, x: -50 } : false}
           animate={isInView ? { opacity: 1, x: 0 } : { opacity: 0, x: -50 }}
           transition={{ duration: 0.8 }}
           className="relative overflow-hidden rounded-2xl border border-border/50 bg-card/90 p-8 backdrop-blur-sm shadow-xl dark:shadow-none"
+          suppressHydrationWarning
         >
           <div className="mb-6">
             <h3 className="text-xl font-bold">AI Processing Pipeline</h3>
@@ -230,10 +235,11 @@ function InteractiveDemoShowcase() {
 
         {/* Right: Generated Materials */}
         <motion.div
-          initial={{ opacity: 0, x: 50 }}
+          initial={shouldAnimate ? { opacity: 0, x: 50 } : false}
           animate={isInView ? { opacity: 1, x: 0 } : { opacity: 0, x: 50 }}
           transition={{ duration: 0.8, delay: 0.2 }}
           className="relative overflow-hidden rounded-2xl border border-border/50 bg-card/90 p-8 backdrop-blur-sm shadow-xl dark:shadow-none"
+          suppressHydrationWarning
         >
           <div className="mb-6">
             <h3 className="text-xl font-bold">Generated Study Materials</h3>
@@ -247,7 +253,7 @@ function InteractiveDemoShowcase() {
                 GENERATED_MATERIALS.map((material, index) => (
                   <motion.div
                     key={material.type}
-                    initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                    initial={shouldAnimate ? { opacity: 0, scale: 0.8, y: 20 } : false}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.8 }}
                     transition={{
@@ -273,7 +279,7 @@ function InteractiveDemoShowcase() {
           <AnimatePresence>
             {currentStage >= 3 && (
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
+                initial={shouldAnimate ? { opacity: 0, y: 20 } : false}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.6 }}
                 className="mt-6 space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-4"
@@ -284,7 +290,7 @@ function InteractiveDemoShowcase() {
                 </div>
 
                 <motion.div
-                  initial={{ opacity: 0, x: -10 }}
+                  initial={shouldAnimate ? { opacity: 0, x: -10 } : false}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.8 }}
                   className="rounded-lg bg-muted p-3 text-sm"
@@ -293,7 +299,7 @@ function InteractiveDemoShowcase() {
                 </motion.div>
 
                 <motion.div
-                  initial={{ opacity: 0, x: 10 }}
+                  initial={shouldAnimate ? { opacity: 0, x: 10 } : false}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 1 }}
                   className="ml-auto max-w-[90%] rounded-lg border bg-card p-3 text-sm shadow-md dark:shadow-sm"
@@ -311,7 +317,7 @@ function InteractiveDemoShowcase() {
           <AnimatePresence>
             {currentStage >= 3 && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
+                initial={shouldAnimate ? { opacity: 0, scale: 0.8 } : false}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 1.2, type: "spring" }}
                 className="mt-6 flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-teal-500/10 to-emerald-500/10 py-3 text-sm font-medium text-teal-600 dark:text-teal-400"
@@ -328,24 +334,28 @@ function InteractiveDemoShowcase() {
 }
 
 export default function DemoShowcaseSection() {
+  const { shouldAnimate } = useLandingAnimation()
+
   return (
-    <section id="demo" className="relative overflow-hidden py-20 sm:py-32">
+    <section id="demo" className="relative overflow-hidden py-10 sm:py-16">
       <SectionBackground />
 
       <div className="relative mx-auto max-w-7xl px-6">
         {/* Section header */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={shouldAnimate ? { opacity: 0, y: 20 } : false}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
           className="mx-auto max-w-4xl text-center"
+          suppressHydrationWarning
         >
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={shouldAnimate ? { opacity: 0, scale: 0.9 } : false}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
             className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm backdrop-blur-sm shadow-sm dark:shadow-none"
+            suppressHydrationWarning
           >
             <Zap className="h-3.5 w-3.5 text-primary" />
             <span className="font-medium">Live Processing Demo</span>
@@ -371,11 +381,12 @@ export default function DemoShowcaseSection() {
 
         {/* Tech stack footer */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={shouldAnimate ? { opacity: 0, y: 20 } : false}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.6 }}
           className="mt-16 text-center"
+          suppressHydrationWarning
         >
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-6 py-3 text-sm font-medium backdrop-blur-sm shadow-md dark:shadow-none">
             <Brain className="h-4 w-4" />

@@ -118,6 +118,7 @@ export const StudyToolsConfirmationDialog: React.FC<StudyToolsConfirmationDialog
               <div className="space-y-3">
                 {/* Primary option - Select document */}
                 <Button
+                  type="button"
                   onClick={onSelectDocument}
                   className="w-full justify-start gap-3 h-auto py-3 px-4"
                   variant="default"
@@ -134,6 +135,7 @@ export const StudyToolsConfirmationDialog: React.FC<StudyToolsConfirmationDialog
                 {/* Secondary option - Use conversation (only if has messages) */}
                 {hasMessages && (
                   <Button
+                    type="button"
                     onClick={onConfirm}
                     className="w-full justify-start gap-3 h-auto py-3 px-4"
                     variant="outline"

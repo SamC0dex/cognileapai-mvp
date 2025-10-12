@@ -104,7 +104,7 @@ function ProcessingChamber() {
         }
         return prev + 1
       })
-    }, 2500)
+    }, 1200)
 
     return () => clearInterval(stageTimer)
   }, [isProcessing])
@@ -115,14 +115,14 @@ function ProcessingChamber() {
 
     const processorTimer = setInterval(() => {
       setSelectedProcessor((prev) => (prev + 1) % AI_PROCESSORS.length)
-    }, 2000)
+    }, 1000)
 
     return () => clearInterval(processorTimer)
   }, [isInView])
 
   // Generate flowing particles
   const generateParticles = () => {
-    const newParticles: Particle[] = Array.from({ length: 40 }, (_, i) => ({
+    const newParticles: Particle[] = Array.from({ length: 12 }, (_, i) => ({
       id: i,
       x: Math.random() * 100,
       y: Math.random() * 100,
@@ -226,9 +226,9 @@ function ProcessingChamber() {
                 animate={{
                   opacity: isInView ? 1 : 0,
                   y: isInView ? 0 : 20,
-                  scale: isActive ? 1.05 : 1,
+                  scale: isActive ? 1.03 : 1,
                 }}
-                transition={{ delay: index * 0.1 }}
+                transition={{ duration: 0.4, delay: index * 0.1 }}
                 className="relative"
               >
                 {/* Layer card */}
@@ -298,29 +298,21 @@ function ProcessingChamber() {
                             style={{ background: layer.color }}
                             initial={{ width: "0%" }}
                             animate={{ width: "100%" }}
-                            transition={{ duration: 2.5, ease: "linear" }}
+                            transition={{ duration: 1.2, ease: "linear" }}
                           />
                         </div>
-                        <motion.p
-                          className="text-[10px] text-muted-foreground"
-                          animate={{ opacity: [0.5, 1, 0.5] }}
-                          transition={{ duration: 1.5, repeat: Infinity }}
-                        >
+                        <p className="text-[10px] text-muted-foreground animate-pulse">
                           Processing...
-                        </motion.p>
+                        </p>
                       </div>
                     )}
 
                     {/* Completion check */}
                     {isCompleted && (
-                      <motion.div
-                        initial={{ scale: 0, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="mt-3 flex items-center gap-1 text-xs text-teal-500"
-                      >
+                      <div className="mt-3 flex items-center gap-1 text-xs text-teal-500">
                         <Check className="h-3 w-3" />
                         <span>Complete</span>
-                      </motion.div>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -432,6 +424,7 @@ function ProcessingChamber() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
+              transition={{ duration: 0.4 }}
               className="border-t border-border/30 bg-gradient-to-b from-teal-500/5 to-transparent p-8"
             >
               <div className="mx-auto max-w-4xl">
@@ -448,13 +441,11 @@ function ProcessingChamber() {
                   {OUTPUT_MATERIALS.map((material, index) => (
                     <motion.div
                       key={material.type}
-                      initial={{ opacity: 0, scale: 0.5, y: 20 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
                       transition={{
                         delay: index * 0.1,
-                        type: "spring",
-                        stiffness: 300,
-                        damping: 20,
+                        duration: 0.3,
                       }}
                       className="group relative overflow-hidden rounded-xl border border-border/30 bg-card/60 p-4 text-center transition-all hover:border-primary/50 shadow-md hover:shadow-xl dark:shadow-none"
                     >
@@ -485,15 +476,10 @@ function ProcessingChamber() {
                 </div>
 
                 {/* Success message */}
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.6 }}
-                  className="mt-6 flex items-center justify-center gap-2 text-sm font-medium text-teal-600 dark:text-teal-400"
-                >
+                <div className="mt-6 flex items-center justify-center gap-2 text-sm font-medium text-teal-600 dark:text-teal-400">
                   <CheckCircle2 className="h-4 w-4" />
                   <span>Complete transformation in &lt; 60 seconds</span>
-                </motion.div>
+                </div>
               </div>
             </motion.div>
           )}
@@ -505,7 +491,7 @@ function ProcessingChamber() {
 
 export default function HowItWorksSection() {
   return (
-    <section id="how-it-works" className="relative overflow-hidden py-20 sm:py-32">
+    <section id="how-it-works" className="relative overflow-hidden py-10 sm:py-16">
       <SectionBackground />
 
       <div className="relative mx-auto max-w-7xl px-6">
@@ -513,19 +499,14 @@ export default function HowItWorksSection() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 0.5 }}
           className="mx-auto max-w-4xl text-center"
         >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm backdrop-blur-sm"
-          >
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm backdrop-blur-sm">
             <Sparkles className="h-3.5 w-3.5 text-primary" />
             <span className="font-medium">Behind The Scenes</span>
-          </motion.div>
+          </div>
 
           <h2 className="text-balance text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
             See The{" "}
@@ -552,8 +533,8 @@ export default function HowItWorksSection() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.4 }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 0.4 }}
           className="mt-20 grid grid-cols-1 gap-6 sm:grid-cols-3"
         >
           {[
@@ -578,10 +559,10 @@ export default function HowItWorksSection() {
           ].map((feature, index) => (
             <motion.div
               key={index}
-              initial={{ opacity: 0, scale: 0.9 }}
+              initial={{ opacity: 0, scale: 0.95 }}
               whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.5 + index * 0.1, type: "spring", stiffness: 200 }}
+              viewport={{ once: true, margin: "-100px" }}
+              transition={{ duration: 0.3, delay: index * 0.1 }}
               className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/80 p-6 text-center backdrop-blur-sm transition-all hover:border-primary/50 shadow-lg hover:shadow-2xl dark:shadow-none"
             >
               <motion.div

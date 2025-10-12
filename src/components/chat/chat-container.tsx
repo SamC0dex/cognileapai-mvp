@@ -37,7 +37,9 @@ import { cn } from '@/lib/utils'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { ConversationTokens } from '@/lib/token-manager'
-import { ChatErrorPanel } from './chat-error-panel'
+import { ActionableErrorPanel } from '@/components/error-management/actionable-error-panel'
+import { ErrorBoundary } from '@/components/error-management'
+import { translateError } from '@/lib/errors/translator'
 import type { ErrorAction } from '@/lib/errors/types'
 
 // Enhanced chat area width variants for coordinated layout
@@ -83,7 +85,7 @@ const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PU
 // Initialize Supabase client
 const supabase = createClient()
 
-export const ChatContainer: React.FC<{
+const ChatContainerContent: React.FC<{
   documentId?: string
   conversationId?: string
   selectedModel?: GeminiModelKey
@@ -130,7 +132,6 @@ export const ChatContainer: React.FC<{
     setError,
     conversationTokens,
     contextWarning,
-    autoRetryState,
     rateLimitUntil,
     pendingMessage,
     updateTokenTracking,
@@ -148,6 +149,7 @@ export const ChatContainer: React.FC<{
   } | null>(null)
   const lastUploadedDocumentRef = useRef<DocumentUploadedDetail['document'] | null>(null)
   const [isTokenCalculating, setIsTokenCalculating] = useState(false)
+  const [lastStableTokens, setLastStableTokens] = useState<ConversationTokens | null>(null)
   const [rateLimitCountdown, setRateLimitCountdown] = useState<number | null>(null)
 
   // Handle scroll state changes from ChatMessages
@@ -306,6 +308,14 @@ export const ChatContainer: React.FC<{
   }, [conversationTokens, isTokenCalculating])
 
   useEffect(() => {
+    if (conversationTokens) {
+      setLastStableTokens(conversationTokens)
+    } else if (messages.length === 0) {
+      setLastStableTokens(null)
+    }
+  }, [conversationTokens, messages.length])
+
+  useEffect(() => {
     if (!rateLimitUntil) {
       setRateLimitCountdown(null)
       return
@@ -325,23 +335,46 @@ export const ChatContainer: React.FC<{
   }, [rateLimitUntil, clearErrorStates])
 
   useEffect(() => {
-    onTokenUsageChange?.({ tokens: conversationTokens, isCalculating: isTokenCalculating })
-  }, [conversationTokens, isTokenCalculating, onTokenUsageChange])
+    const tokensForIndicator = conversationTokens ?? lastStableTokens
+    onTokenUsageChange?.({ tokens: tokensForIndicator, isCalculating: isTokenCalculating })
+  }, [conversationTokens, lastStableTokens, isTokenCalculating, onTokenUsageChange])
+
+  // Listen for document removal events
+  useEffect(() => {
+    const handleDocumentRemoved = (event: Event) => {
+      const customEvent = event as CustomEvent<{ documentId: string }>
+      const removedDocumentId = customEvent.detail?.documentId
+      
+      if (removedDocumentId && urlSelectedDocument?.id === removedDocumentId) {
+        // Clear URL-based document selection and navigate to general chat
+        setUrlSelectedDocument(null)
+        if (typeof window !== 'undefined') {
+          const newUrl = conversationId ? `/chat/${conversationId}` : '/chat'
+          window.history.pushState({}, '', newUrl)
+        }
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('document-removed', handleDocumentRemoved as EventListener)
+      return () => window.removeEventListener('document-removed', handleDocumentRemoved as EventListener)
+    }
+  }, [urlSelectedDocument, conversationId])
 
   // Handle document removal
   const handleRemoveDocument = useCallback((documentId: string) => {
     // Remove from context if it's a selected document
     removeSelectedDocument(documentId)
 
-    // If it's the URL document, navigate away
+    // If it's the URL document, clear it locally too
     if (urlSelectedDocument?.id === documentId) {
       setUrlSelectedDocument(null)
       if (typeof window !== 'undefined') {
-        window.history.pushState({}, '', '/chat')
-        window.location.reload()
+        const newUrl = conversationId ? `/chat/${conversationId}` : '/chat'
+        window.history.pushState({}, '', newUrl)
       }
     }
-  }, [removeSelectedDocument, urlSelectedDocument])
+  }, [removeSelectedDocument, urlSelectedDocument, conversationId])
 
   // Check if any message is currently streaming
   const hasStreamingMessage = messages.some(msg => msg.role === 'assistant' && msg.isStreaming)
@@ -399,6 +432,7 @@ export const ChatContainer: React.FC<{
       case 'upload':
         clearErrorStates()
         if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('open-document-upload'))
           document.querySelector('[data-dashboard-upload-trigger]')?.dispatchEvent(new Event('click'))
         }
         break
@@ -487,7 +521,7 @@ export const ChatContainer: React.FC<{
         />
 
         {friendlyError && (
-          <ChatErrorPanel
+          <ActionableErrorPanel
             error={friendlyError}
             countdownSeconds={rateLimitCountdown}
             onAction={handleErrorAction}
@@ -525,7 +559,10 @@ export const ChatContainer: React.FC<{
         {/* Input Area */}
         <ChatInput
           onSendMessage={handleSendMessage}
-          disabled={hasStreamingMessage}
+          disabled={hasStreamingMessage || isRateLimited}
+          disabledReason={isRateLimited ? 'Rate limit in effect. Please wait before sending another message.' : undefined}
+          rateLimitCountdown={isRateLimited ? rateLimitCountdown : null}
+          initialValue={friendlyError && pendingMessage ? pendingMessage : undefined}
           placeholder={
             selectedDocuments.length > 0
               ? `Ask about ${selectedDocuments.length > 1 ? 'your documents' : `"${selectedDocuments[0].title}"`}...`
@@ -563,6 +600,68 @@ export const ChatContainer: React.FC<{
     </div>
   )
 })
+
+ChatContainerContent.displayName = 'ChatContainerContent'
+
+const ChatContainerErrorFallback: React.FC<{ error: Error; retry: () => void }> = ({ error, retry }) => {
+  const translated = useMemo(() => translateError(error, {
+    source: 'chat',
+    operation: 'render',
+    rawMessage: error.message,
+    payload: {
+      component: 'ChatContainer'
+    }
+  }), [error])
+
+  useEffect(() => {
+    if (translated.shouldRedirectToLogin && typeof window !== 'undefined') {
+      window.location.href = '/auth/login'
+    }
+  }, [translated.shouldRedirectToLogin])
+
+  const handleAction = useCallback((action: ErrorAction) => {
+    switch (action.intent) {
+      case 'retry':
+        retry()
+        break
+      case 'reload':
+        if (typeof window !== 'undefined') {
+          window.location.reload()
+        }
+        break
+      case 'support':
+        if (typeof window !== 'undefined') {
+          window.open('mailto:support@cognileap.ai?subject=Chat%20Issue', '_blank')
+        }
+        break
+      case 'signin':
+        if (typeof window !== 'undefined') {
+          window.location.href = '/auth/login'
+        }
+        break
+      default:
+        retry()
+        break
+    }
+  }, [retry])
+
+  return (
+    <div className="p-6">
+      <ActionableErrorPanel error={translated.userError} onAction={handleAction} />
+    </div>
+  )
+}
+
+type ChatContainerProps = React.ComponentProps<typeof ChatContainerContent>
+
+const ChatContainerWithBoundary: React.FC<ChatContainerProps> = (props) => (
+  <ErrorBoundary fallback={ChatContainerErrorFallback}>
+    <ChatContainerContent {...props} />
+  </ErrorBoundary>
+)
+
+export const ChatContainer = React.memo(ChatContainerWithBoundary)
+ChatContainer.displayName = 'ChatContainer'
 
 // Fullscreen Canvas Component
 const FullscreenCanvas: React.FC = () => {

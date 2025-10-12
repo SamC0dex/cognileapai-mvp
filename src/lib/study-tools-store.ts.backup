@@ -197,72 +197,41 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
   isProcessingAutoOpen: false,
   _recentlyAutoOpened: new Set<string>(),
   enqueueAutoOpen: (id: string, type: StudyToolType) => {
-    const { _recentlyAutoOpened, autoOpenQueue, isProcessingAutoOpen } = get()
-    
-    // Skip if already auto-opened
+    const { _recentlyAutoOpened } = get()
     if (_recentlyAutoOpened.has(id)) {
-      console.log('[StudyToolsStore] Skipping auto-open - already opened:', id)
       return
     }
 
-    // Skip if already in queue
-    if (autoOpenQueue.some(item => item.id === id)) {
-      console.log('[StudyToolsStore] Skipping auto-open - already in queue:', id)
-      return
-    }
+    let shouldSchedule = false
+    set(state => {
+      if (state.autoOpenQueue.some(item => item.id === id)) {
+        return state
+      }
+      shouldSchedule = true
+      return {
+        autoOpenQueue: [...state.autoOpenQueue, { id, type }]
+      }
+    })
 
-    console.log('[StudyToolsStore] Enqueueing auto-open:', { id, type, queueLength: autoOpenQueue.length })
-
-    // Add to queue
-    set(state => ({
-      autoOpenQueue: [...state.autoOpenQueue, { id, type }]
-    }))
-
-    // Trigger processing if not already processing
-    if (!isProcessingAutoOpen) {
-      console.log('[StudyToolsStore] Starting queue processing')
+    if (shouldSchedule) {
       get()._processAutoOpenQueue()
-    } else {
-      console.log('[StudyToolsStore] Queue processing already in progress, item will be processed next')
     }
   },
   _processAutoOpenQueue: () => {
     const snapshot = get()
-    
-    // Guard: already processing
-    if (snapshot.isProcessingAutoOpen) {
-      console.log('[StudyToolsStore] Queue processing blocked - already in progress')
-      return
-    }
-
+    if (snapshot.isProcessingAutoOpen) return
     const nextItem = snapshot.autoOpenQueue[0]
-    
-    // Guard: empty queue
-    if (!nextItem) {
-      console.log('[StudyToolsStore] Queue is empty, nothing to process')
-      return
-    }
+    if (!nextItem) return
 
-    console.log('[StudyToolsStore] Processing queue item:', {
-      id: nextItem.id,
-      type: nextItem.type,
-      remainingInQueue: snapshot.autoOpenQueue.length - 1
-    })
-
-    // Mark as processing and remove item from queue
     set(state => ({
       isProcessingAutoOpen: true,
       autoOpenQueue: state.autoOpenQueue.slice(1)
     }))
 
     const finalize = () => {
-      console.log('[StudyToolsStore] Finalizing auto-open for:', nextItem.id)
-      
       set(state => {
         const updatedSet = new Set(state._recentlyAutoOpened)
         updatedSet.add(nextItem.id)
-        
-        // Keep set size manageable
         if (updatedSet.size > 50) {
           const iterator = updatedSet.values()
           while (updatedSet.size > 50) {
@@ -271,47 +240,28 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
             updatedSet.delete(next.value)
           }
         }
-        
         return {
           isProcessingAutoOpen: false,
           _recentlyAutoOpened: updatedSet
         }
       })
 
-      // Schedule next item processing after a delay
-      const remainingQueue = get().autoOpenQueue
-      if (remainingQueue.length > 0) {
-        console.log('[StudyToolsStore] Scheduling next queue item processing:', remainingQueue[0].id)
-        setTimeout(() => {
-          get()._processAutoOpenQueue()
-        }, 100) // Small delay to ensure UI has time to settle
-      } else {
-        console.log('[StudyToolsStore] Queue processing complete - no more items')
-      }
+      queueMicrotask(() => get()._processAutoOpenQueue())
     }
 
-    // Wait 1200ms before opening to allow previous content to settle
     setTimeout(async () => {
       try {
-        console.log('[StudyToolsStore] Opening content:', nextItem.id)
-        
         if (nextItem.type === 'flashcards') {
           const flashcardStore = await loadFlashcardStore()
           const flashcardState = flashcardStore.getState()
           const flashcardSet = flashcardState.flashcardSets.find(set => set.id === nextItem.id)
           if (flashcardSet) {
-            console.log('[StudyToolsStore] Opening flashcard viewer:', flashcardSet.title)
             flashcardState.openViewer(flashcardSet)
-          } else {
-            console.warn('[StudyToolsStore] Flashcard set not found:', nextItem.id)
           }
         } else {
           const content = get().generatedContent.find(content => content.id === nextItem.id)
           if (content) {
-            console.log('[StudyToolsStore] Opening canvas:', content.title)
             await get().openCanvas(content)
-          } else {
-            console.warn('[StudyToolsStore] Study tool content not found:', nextItem.id)
           }
         }
       } catch (error) {
@@ -319,7 +269,7 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
       } finally {
         finalize()
       }
-    }, 1200) // Increased from 400ms to 1200ms for better sequential opening
+    }, 400)
   },
   isGenerating: false, // Proper reactive state
   isGeneratingType: (type: StudyToolType) => {
@@ -413,7 +363,6 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
     const generationId = resumeOptions?.generationId ?? crypto.randomUUID()
     const startTime = resumeOptions?.startedAt ?? Date.now()
     const cleanupGeneration = get()._cleanupGenerationTracking
-    let isTimeout = false // Track if abort was due to timeout
 
     console.log('[StudyToolsStore] Starting generation:', {
       type,
@@ -616,30 +565,7 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
               return
             }
 
-            // Store current progress before database load to prevent overwriting
-            const currentState = get()
-            const currentProgress = currentState.generatedContent.find(c => c.id === generationId)?.generationProgress ?? 0
-            const currentActiveGeneration = currentState.activeGenerations.get(generationId)
-            
             await get().loadStudyToolsFromDatabase(effectiveDocumentId, effectiveConversationId)
-
-            // After database load, preserve higher progress value (don't let DB overwrite local progress)
-            if (currentActiveGeneration) {
-              set(state => {
-                const dbContent = state.generatedContent.find(content => content.id === generationId)
-                if (dbContent && dbContent.isGenerating && (dbContent.generationProgress ?? 0) < currentProgress) {
-                  // Database has lower progress - restore the higher local progress
-                  return {
-                    generatedContent: state.generatedContent.map(content =>
-                      content.id === generationId
-                        ? { ...content, generationProgress: currentProgress }
-                        : content
-                    )
-                  }
-                }
-                return state
-              })
-            }
 
             if (type === 'flashcards') {
               const flashcardStoreHook = useFlashcardStoreRef ?? await ensureFlashcardStore()
@@ -667,21 +593,37 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
           }
         }
 
-        // Smart polling: wait 30s before first check, then use consistent 5s intervals
-        // Reduced from aggressive 2s polling to prevent flickering
-        const statusInterval = setInterval(() => {
-          void pollStatus()
-        }, 5000) // Consistent 5 second intervals - balances responsiveness with stability
+        // Smart polling: wait 30s before first check, then adjust interval based on elapsed time
+        let currentInterval = 10000 // Start with 10s intervals after initial delay
+        let statusInterval: NodeJS.Timeout
 
-        set(state => {
-          const newActivePollIntervals = new Map(state.activePollIntervals)
-          newActivePollIntervals.set(generationId, statusInterval)
-          return { activePollIntervals: newActivePollIntervals }
-        })
+        const startPolling = () => {
+          statusInterval = setInterval(() => {
+            const elapsed = Date.now() - pollStartTime
+            
+            // Adjust interval based on elapsed time
+            if (elapsed > 60000 && currentInterval !== 2000) {
+              // After 60s: poll every 2s
+              clearInterval(statusInterval)
+              currentInterval = 2000
+              startPolling()
+              return
+            }
+            
+            void pollStatus()
+          }, currentInterval)
 
-        // Wait 30 seconds before first check
+          set(state => {
+            const newActivePollIntervals = new Map(state.activePollIntervals)
+            newActivePollIntervals.set(generationId, statusInterval)
+            return { activePollIntervals: newActivePollIntervals }
+          })
+        }
+
+        // Wait 30 seconds before starting polling
         setTimeout(() => {
           void pollStatus() // First check after 30s
+          startPolling() // Then start interval
         }, 30000)
       }
 
@@ -754,23 +696,12 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
       }
 
       let lastProgress = placeholderContent.generationProgress ?? 0 // Track to ensure never going backwards
-      let lastUpdateTime = Date.now() // Track last update to throttle rapid updates
-      
       const progressInterval = setInterval(() => {
-        const now = Date.now()
-        const elapsedSeconds = (now - startTime) / 1000
+        const elapsedSeconds = (Date.now() - startTime) / 1000
         const { progress: newProgress, message } = getRealisticProgress(elapsedSeconds, type)
-        
         // Ensure progress never goes backwards
         const progress = Math.max(lastProgress, newProgress)
-        
-        // Skip update if progress hasn't changed significantly (prevent flickering from tiny updates)
-        if (Math.abs(progress - lastProgress) < 0.5 && now - lastUpdateTime < 500) {
-          return
-        }
-        
         lastProgress = progress
-        lastUpdateTime = now
 
         set(state => {
           // Update active generation progress
@@ -817,7 +748,7 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
           )
           useFlashcardStoreRef.setState({ flashcardSets: updatedSets })
         }
-      }, 500)
+      }, 300)
 
       // Track interval for cleanup
       set(state => {
@@ -833,10 +764,7 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
 
       // Create AbortController with 90 second timeout (API has 60s maxDuration + buffer)
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => {
-        isTimeout = true
-        controller.abort(new Error('Request timeout after 90 seconds'))
-      }, 90000)
+      const timeoutId = setTimeout(() => controller.abort(), 90000)
 
       let response: Response
       try {
@@ -885,11 +813,10 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
       const result = await response.json()
       console.log('[StudyToolsStore] Generation successful:', result)
 
-      // Get current progress and status before completion animation
+      // Get current progress before completion animation
       const currentState = get()
       const currentGeneration = currentState.activeGenerations.get(generationId)
       const currentProgress = currentGeneration?.progress || 0
-      const currentStatusMessage = placeholderContent.statusMessage || 'Finalizing...'
 
       // Animate progress to 100% before opening content (completion animation)
       const completeProgress = () => {
@@ -914,13 +841,10 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
                   status: 'finalizing'
                 })
 
-                // Only show "Complete!" when very close to 100% to prevent flickering
-                const completionMessage = newProgress >= 98 ? 'Complete!' : currentStatusMessage
-
                 // Update placeholder content progress
                 const updatedContent = state.generatedContent.map(content =>
                   content.id === placeholderContent.id
-                    ? { ...content, generationProgress: newProgress, statusMessage: completionMessage }
+                    ? { ...content, generationProgress: newProgress, statusMessage: 'Complete!' }
                     : content
                 )
 
@@ -943,17 +867,14 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
             // Also update flashcard placeholder if it's a flashcard generation
             if (type === 'flashcards' && useFlashcardStoreRef) {
               const flashcardStore = useFlashcardStoreRef.getState()
-              const currentFlashcardProgress = currentState.activeGenerations.get(generationId)?.progress || 0
-              const flashcardCompletionMessage = currentFlashcardProgress >= 98 ? 'Complete!' : currentStatusMessage
-              
               const updatedSets = flashcardStore.flashcardSets.map((set: FlashcardSet) =>
                 set.id === placeholderContent.id
                   ? {
                       ...set,
                       metadata: {
                         ...set.metadata,
-                        generationProgress: Math.min(100, currentFlashcardProgress + 5),
-                        statusMessage: flashcardCompletionMessage
+                        generationProgress: Math.min(100, (currentState.activeGenerations.get(generationId)?.progress || 0) + 5),
+                        statusMessage: 'Complete!'
                       }
                     }
                   : set
@@ -1030,59 +951,9 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
       console.error('[StudyToolsStore] Generation failed:', error)
       const errorMessage = error instanceof Error ? error.message : 'Generation failed'
 
-      // Check if this is a timeout abort (intentional) vs navigation/refresh abort (unintentional)
-      const isAbortError = error instanceof DOMException && error.name === 'AbortError'
-      const isNetworkError = error instanceof TypeError && error.message.includes('Failed to fetch')
-      
-      // If timeout occurred, treat as actual error (not resumable)
-      if (isAbortError && isTimeout) {
-        console.error('[StudyToolsStore] Generation timed out after 90 seconds')
-        
-        // Clean up interval if it exists
-        const currentState = get()
-        const progressInterval = currentState.activeIntervals.get(generationId)
-        if (progressInterval) {
-          clearInterval(progressInterval)
-          set(state => {
-            const newActiveIntervals = new Map(state.activeIntervals)
-            newActiveIntervals.delete(generationId)
-            return { activeIntervals: newActiveIntervals }
-          })
-        }
-
-        // Update placeholder to show timeout error
-        const timeoutError = new Error(`${STUDY_TOOLS[type].name} generation timed out. The content may be too large or the service is experiencing high load. Please try with a smaller document or try again later.`)
-        const translated = translateError(timeoutError, {
-          source: 'study-tools',
-          operation: 'generate',
-          rawMessage: timeoutError.message,
-          payload: { type, documentId, conversationId }
-        })
-
-        logError(timeoutError, {
-          source: 'study-tools',
-          operation: 'generate',
-          rawMessage: timeoutError.message,
-          payload: { type, documentId, conversationId }
-        }, translated.userError)
-
-        set(state => ({
-          error: translated.userError.message,
-          friendlyError: translated.userError,
-          lastFailedGeneration: { type, documentId, conversationId, attempt: 1 },
-          generatedContent: state.generatedContent.map(content =>
-            content.id === placeholderContent.id
-              ? { ...content, isGenerating: false, generationProgress: 0, statusMessage: undefined }
-              : content
-          )
-        }))
-        
-        cleanupGeneration(generationId)
-        return
-      }
-
-      // Handle navigation/refresh interruption (try to resume)
-      if (isAbortError || isNetworkError) {
+      // Handle both AbortError (navigation) and TypeError (refresh/network interruption)
+      if ((error instanceof DOMException && error.name === 'AbortError') || 
+          (error instanceof TypeError && error.message.includes('Failed to fetch'))) {
         console.warn('[StudyToolsStore] Generation interrupted (refresh/navigation). Preserving state and resuming...')
 
         startStatusPolling()

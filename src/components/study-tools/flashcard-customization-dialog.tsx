@@ -105,6 +105,7 @@ export const FlashcardCustomizationDialog: React.FC<FlashcardCustomizationDialog
                   return (
                     <motion.button
                       key={option}
+                      type="button"
                       className={cn(
                         "relative p-4 rounded-lg border-2 transition-all duration-200 text-left",
                         isSelected
@@ -154,6 +155,7 @@ export const FlashcardCustomizationDialog: React.FC<FlashcardCustomizationDialog
                   return (
                     <motion.button
                       key={level}
+                      type="button"
                       className={cn(
                         "relative p-4 rounded-lg border-2 transition-all duration-200 text-left",
                         isSelected
@@ -223,6 +225,7 @@ export const FlashcardCustomizationDialog: React.FC<FlashcardCustomizationDialog
               className="flex justify-end pt-4 border-t border-border"
             >
               <motion.button
+                type="button"
                 onClick={handleGenerate}
                 disabled={isGenerating}
                 className={cn(

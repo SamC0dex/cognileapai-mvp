@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Plus, Minus, HelpCircle } from "lucide-react"
 import { useState } from "react"
 import { SectionBackground } from "./animated-background"
+import { cn } from "@/lib/utils"
+import { useLandingAnimation } from "@/lib/landing/landing-animation-context"
 
 /**
  * FAQ Section - Modern Accordion with Smooth Animations
@@ -59,17 +61,24 @@ function FAQAccordionItem({
   isOpen: boolean
   onToggle: () => void
 }) {
+  const { shouldAnimate } = useLandingAnimation()
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={shouldAnimate ? { opacity: 0, y: 20 } : false}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-50px" }}
       transition={{ delay: index * 0.08 }}
-      className="group relative overflow-hidden rounded-xl border transition-all duration-300"
+      className={cn(
+        "group relative overflow-hidden rounded-xl border transition-all duration-300",
+        "bg-white/95 shadow-[0_24px_48px_rgba(15,23,42,0.08)] border-white/70",
+        "dark:bg-[rgba(15,23,42,0.82)] dark:border-white/10 dark:shadow-[0_22px_48px_rgba(2,6,23,0.55)]",
+        isOpen ? "ring-1 ring-teal-400/30" : "hover:border-white/85"
+      )}
       style={{
-        borderColor: isOpen ? "rgba(20, 184, 166, 0.5)" : "hsl(var(--border) / 0.5)",
-        backgroundColor: isOpen ? "rgba(20, 184, 166, 0.05)" : "hsl(var(--card) / 0.6)",
-        boxShadow: isOpen ? "0 10px 40px rgba(20, 184, 166, 0.15)" : "none",
+        borderColor: isOpen ? "rgba(20, 184, 166, 0.55)" : undefined,
+        backgroundColor: isOpen ? "rgba(20, 184, 166, 0.1)" : undefined,
+        boxShadow: isOpen ? "0 18px 48px rgba(20, 184, 166, 0.18)" : undefined,
       }}
     >
       {/* Question button */}
@@ -105,7 +114,7 @@ function FAQAccordionItem({
       <AnimatePresence initial={false}>
         {isOpen && (
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
+            initial={shouldAnimate ? { height: 0, opacity: 0 } : false}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{
@@ -115,7 +124,7 @@ function FAQAccordionItem({
             className="overflow-hidden"
           >
             <motion.div
-              initial={{ y: -10 }}
+              initial={shouldAnimate ? { y: -10 } : false}
               animate={{ y: 0 }}
               exit={{ y: -10 }}
               transition={{ duration: 0.2 }}
@@ -149,26 +158,27 @@ function FAQAccordionItem({
 
 export default function FaqSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(0)
+  const { shouldAnimate } = useLandingAnimation()
 
   const handleToggle = (index: number) => {
     setOpenIndex(openIndex === index ? null : index)
   }
 
   return (
-    <section id="faq" className="relative overflow-hidden py-20 sm:py-32">
+    <section id="faq" className="relative overflow-hidden py-10 sm:py-16" suppressHydrationWarning>
       <SectionBackground />
 
       <div className="relative mx-auto max-w-7xl px-6">
         {/* Section header */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={shouldAnimate ? { opacity: 0, y: 20 } : false}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
           className="mx-auto max-w-4xl text-center"
         >
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={shouldAnimate ? { opacity: 0, scale: 0.9 } : false}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
             className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm backdrop-blur-sm"
@@ -185,14 +195,14 @@ export default function FaqSection() {
           </h2>
 
           <p className="mt-6 text-lg text-muted-foreground sm:text-xl">
-            Technical details, features, and answers to help you understand the full capabilities of CogniLeap's AI
+            Technical details, features, and answers to help you understand the full capabilities of CogniLeap’s AI
             learning system.
           </p>
         </motion.div>
 
         {/* FAQ Accordion */}
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
+          initial={shouldAnimate ? { opacity: 0, y: 30 } : false}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.8, delay: 0.2 }}
@@ -213,21 +223,24 @@ export default function FaqSection() {
 
         {/* Contact CTA */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={shouldAnimate ? { opacity: 0, y: 20 } : false}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.6 }}
           className="mt-16 text-center"
         >
-          <div className="inline-flex flex-col items-center gap-3 rounded-2xl border border-border/50 bg-card/60 px-8 py-6 backdrop-blur-sm">
-            <p className="text-sm text-muted-foreground">Still have questions?</p>
-            <p className="text-sm">
-              This is a college project showcase built to demonstrate advanced AI integration and modern web
-              development.
-            </p>
-            <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="inline-flex h-2 w-2 rounded-full bg-teal-500" />
-              <span>Built with Next.js 15 • Google Gemini 2.5 Pro • Transformers.js</span>
+          <div className="relative inline-flex flex-col items-center gap-3 overflow-hidden rounded-2xl border border-white/70 px-8 py-6 backdrop-blur-sm dark:border-white/10">
+            <div className="pointer-events-none absolute inset-0 rounded-2xl bg-white/95 shadow-[0_24px_48px_rgba(15,23,42,0.08)] dark:bg-[rgba(15,23,42,0.82)] dark:shadow-[0_22px_48px_rgba(2,6,23,0.55)]" />
+            <div className="relative z-10 flex flex-col items-center gap-3">
+              <p className="text-sm text-muted-foreground">Still have questions?</p>
+              <p className="text-sm">
+                This is a college project showcase built to demonstrate advanced AI integration and modern web
+                development.
+              </p>
+              <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="inline-flex h-2 w-2 rounded-full bg-teal-500" />
+                <span>Built with Next.js 15 • Google Gemini 2.5 Pro • Transformers.js</span>
+              </div>
             </div>
           </div>
         </motion.div>

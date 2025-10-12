@@ -96,7 +96,8 @@ function matchCategory(message: string, context: ErrorContext, status?: number, 
   return 'unknown'
 }
 
-function buildError(category: ErrorCategory, message: string, context: ErrorContext): TranslatedError {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function buildError(category: ErrorCategory, _message: string, _context: ErrorContext): TranslatedError {
   switch (category) {
     case 'authentication':
       return {

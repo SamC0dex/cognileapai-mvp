@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
 import { useDropzone } from 'react-dropzone'
 import { DashboardLayout } from '@/components/dashboard-layout'
 import { DashboardHeader } from '@/components/dashboard-header'
@@ -11,70 +10,29 @@ import { DashboardTabs } from '@/components/dashboard-tabs'
 
 export default function DashboardPage() {
   const router = useRouter()
-  const [isUploading, setIsUploading] = useState(false)
+  const [isUploading] = useState(false)
 
-  const uploadFile = useCallback(async (file: File) => {
-    const formData = new FormData()
-    formData.append('file', file)
-
-    try {
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      })
-
-      if (response.ok) {
-        const result = await response.json()
-        toast.success(`"${file.name}" uploaded successfully!`)
-        // Navigate to chat with document context (instant, no delay)
-        router.push(`/chat?type=document&documentId=${result.document?.id || 'new'}&title=${encodeURIComponent(file.name)}`)
-      } else {
-        const error = await response.json()
-        toast.error(error.error || 'Upload failed')
-      }
-    } catch (error) {
-      toast.error('Upload failed')
-      console.error('Upload error:', error)
+  const handleUpload = useCallback(() => {
+    // First expand the documents panel to show upload progress
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('expand-documents-panel'))
+      // Small delay to let panel start opening, then trigger upload
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('open-document-upload'))
+      }, 100)
     }
-  }, [router])
-
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    if (acceptedFiles.length === 0) return
-    
-    setIsUploading(true)
-    
-    try {
-      // Upload files sequentially to avoid overwhelming the server
-      for (const file of acceptedFiles) {
-        await uploadFile(file)
-      }
-    } finally {
-      setIsUploading(false)
-    }
-  }, [uploadFile])
+  }, [])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
+    onDrop: () => {
+      // Instead of handling uploads here, delegate to documents panel
+      handleUpload()
+    },
     accept: { 'application/pdf': ['.pdf'] },
     maxSize: 20 * 1024 * 1024, // 20MB
     disabled: isUploading,
     noClick: true // Disable default click to open file dialog
   })
-
-  const handleUpload = () => {
-    // Trigger file dialog manually
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.pdf'
-    input.multiple = true
-    input.onchange = async (e) => {
-      const files = Array.from((e.target as HTMLInputElement).files || [])
-      if (files.length > 0) {
-        await onDrop(files)
-      }
-    }
-    input.click()
-  }
 
   // Prefetch chat routes to make transitions instant
   useEffect(() => {

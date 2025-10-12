@@ -13,6 +13,7 @@ import {
 } from '@/lib/genai-client'
 import type { GeminiModelKey } from '@/lib/ai-config'
 import { GeminiModelSelector } from '@/lib/ai-config'
+import { TokenManager } from '@/lib/token-manager'
 
 // Service role client for background operations only
 const serviceSupabase = createClient(
@@ -89,6 +90,22 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    const conversationTokenSummary = TokenManager.estimateConversation(
+      messages.map(message => ({
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        timestamp: new Date(message.timestamp)
+      }))
+    )
+    conversationTokenSummary.conversationId = conversationId
+
+    const documentTokenBudget = TokenManager.getOptimalDocumentSize(conversationTokenSummary.totalTokens)
+
+    console.log(
+      `[StatefulChat] Tokens ~${conversationTokenSummary.totalTokens.toLocaleString()} (level: ${conversationTokenSummary.warningLevel}), document budget: ${documentTokenBudget.toLocaleString()} tokens`
+    )
+
     // Get the latest user message
     const lastMessage = messages[messages.length - 1]
     if (lastMessage.role !== 'user') {
@@ -109,7 +126,13 @@ export async function POST(req: NextRequest) {
     // Check if we have an existing session for this conversation
     let sessionId = conversationSessionCache.get(conversationId)
     let isNewSession = false
-
+    
+    // Track token counts for system prompt and document context
+    // Token counts tracked from new session creation
+    // eslint-disable-next-line prefer-const
+    let systemPromptTokens = 0
+    // eslint-disable-next-line prefer-const
+    let documentContextTokens = 0
     if (!sessionId || !getSessionInfo(sessionId)) {
       // Create new session
       isNewSession = true
@@ -117,6 +140,7 @@ export async function POST(req: NextRequest) {
 
       // Build system prompt and context
       const systemPrompt = getSystemPrompt(chatType, documentId, selectedModelKey)
+      systemPromptTokens = TokenManager.estimate(systemPrompt).estimated
       let documentContext = ''
 
       // Handle document context for new sessions
@@ -167,7 +191,7 @@ export async function POST(req: NextRequest) {
                       `${processedDocs.length} Documents`,
                       combinedContent,
                       {
-                        maxTokens: 200000,
+                        maxTokens: documentTokenBudget,
                         chunkSize: 800,
                         overlap: 200,
                         useSemanticSearch: embeddingsAvailable,
@@ -179,16 +203,28 @@ export async function POST(req: NextRequest) {
                     )
                   } catch (contextError) {
                     console.warn('[StatefulChat] RAG failed, using simple context:', contextError)
-                    documentContext = processedDocs.map(doc =>
-                      `\n\n=== ${doc.title} ===\n${doc.content.slice(0, 200000)}`
-                    ).join('').slice(0, 800000)
+                    const fallbackBudgetChars = documentTokenBudget * 4
+                    let remainingChars = fallbackBudgetChars
+
+                    documentContext = processedDocs.map(doc => {
+                      if (remainingChars <= 0) return ''
+                      const snippet = doc.content.slice(0, remainingChars)
+                      remainingChars = Math.max(0, remainingChars - snippet.length)
+                      return `\n\n=== ${doc.title} ===\n${snippet}`
+                    }).join('').slice(0, fallbackBudgetChars)
                   }
                 } else {
                   // Simple concatenation for smaller documents
                   console.log(`[StatefulChat] Using simple concatenation for small documents`)
-                  documentContext = processedDocs.map(doc =>
-                    `\n\n=== ${doc.title} ===\n${doc.content}`
-                  ).join('')
+                  const budgetChars = documentTokenBudget * 4
+                  let remainingChars = budgetChars
+
+                  documentContext = processedDocs.map(doc => {
+                    if (remainingChars <= 0) return ''
+                    const snippet = doc.content.slice(0, remainingChars)
+                    remainingChars = Math.max(0, remainingChars - snippet.length)
+                    return `\n\n=== ${doc.title} ===\n${snippet}`
+                  }).join('').slice(0, budgetChars)
                 }
               }
             }
@@ -196,6 +232,12 @@ export async function POST(req: NextRequest) {
             console.error('[StatefulChat] Error fetching document context:', error)
           }
         }
+      }
+
+      // Calculate document context tokens after building context
+      if (documentContext) {
+        documentContextTokens = TokenManager.estimate(documentContext).estimated
+        console.log(`[StatefulChat] New session - calculated document context tokens: ${documentContextTokens.toLocaleString()}`)
       }
 
       // Convert conversation history to GenAI format (excluding the last message)
@@ -219,6 +261,13 @@ export async function POST(req: NextRequest) {
       console.log(`[StatefulChat] Created session: ${sessionId}`)
     } else {
       console.log(`[StatefulChat] Using existing session: ${sessionId}`)
+      
+      // For existing sessions, document context was already added during session creation
+      // We DON'T send new values to avoid duplication/confusion in the frontend
+      // The frontend will keep the original values from session creation
+      systemPromptTokens = 0  // Don't update - already tracked from session creation
+      documentContextTokens = 0  // Don't update - already tracked from session creation
+      console.log(`[StatefulChat] Existing session - not sending system/document token breakdown (already tracked from session creation)`)
     }
 
     // Send message to session and stream response
@@ -255,10 +304,26 @@ export async function POST(req: NextRequest) {
                 model: modelConfig.displayName,
                 modelKey: selectedModelKey,
                 sessionId,
-                isNewSession
+                isNewSession,
+                tokenBudget: {
+                  conversation: conversationTokenSummary.totalTokens,
+                  conversationLevel: conversationTokenSummary.warningLevel,
+                  document: documentTokenBudget
+                }
+,
+                // Token breakdown for accurate tracking
+                tokenBreakdown: {
+                  systemPrompt: systemPromptTokens,
+                  documentContext: documentContextTokens,
+                  isNewSession: isNewSession
+                }
               }
 
               const metadataData = JSON.stringify(metadata)
+              console.log('[StatefulChat] Sending metadata with token breakdown:', {
+                systemPrompt: metadata.tokenBreakdown.systemPrompt,
+                documentContext: metadata.tokenBreakdown.documentContext
+              })
               controller.enqueue(new TextEncoder().encode(`8:${metadataData}\n`))
 
               // Save message to database
@@ -274,7 +339,12 @@ export async function POST(req: NextRequest) {
                       documentId,
                       modelUsed: selectedModelKey,
                       sessionId,
-                      isNewSession
+                      isNewSession,
+                      tokenBudget: {
+                        conversation: conversationTokenSummary.totalTokens,
+                        conversationLevel: conversationTokenSummary.warningLevel,
+                        document: documentTokenBudget
+                      }
                     }
                   })
 
@@ -288,9 +358,55 @@ export async function POST(req: NextRequest) {
                       tokens: metadata.usage.totalTokens,
                       modelKey: selectedModelKey,
                       sessionId,
-                      isNewSession
+                      isNewSession,
+                      tokenBudget: {
+                        conversation: conversationTokenSummary.totalTokens,
+                        conversationLevel: conversationTokenSummary.warningLevel,
+                        document: documentTokenBudget
+                      }
                     }
                   })
+
+                  // Save token breakdown to conversation metadata ONLY for NEW sessions
+                  // This allows us to restore token counts on page refresh
+                  // IMPORTANT: Only update metadata if this is genuinely a new session to avoid overwriting
+                  if (isNewSession && (systemPromptTokens > 0 || documentContextTokens > 0)) {
+                    // First, check if metadata already exists to avoid overwriting
+                    const { data: existingConv } = await supabase
+                      .from('conversations')
+                      .select('metadata')
+                      .eq('id', conversationId)
+                      .eq('user_id', user.id)
+                      .single()
+
+                    // Only update if metadata is empty or doesn't have token counts
+                    const existingMetadata = existingConv?.metadata as Record<string, unknown> | null
+                    const hasExistingTokens = existingMetadata && 
+                      (typeof existingMetadata.systemPromptTokens === 'number' || 
+                       typeof existingMetadata.documentContextTokens === 'number')
+
+                    if (!hasExistingTokens) {
+                      const { error: updateError } = await supabase
+                        .from('conversations')
+                        .update({
+                          metadata: {
+                            systemPromptTokens,
+                            documentContextTokens,
+                            savedAt: new Date().toISOString()
+                          }
+                        })
+                        .eq('id', conversationId)
+                        .eq('user_id', user.id)
+
+                      if (updateError) {
+                        console.error('[StatefulChat] Failed to save token breakdown to conversation:', updateError)
+                      } else {
+                        console.log(`[StatefulChat] Saved token breakdown to conversation: system=${systemPromptTokens}, document=${documentContextTokens}`)
+                      }
+                    } else {
+                      console.log(`[StatefulChat] Metadata already exists, skipping update`)
+                    }
+                  }
                 } catch (error) {
                   console.error('[StatefulChat] Failed to save messages:', error)
                 }

@@ -1,20 +1,23 @@
 "use client"
 
 import Link from "next/link"
-import { motion, useReducedMotion } from "framer-motion"
+import { motion } from "framer-motion"
 import { buttonVariants } from "@/components/ui"
 import { animationVariants as A, getReducedMotionVariants } from "@/lib/landing/animation-variants"
+import { useLandingAnimation } from "@/lib/landing/landing-animation-context"
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion"
 
 export default function FinalCtaSection() {
-  const prefersReducedMotion = useReducedMotion()
+  const prefersReducedMotion = usePrefersReducedMotion()
+  const { shouldAnimate } = useLandingAnimation()
   return (
-    <section className="relative py-16 sm:py-24">
+    <section className="relative py-8 sm:py-12" suppressHydrationWarning>
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute -top-24 left-1/2 h-72 w-[36rem] -translate-x-1/2 rounded-full blur-3xl opacity-25 bg-[radial-gradient(ellipse_at_center,theme(colors.brand.purple.500),transparent_60%)] dark:opacity-30" />
       </div>
       <div className="mx-auto max-w-7xl px-6">
         <motion.div
-          initial="hidden"
+          initial={shouldAnimate ? "hidden" : false}
           whileInView="visible"
           viewport={{ once: true, amount: 0.4 }}
           variants={prefersReducedMotion ? getReducedMotionVariants(A.scroll.reveal) : A.scroll.reveal}

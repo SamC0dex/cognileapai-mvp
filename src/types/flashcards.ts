@@ -33,6 +33,7 @@ export interface FlashcardSet {
     sourceContentLength: number
     isGenerating?: boolean
     generationProgress?: number
+    statusMessage?: string
   }
 }
 

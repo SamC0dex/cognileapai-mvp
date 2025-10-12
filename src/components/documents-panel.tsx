@@ -11,6 +11,11 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useDocuments } from '@/contexts/documents-context'
 import type { Database } from '@/lib/supabase'
+import { translateError } from '@/lib/errors/translator'
+import { logError } from '@/lib/errors/logger'
+import type { UserFacingError, ErrorAction, ErrorInput } from '@/lib/errors/types'
+import { ActionableErrorPanel } from '@/components/error-management/actionable-error-panel'
+import { ErrorBoundary } from '@/components/error-management'
 
 type DocumentItem = Database['public']['Tables']['documents']['Row']
 
@@ -20,11 +25,67 @@ interface DocumentsPanelProps {
   sidebarCollapsed?: boolean
 }
 
-export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: DocumentsPanelProps) {
+const DocumentsPanelErrorFallback: React.FC<{ error: Error; retry: () => void }> = ({ error, retry }) => {
+  const translated = React.useMemo(() => translateError(error, {
+    source: 'document-upload',
+    operation: 'render',
+    rawMessage: error.message,
+    payload: {
+      component: 'DocumentsPanel'
+    }
+  }), [error])
+
+  const handleAction = React.useCallback((action: ErrorAction) => {
+    switch (action.intent) {
+      case 'retry':
+      case 'upload':
+        retry()
+        break
+      case 'reload':
+        if (typeof window !== 'undefined') {
+          window.location.reload()
+        }
+        break
+      case 'support':
+        if (typeof window !== 'undefined') {
+          window.open('mailto:support@cognileap.ai?subject=Document%20Panel%20Issue', '_blank')
+        }
+        break
+      case 'signin':
+        if (typeof window !== 'undefined') {
+          window.location.href = '/auth/login'
+        }
+        break
+      default:
+        retry()
+        break
+    }
+  }, [retry])
+
+  return (
+    <div className="p-4">
+      <ActionableErrorPanel error={translated.userError} onAction={handleAction} />
+    </div>
+  )
+}
+
+export function DocumentsPanel(props: DocumentsPanelProps) {
+  return (
+    <ErrorBoundary fallback={DocumentsPanelErrorFallback}>
+      <DocumentsPanelContent {...props} />
+    </ErrorBoundary>
+  )
+}
+
+function DocumentsPanelContent({ isOpen, onClose, sidebarCollapsed = true }: DocumentsPanelProps) {
   const router = useRouter()
   const {
     documents,
     documentsLoading,
+    uploadingDocuments,
+    addUploadingDocument,
+    updateUploadingDocument,
+    removeUploadingDocument,
     refreshDocuments,
     selectedDocuments: contextSelectedDocs,
     addSelectedDocument,
@@ -38,6 +99,7 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
   const [renameDialog, setRenameDialog] = useState<{open: boolean, document: DocumentItem | null}>({open: false, document: null})
   const [removeDialog, setRemoveDialog] = useState<{open: boolean, document: DocumentItem | null}>({open: false, document: null})
   const [newDocumentName, setNewDocumentName] = useState('')
+  const [uploadError, setUploadError] = useState<UserFacingError | null>(null)
 
   // Memoized Supabase client to prevent recreating on every render
   const supabase = React.useMemo(() => createClient(), [])
@@ -52,41 +114,130 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
     if (!files || files.length === 0) return
 
     setIsUploading(true)
+    setUploadError(null)
 
     try {
       const fileArray = Array.from(files)
       for (const file of fileArray) {
+        // Generate temporary ID for optimistic update
+        const tempId = `uploading-${Date.now()}-${Math.random()}`
+        
+        // Add uploading document to context immediately
+        addUploadingDocument({
+          id: tempId,
+          title: file.name.replace(/\.pdf$/i, ''),
+          size: file.size,
+          isUploading: true,
+          progress: 0
+        })
+
         const formData = new FormData()
         formData.append('file', file)
 
-        const response = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData
-        })
+        try {
+          const response = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+          })
 
-        if (response.ok) {
-          const result = await response.json()
+          if (response.ok) {
+            const result = await response.json()
 
-          if (result.alreadyExists) {
-            toast.info(`"${result.document?.title || file.name}" is already in your library.`)
+            // Remove uploading document
+            removeUploadingDocument(tempId)
+
+            if (result.alreadyExists) {
+              toast.info(`"${result.document?.title || file.name}" is already in your library.`)
+              // Show warning if present for duplicate documents too
+              if (result.warning) {
+                setTimeout(() => {
+                  toast.warning(result.warning, { duration: 5000 })
+                }, 500)
+              }
+            } else {
+              toast.success(`"${file.name}" uploaded successfully!`)
+              // Show warning if present for large files
+              if (result.warning) {
+                setTimeout(() => {
+                  toast.warning(result.warning, { duration: 5000 })
+                }, 500)
+              }
+            }
           } else {
-            toast.success(`"${file.name}" uploaded successfully!`)
+            const errorBody = await response.json().catch(() => ({ error: 'Upload failed' }))
+            const rawMessage = typeof errorBody?.error === 'string' ? errorBody.error : 'Upload failed'
+            
+            // Update uploading document with error
+            updateUploadingDocument(tempId, {
+              error: rawMessage
+            })
+
+            const translated = translateError({
+              message: rawMessage,
+              status: response.status
+            }, {
+              source: 'document-upload',
+              operation: 'upload',
+              rawMessage,
+              payload: {
+                fileName: file.name,
+                status: response.status
+              }
+            })
+
+            logError(errorBody, {
+              source: 'document-upload',
+              operation: 'upload',
+              rawMessage,
+              payload: {
+                fileName: file.name,
+                status: response.status
+              }
+            }, translated.userError)
+
+            toast.error(translated.userError.message)
+            setUploadError(translated.userError)
+
+            // Remove failed upload after 3 seconds
+            setTimeout(() => {
+              removeUploadingDocument(tempId)
+            }, 3000)
           }
-        } else {
-          const error = await response.json()
-          toast.error(error.error || 'Upload failed')
+        } catch (fetchError) {
+          // Update uploading document with error
+          updateUploadingDocument(tempId, {
+            error: 'Network error'
+          })
+
+          throw fetchError
         }
       }
 
       // Refresh the list after all uploads
       await refreshDocuments({ force: true })
     } catch (error) {
-      toast.error('Upload failed')
-      console.error('Upload error:', error)
+      const translated = translateError(error as ErrorInput, {
+        source: 'document-upload',
+        operation: 'upload',
+        rawMessage: error instanceof Error ? error.message : 'Upload failed',
+        payload: {
+          attemptedFiles: files.length
+        }
+      })
+      logError(error, {
+        source: 'document-upload',
+        operation: 'upload',
+        rawMessage: error instanceof Error ? error.message : 'Upload failed',
+        payload: {
+          attemptedFiles: files.length
+        }
+      }, translated.userError)
+      toast.error(translated.userError.message)
+      setUploadError(translated.userError)
     } finally {
       setIsUploading(false)
     }
-  }, [refreshDocuments])
+  }, [addUploadingDocument, updateUploadingDocument, removeUploadingDocument, refreshDocuments])
 
   const handleUpload = React.useCallback(() => {
     if (isUploading) return
@@ -108,6 +259,45 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
     }
     input.click()
   }, [isUploading, handleFileUpload])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const handler = () => handleUpload()
+    window.addEventListener('open-document-upload', handler as EventListener)
+    return () => {
+      window.removeEventListener('open-document-upload', handler as EventListener)
+    }
+  }, [handleUpload])
+
+  const handleUploadErrorAction = React.useCallback((action: ErrorAction) => {
+    switch (action.intent) {
+      case 'retry':
+      case 'upload':
+        setUploadError(null)
+        handleUpload()
+        break
+      case 'signin':
+        setUploadError(null)
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login'
+        }
+        break
+      case 'support':
+        if (typeof window !== 'undefined') {
+          window.open('mailto:support@cognileap.ai?subject=Upload%20Assistance', '_blank')
+        }
+        break
+      case 'reload':
+        if (typeof window !== 'undefined') {
+          window.location.reload()
+        }
+        break
+      case 'dismiss':
+      default:
+        setUploadError(null)
+        break
+    }
+  }, [handleUpload])
 
 
   const formatFileSize = (bytes: number) => {
@@ -292,6 +482,7 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
                 <Button
                   onClick={handleUpload}
                   disabled={isUploading}
+                  data-dashboard-upload-trigger
                   className="flex-1 gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                   <Plus className="h-4 w-4" />
@@ -303,8 +494,12 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
 
 
             {/* Document List */}
+            {uploadError && (
+              <ActionableErrorPanel error={uploadError} onAction={handleUploadErrorAction} />
+            )}
+
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {documentsLoading && documents.length === 0 ? (
+              {documentsLoading && documents.length === 0 && uploadingDocuments.length === 0 ? (
                 <div className="space-y-3">
                   {[1, 2, 3].map((i) => (
                     <div
@@ -313,7 +508,7 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
                     />
                   ))}
                 </div>
-              ) : documents.length === 0 ? (
+              ) : documents.length === 0 && uploadingDocuments.length === 0 ? (
                 <div className="text-center py-12">
                   <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
                     <FileText className="h-8 w-8 text-muted-foreground" />
@@ -333,34 +528,82 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Select all sources</span>
-                    <button
-                      onClick={handleSelectAll}
-                      className={`w-4 h-4 border rounded flex items-center justify-center transition-colors ${
-                        selectAll
-                          ? 'border-primary bg-primary'
-                          : 'border-muted-foreground/30 bg-transparent hover:border-primary/50'
-                      }`}
-                    >
-                      {selectAll && (
-                        <svg
-                          className="w-2.5 h-2.5 text-primary-foreground"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={3}
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
+                  {documents.length > 0 && (
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Select all sources</span>
+                      <button
+                        onClick={handleSelectAll}
+                        className={`w-4 h-4 border rounded flex items-center justify-center transition-colors ${
+                          selectAll
+                            ? 'border-primary bg-primary'
+                            : 'border-muted-foreground/30 bg-transparent hover:border-primary/50'
+                        }`}
+                      >
+                        {selectAll && (
+                          <svg
+                            className="w-2.5 h-2.5 text-primary-foreground"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={3}
+                              d="M5 13l4 4L19 7"
+                            />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  )}
 
+                  {/* Show uploading documents first */}
+                  <AnimatePresence mode="popLayout">
+                    {uploadingDocuments.map((uploadingDoc) => (
+                      <motion.div
+                        key={uploadingDoc.id}
+                        initial={{ opacity: 0, y: -10, height: 0 }}
+                        animate={{ opacity: 1, y: 0, height: 'auto' }}
+                        exit={{ opacity: 0, x: -20, height: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="group"
+                      >
+                        <div className={cn(
+                          "flex items-center gap-2 p-2 rounded-lg transition-colors",
+                          uploadingDoc.error ? "bg-destructive/10 border border-destructive/20" : "bg-primary/5 border border-primary/20"
+                        )}>
+                          {uploadingDoc.error ? (
+                            <div className="w-4 h-4 shrink-0 text-destructive">
+                              <X className="h-4 w-4" />
+                            </div>
+                          ) : (
+                            <div className="w-4 h-4 shrink-0">
+                              <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
+                            </div>
+                          )}
+                          <FileText className={cn(
+                            "h-4 w-4 shrink-0",
+                            uploadingDoc.error ? "text-destructive" : "text-primary"
+                          )} />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium truncate" style={{ maxWidth: '180px' }}>
+                              {uploadingDoc.title}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {uploadingDoc.error ? (
+                                <span className="text-destructive">{uploadingDoc.error}</span>
+                              ) : (
+                                <span className="text-primary">Uploading...</span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+
+                  {/* Show actual documents */}
                   {documents.map((document) => (
                     <div key={document.id} className="group">
                       <div className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/30 transition-colors">

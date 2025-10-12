@@ -273,6 +273,7 @@ async function generateWithFallback(
 
 
 interface StudyToolGenerateRequest {
+  id?: string
   type: StudyToolPromptType
   documentId?: string
   conversationId?: string
@@ -297,6 +298,7 @@ export async function POST(req: NextRequest) {
   let documentId: string | undefined
   let conversationId: string | undefined
   let flashcardOptions: StudyToolGenerateRequest['flashcardOptions']
+  let generationId: string | undefined
 
   try {
     // Authenticate user first
@@ -313,6 +315,7 @@ export async function POST(req: NextRequest) {
     console.log('[StudyTools] Authenticated user:', user.id)
 
     const requestData: StudyToolGenerateRequest = await req.json()
+    generationId = requestData.id
     type = requestData.type
     documentId = requestData.documentId
     conversationId = requestData.conversationId
@@ -531,89 +534,151 @@ export async function POST(req: NextRequest) {
 
     let outputId: string | null = null
 
-    // For conversation-based study tools, we need to find the associated document or use a workaround
+    // For conversation-based study tools, get the associated document if available
     let saveDocumentId = documentId
     if (!saveDocumentId && conversationId) {
-      // For conversation-based study tools, try to get the document from conversation
+      // Try to get the document from conversation (optional association)
       const { data: conversation } = await supabase
         .from('conversations')
         .select('document_id')
         .eq('id', conversationId)
         .single()
 
-      saveDocumentId = conversation?.document_id
+      saveDocumentId = conversation?.document_id || undefined
     }
 
     try {
-      const insertData: {
-        section_id: null
-        overall: boolean
-        type: string
-        document_id?: string
-        payload: Record<string, unknown>
-      } = {
-        section_id: null,
-        overall: true,
-        type: dbType,
-        payload: {
-          title: generatedTitle,
-          content: processedContent,
-          type: type,
-          documentId: documentId,
-          conversationId: conversationId,
-          createdAt: new Date().toISOString(),
-          // Include flashcard-specific data
-          ...(type === 'flashcards' && flashcardData ? {
-            cards: flashcardData,
-            options: flashcardOptions,
-            metadata: {
-              model: modelUsed,
-              duration: generationDuration,
-              contentLength: processedContent.length,
-              sourceContentLength: documentContent.length,
-              totalCards: flashcardData.length,
-              avgDifficulty: flashcardOptions?.difficulty || 'medium',
-              fallbackStrategy: modelUsed.includes('flash') ? 'applied' : 'none'
+      const nowIso = new Date().toISOString()
+      const resolvedDocumentId = saveDocumentId ?? null
+      const resolvedConversationId = conversationId ?? null
+
+      const payload: Record<string, unknown> = {
+        title: generatedTitle,
+        content: processedContent,
+        type,
+        documentId,
+        conversationId,
+        createdAt: nowIso,
+        ...(type === 'flashcards' && flashcardData
+          ? {
+              cards: flashcardData,
+              options: flashcardOptions,
+              metadata: {
+                model: modelUsed,
+                duration: generationDuration,
+                contentLength: processedContent.length,
+                sourceContentLength: documentContent.length,
+                totalCards: flashcardData.length,
+                avgDifficulty: flashcardOptions?.difficulty || 'medium',
+                fallbackStrategy: modelUsed.includes('flash') ? 'applied' : 'none'
+              }
             }
-          } : {
-            metadata: {
-              model: modelUsed,
-              duration: generationDuration,
-              contentLength: processedContent.length,
-              sourceContentLength: documentContent.length,
-              fallbackStrategy: modelUsed.includes('flash') ? 'applied' : 'none'
-            }
+          : {
+              metadata: {
+                model: modelUsed,
+                duration: generationDuration,
+                contentLength: processedContent.length,
+                sourceContentLength: documentContent.length,
+                fallbackStrategy: modelUsed.includes('flash') ? 'applied' : 'none'
+              }
+            })
+      }
+
+      // Ensure we have at least one source (document or conversation)
+      if (!resolvedDocumentId && !resolvedConversationId) {
+        console.error('[StudyTools] Cannot save study tool: no document_id or conversation_id provided')
+        throw new Error('Study tool must have either a document or conversation source')
+      }
+
+      // Check if an output already exists for this source/type combination
+      let existingQuery = serviceSupabase
+        .from('outputs')
+        .select('id')
+        .eq('overall', true)
+        .eq('type', dbType)
+        .is('section_id', null)
+
+      existingQuery = resolvedDocumentId
+        ? existingQuery.eq('document_id', resolvedDocumentId)
+        : existingQuery.is('document_id', null)
+
+      existingQuery = resolvedConversationId
+        ? existingQuery.eq('conversation_id', resolvedConversationId)
+        : existingQuery.is('conversation_id', null)
+
+      const { data: existingOutput, error: existingError } = await existingQuery.maybeSingle()
+
+      if (existingError) {
+        // Log but do not fail - we'll treat it as no existing record
+        console.warn('[StudyTools] Existing output lookup error:', existingError)
+      }
+
+      if (existingOutput?.id) {
+        const { data: updatedOutput, error: updateError } = await serviceSupabase
+          .from('outputs')
+          .update({
+            payload,
+            document_id: resolvedDocumentId,
+            conversation_id: resolvedConversationId,
+            updated_at: nowIso
+          })
+          .eq('id', existingOutput.id)
+          .select('id')
+          .single()
+
+        if (updateError) {
+          console.error('[StudyTools] Failed to update existing output:', updateError)
+          console.error('[StudyTools] Update error details:', {
+            code: updateError.code,
+            message: updateError.message,
+            details: updateError.details,
+            hint: updateError.hint
+          })
+        } else {
+          outputId = updatedOutput?.id ?? existingOutput.id
+          console.log('[StudyTools] Updated existing study tool output:', outputId, {
+            documentId: resolvedDocumentId,
+            conversationId: resolvedConversationId,
+            type: dbType
           })
         }
-      }
-
-      // Add document_id if we have one, otherwise skip it for conversation-only study tools
-      if (saveDocumentId) {
-        insertData.document_id = saveDocumentId
       } else {
-        // For conversation-only study tools, we still need a document_id for the schema
-        // Create a temporary placeholder or modify schema - for now log and skip database save
-        console.warn('[StudyTools] No document_id available for conversation-based study tool, skipping database save')
-        console.log('[StudyTools] Study tool generated successfully but not saved to database - conversation-only mode')
-      }
+        const insertPayload = {
+          ...(generationId ? { id: generationId } : {}),
+          section_id: null,
+          overall: true,
+          type: dbType,
+          document_id: resolvedDocumentId,
+          conversation_id: resolvedConversationId,
+          payload
+        }
 
-      if (saveDocumentId) {
-        // Use service role for insert since we've already verified user owns the document
         const { data: output, error: saveError } = await serviceSupabase
           .from('outputs')
-          .insert(insertData)
+          .insert(insertPayload)
           .select('id')
           .single()
 
         if (saveError) {
           console.error('[StudyTools] Failed to save to database:', saveError)
+          console.error('[StudyTools] Save error details:', {
+            code: saveError.code,
+            message: saveError.message,
+            details: saveError.details,
+            hint: saveError.hint
+          })
         } else {
           outputId = output?.id || null
-          console.log('[StudyTools] Saved to database with ID:', outputId)
+          console.log('[StudyTools] Successfully saved study tool to database:', outputId, {
+            documentId: resolvedDocumentId,
+            conversationId: resolvedConversationId,
+            type: dbType
+          })
         }
       }
     } catch (saveError) {
       console.error('[StudyTools] Database save error:', saveError)
+      // Don't throw - return generated content even if save fails
     }
 
     return NextResponse.json({

@@ -6,9 +6,9 @@ import type { GeminiModelKey } from './ai-config'
 import { TokenManager, type ConversationTokens } from './token-manager'
 import { translateError, getNextAutoRetryDelay } from './errors/translator'
 import { logError } from './errors/logger'
-import type { UserFacingError } from './errors/types'
+import type { UserFacingError, ErrorInput } from './errors/types'
 
-export type Role = 'user' | 'assistant'
+export type Role = 'user' | 'assistant' | 'system'
 
 export interface Message {
   id: string
@@ -163,6 +163,8 @@ export function useChatStore(): StoreShape {
   const [lastOptimization, setLastOptimization] = useState<OptimizationSummary | null>(null)
 
   // token tracking state
+  const [systemPromptTokens, setSystemPromptTokens] = useState<number>(0)
+  const [documentContextTokens, setDocumentContextTokens] = useState<number>(0)
   const [conversationTokens, setConversationTokens] = useState<ConversationTokens | null>(null)
   const [contextWarning, setContextWarning] = useState<string | null>(null)
 
@@ -191,18 +193,65 @@ export function useChatStore(): StoreShape {
 
       setIsLoading(true)
       setError(null)
+      setLastOptimization(null)
+      setIsOptimizingConversation(false)
+      setContextState(() => {
+        contextStateRef.current = DEFAULT_CONTEXT_STATE
+        return DEFAULT_CONTEXT_STATE
+      })
       setCurrentConversation(conversationId)
       conversationRef.current = conversationId
 
       console.log('[Chat Store] Loading conversation:', conversationId)
 
-      // Load messages from Supabase
-      const { data: messagesData, error: messagesError } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('conversation_id', conversationId)
-        .order('sequence_number', { ascending: true })
+      // Wait for authentication to complete before loading metadata
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        console.warn('[Chat Store] No authenticated user, waiting for auth...')
+        // Retry after a short delay to allow auth to complete
+        await new Promise(resolve => setTimeout(resolve, 500))
+        const { data: { user: retryUser } } = await supabase.auth.getUser()
+        if (!retryUser) {
+          // Silently exit if auth fails - this is expected during logout or when session expires
+          // Only set error if we're not in the process of redirecting/logging out
+          console.log('[Chat Store] No authenticated user found - skipping conversation load')
+          setIsLoading(false)
+          return
+        }
+        console.log('[Chat Store] Auth completed on retry')
+      }
 
+      // Load conversation metadata (includes token breakdown) AND messages in parallel
+      const [convResult, messagesResult] = await Promise.all([
+        supabase
+          .from('conversations')
+          .select('metadata, document_id')
+          .eq('id', conversationId)
+          .single(),
+        supabase
+          .from('messages')
+          .select('*')
+          .eq('conversation_id', conversationId)
+          .order('sequence_number', { ascending: true })
+      ])
+
+      // Restore token breakdown from conversation metadata
+      if (convResult.data?.metadata) {
+        const metadata = convResult.data.metadata as Record<string, unknown> | null
+        if (metadata && typeof metadata === 'object') {
+          if (typeof metadata.systemPromptTokens === 'number') {
+            setSystemPromptTokens(metadata.systemPromptTokens)
+            console.log(`[Chat] Restored system prompt tokens: ${metadata.systemPromptTokens}`)
+          }
+          if (typeof metadata.documentContextTokens === 'number') {
+            setDocumentContextTokens(metadata.documentContextTokens)
+            console.log(`[Chat] Restored document context tokens: ${metadata.documentContextTokens}`)
+          }
+        }
+      }
+
+      // Check for messages errors
+      const { data: messagesData, error: messagesError } = messagesResult
       if (messagesError) {
         console.error('Error loading messages:', {
           error: messagesError,
@@ -272,6 +321,12 @@ export function useChatStore(): StoreShape {
     isAutoRetry = false
   ) => {
     if (!content.trim()) return
+
+    if (contextStateRef.current.isBlocked && !skipUserMessage) {
+      const limitMessage = 'Context limit reached. Please optimize the conversation or start a fresh chat to continue.'
+      setError(limitMessage)
+      return
+    }
 
     const modelToUse = model || selectedModel
 
@@ -523,12 +578,35 @@ export function useChatStore(): StoreShape {
               } else if (line.startsWith('8:')) {
                 try {
                   const metadata = JSON.parse(line.slice(2))
+                  console.log('[Chat] Received metadata:', metadata)
                   if (metadata?.usage?.totalTokens) {
                     finalTokenUsage = metadata.usage.totalTokens
                     console.log('[Chat] Received token usage:', finalTokenUsage)
                   }
-                } catch {
-                  // Continue if metadata parsing fails
+                  // Capture system and document context tokens ONLY for new sessions
+                  // For existing sessions, these values don't change and should not be updated
+                  if (metadata?.tokenBreakdown) {
+                    console.log('[Chat] Token breakdown found:', metadata.tokenBreakdown)
+                    const isNewSession = metadata.tokenBreakdown.isNewSession
+                    
+                    // Only update system/document tokens for NEW sessions
+                    if (isNewSession) {
+                      if (metadata.tokenBreakdown.systemPrompt) {
+                        setSystemPromptTokens(metadata.tokenBreakdown.systemPrompt)
+                        console.log(`[Chat] NEW SESSION - System prompt tokens: ${metadata.tokenBreakdown.systemPrompt}`)
+                      }
+                      if (metadata.tokenBreakdown.documentContext) {
+                        setDocumentContextTokens(metadata.tokenBreakdown.documentContext)
+                        console.log(`[Chat] NEW SESSION - Document context tokens: ${metadata.tokenBreakdown.documentContext}`)
+                      }
+                    } else {
+                      console.log(`[Chat] EXISTING SESSION - Keeping previous system/document context token values`)
+                    }
+                  } else {
+                    console.warn('[Chat] No tokenBreakdown in metadata')
+                  }
+                } catch (err) {
+                  console.error('[Chat] Metadata parsing failed:', err)
                 }
               }
             } catch {
@@ -719,7 +797,7 @@ export function useChatStore(): StoreShape {
         }
       }
 
-      const translated = translateError(e, errorContext)
+      const translated = translateError(e as ErrorInput, errorContext)
       const baseUserError: UserFacingError = {
         ...translated.userError,
         metadata: {
@@ -888,6 +966,13 @@ export function useChatStore(): StoreShape {
     clearAutoRetryTimer()
     setRateLimitUntil(null)
     setPendingMessage(null)
+    setLastOptimization(null)
+    setIsOptimizingConversation(false)
+    setContextState(() => {
+      contextStateRef.current = DEFAULT_CONTEXT_STATE
+      return DEFAULT_CONTEXT_STATE
+    })
+    allMessagesRef.current = []
 
     // Reset token tracking
     setConversationTokens(null)
@@ -902,6 +987,55 @@ export function useChatStore(): StoreShape {
     setRateLimitUntil(null)
   }, [])
 
+  const markCautionToastSeen = useCallback(() => {
+    setContextState(prev => {
+      if (!prev.cautionToastPending) {
+        return prev
+      }
+      const next: ContextState = {
+        ...prev,
+        cautionToastPending: false,
+        lastUpdated: Date.now()
+      }
+      contextStateRef.current = next
+      return next
+    })
+  }, [])
+
+  const acknowledgeWarning = useCallback((decision: WarningResolution) => {
+    setContextState(prev => {
+      const nextLevel = decision === 'start_new_chat' ? 'none' : prev.level
+      const next: ContextState = {
+        ...prev,
+        level: nextLevel,
+        warningActive: false,
+        warningDecision: decision,
+        cautionToastPending: decision === 'start_new_chat' ? false : prev.cautionToastPending,
+        criticalActive: decision === 'start_new_chat' ? false : prev.criticalActive,
+        isBlocked: decision === 'start_new_chat' ? false : prev.isBlocked,
+        lastUpdated: Date.now()
+      }
+      contextStateRef.current = next
+      return next
+    })
+  }, [])
+
+  const clearCriticalContext = useCallback(() => {
+    setContextState(prev => {
+      if (!prev.criticalActive && !prev.isBlocked) {
+        return prev
+      }
+      const next: ContextState = {
+        ...prev,
+        criticalActive: false,
+        isBlocked: false,
+        lastUpdated: Date.now()
+      }
+      contextStateRef.current = next
+      return next
+    })
+  }, [])
+
   const stableSetDocumentContext = useCallback((ctx: DocumentContext | null) => {
     setDocumentContext(ctx)
   }, [])
@@ -911,6 +1045,19 @@ export function useChatStore(): StoreShape {
     if (messages.length === 0) {
       setConversationTokens(null)
       setContextWarning(null)
+      setContextState(() => {
+        contextStateRef.current = DEFAULT_CONTEXT_STATE
+        return DEFAULT_CONTEXT_STATE
+      })
+      setLastOptimization(null)
+      setIsOptimizingConversation(false)
+      return
+    }
+
+    // Skip calculation if any message is still streaming
+    // Token tracking will run again when streaming completes
+    const hasStreamingMessage = messages.some(msg => msg.isStreaming)
+    if (hasStreamingMessage) {
       return
     }
 
@@ -934,7 +1081,10 @@ export function useChatStore(): StoreShape {
     }))
 
     // Calculate conversation tokens
-    const tokens = TokenManager.estimateConversation(messagesWithTokens)
+    const tokens = TokenManager.estimateConversation(messagesWithTokens, {
+      systemPrompt: systemPromptTokens,
+      documentContext: documentContextTokens
+    })
     tokens.conversationId = currentConversation || 'temp-conversation'
 
     // Generate warning message
@@ -942,9 +1092,58 @@ export function useChatStore(): StoreShape {
 
     setConversationTokens(tokens)
     setContextWarning(warning)
+    setContextState(prev => {
+      const nextLevel = tokens.warningLevel
+
+      let warningDecision = prev.warningDecision
+      if (nextLevel === 'none' || nextLevel === 'caution') {
+        warningDecision = 'none'
+      }
+
+      let cautionToastPending = prev.cautionToastPending
+      if (nextLevel === 'caution') {
+        if (prev.level !== 'caution' && prev.level !== 'warning' && prev.level !== 'critical') {
+          cautionToastPending = true
+        }
+      } else {
+        cautionToastPending = false
+      }
+
+      let warningActive = prev.warningActive
+      if (nextLevel === 'warning') {
+        if (prev.level !== 'warning' && warningDecision !== 'continue' && warningDecision !== 'optimize' && warningDecision !== 'start_new_chat') {
+          warningActive = true
+        }
+      } else {
+        warningActive = false
+      }
+
+      if (nextLevel === 'warning' && (warningDecision === 'continue' || warningDecision === 'optimize' || warningDecision === 'start_new_chat')) {
+        warningActive = false
+      }
+
+      const criticalActive = nextLevel === 'critical'
+      if (criticalActive) {
+        warningActive = false
+        warningDecision = 'none'
+      }
+
+      const nextState: ContextState = {
+        level: nextLevel,
+        cautionToastPending,
+        warningActive,
+        warningDecision,
+        criticalActive,
+        isBlocked: criticalActive,
+        lastUpdated: Date.now()
+      }
+
+      contextStateRef.current = nextState
+      return nextState
+    })
 
     console.log(`[TokenTracker] Conversation ${currentConversation}: ${tokens.totalTokens.toLocaleString()} tokens (${tokens.warningLevel})`)
-  }, [messages, currentConversation])
+  }, [messages, currentConversation, systemPromptTokens, documentContextTokens])
 
   const canAddMessage = useCallback((content: string): { canAdd: boolean; warning?: string } => {
     if (!conversationTokens) {
@@ -960,6 +1159,113 @@ export function useChatStore(): StoreShape {
     }
   }, [conversationTokens])
 
+  const optimizeConversation = useCallback(async (): Promise<OptimizationSummary | null> => {
+    if (isOptimizingConversation || allMessagesRef.current.length === 0) {
+      return null
+    }
+
+    setIsOptimizingConversation(true)
+
+    try {
+      const currentMessages = allMessagesRef.current
+      const tokenManagerMessages = currentMessages.map(message => {
+        const estimatedTokenCount = message.tokenCount
+          ? {
+              estimated: message.tokenCount.estimated,
+              confidence: message.tokenCount.confidence,
+              method: 'estimation' as const,
+              timestamp: message.timestamp
+            }
+          : TokenManager.estimate(message.content)
+
+        return {
+          id: message.id,
+          role: message.role,
+          content: message.content,
+          timestamp: message.timestamp,
+          tokenCount: estimatedTokenCount
+        }
+      })
+
+      const result = TokenManager.optimize(tokenManagerMessages, undefined, {
+        leadingMessages: 3,
+        trailingMessages: 30,
+        minimumTrailing: 8,
+        highlightSamples: 3
+      })
+
+      const normalizedOptimizedMessages: Message[] = result.optimizedMessages.map(message => ({
+        id: message.id,
+        role: message.role as Role,
+        content: message.content,
+        timestamp: message.timestamp instanceof Date ? message.timestamp : new Date(message.timestamp),
+        tokenCount: message.tokenCount
+          ? {
+              estimated: message.tokenCount.estimated,
+              confidence: message.tokenCount.confidence
+            }
+          : undefined
+      }))
+
+      const normalizedRemovedMessages: Message[] = result.removedMessages.map(message => ({
+        id: message.id,
+        role: message.role as Role,
+        content: message.content,
+        timestamp: message.timestamp instanceof Date ? message.timestamp : new Date(message.timestamp),
+        tokenCount: message.tokenCount
+          ? {
+              estimated: message.tokenCount.estimated,
+              confidence: message.tokenCount.confidence
+            }
+          : undefined
+      }))
+
+      setMessages(normalizedOptimizedMessages)
+      allMessagesRef.current = normalizedOptimizedMessages
+
+      const timestamp = Date.now()
+      const summary: OptimizationSummary = {
+        timestamp,
+        tokensRemoved: result.tokensRemoved,
+        tokensKept: result.tokensKept,
+        removedMessages: normalizedRemovedMessages,
+        keptLeading: result.keptLeading,
+        keptTrailing: result.keptTrailing,
+        highlightSnippets: result.highlightSnippets,
+        summaryMessageId: result.summaryMessage?.id,
+        originalMessages: currentMessages,
+        optimizedMessages: normalizedOptimizedMessages
+      }
+
+      setLastOptimization(summary)
+      clearCriticalContext()
+      setContextState(prev => {
+        const next: ContextState = {
+          ...prev,
+          level: prev.level === 'critical' ? 'warning' : prev.level,
+          warningActive: false,
+          warningDecision: 'optimize',
+          cautionToastPending: false,
+          criticalActive: false,
+          isBlocked: false,
+          lastUpdated: timestamp
+        }
+        contextStateRef.current = next
+        return next
+      })
+
+      setTimeout(() => updateTokenTracking(), 0)
+
+      return summary
+    } catch (optimizationError) {
+      console.error('[Chat] Failed to optimize conversation:', optimizationError)
+      setError('Failed to optimize conversation. Please try again.')
+      return null
+    } finally {
+      setIsOptimizingConversation(false)
+    }
+  }, [clearCriticalContext, isOptimizingConversation, updateTokenTracking])
+
   return {
     messages,
     isLoading,
@@ -972,6 +1278,15 @@ export function useChatStore(): StoreShape {
     autoRetryState,
     rateLimitUntil,
     pendingMessage,
+    contextLevel: contextState.level,
+    cautionToastPending: contextState.cautionToastPending,
+    warningActive: contextState.warningActive,
+    warningDecision: contextState.warningDecision,
+    criticalActive: contextState.criticalActive,
+    isContextBlocked: contextState.isBlocked,
+    lastContextUpdate: contextState.lastUpdated,
+    isOptimizingConversation,
+    lastOptimization,
 
     // token tracking
     conversationTokens,
@@ -989,6 +1304,10 @@ export function useChatStore(): StoreShape {
     createNewConversation,
     resetState,
     clearErrorStates,
+    markCautionToastSeen,
+    acknowledgeWarning,
+    clearCriticalContext,
+    optimizeConversation,
 
     // token tracking actions
     updateTokenTracking,

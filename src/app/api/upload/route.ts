@@ -61,10 +61,49 @@ export async function POST(req: NextRequest) {
     }
 
     if (file.type !== 'application/pdf') {
-      return NextResponse.json({ error: 'File must be a PDF' }, { status: 400 })
+      return NextResponse.json({ 
+        error: 'Invalid file type. Only PDF files are supported.',
+        details: 'Please upload a PDF document.' 
+      }, { status: 400 })
     }
 
-    console.log('Processing file:', file.name, file.size)
+    // File size validation
+    const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB hard limit
+    const WARN_FILE_SIZE = 50 * 1024 * 1024 // 50MB warning threshold
+    
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json({ 
+        error: 'File too large',
+        message: `PDF file exceeds the maximum size limit of 100MB. Your file is ${Math.round(file.size / (1024 * 1024))}MB.`,
+        details: 'Please try a smaller document or split it into multiple parts.',
+        size: file.size,
+        limit: MAX_FILE_SIZE
+      }, { status: 413 })
+    }
+
+    // Estimate tokens and warn for large files
+    // Rough estimation: For PDFs, 1 byte ≈ 0.2 tokens (conservative estimate)
+    // This accounts for text extraction compression
+    const estimatedTokens = Math.ceil(file.size * 0.2)
+    const TOKEN_WARNING_THRESHOLD = 200000 // 200K tokens
+    const TOKEN_CRITICAL_THRESHOLD = 500000 // 500K tokens
+
+    let sizeWarning = null
+    if (estimatedTokens > TOKEN_CRITICAL_THRESHOLD) {
+      return NextResponse.json({ 
+        error: 'Document too large for optimal processing',
+        message: `This PDF is very large (estimated ~${Math.round(estimatedTokens / 1000)}K tokens, ~${Math.round(file.size / (1024 * 1024))}MB). Maximum recommended size is ~500 pages.`,
+        details: 'Large documents may experience degraded AI quality and slower processing. Consider splitting into smaller sections.',
+        estimatedTokens,
+        threshold: TOKEN_CRITICAL_THRESHOLD
+      }, { status: 413 })
+    } else if (estimatedTokens > TOKEN_WARNING_THRESHOLD) {
+      sizeWarning = `Large document detected (~${Math.round(estimatedTokens / 1000)}K tokens). Processing may take longer, and AI features will use intelligent chunking for optimal quality.`
+    } else if (file.size > WARN_FILE_SIZE) {
+      sizeWarning = `Large file detected (${Math.round(file.size / (1024 * 1024))}MB). Processing may take a few minutes.`
+    }
+
+    console.log('Processing file:', file.name, file.size, 'bytes, estimated:', estimatedTokens, 'tokens')
 
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
@@ -115,7 +154,8 @@ export async function POST(req: NextRequest) {
           hasStudyGuide: false,
           hasSummary: false,
           hasNotes: false
-        }
+        },
+        ...(sizeWarning ? { warning: sizeWarning } : {})
       })
     }
 
@@ -274,7 +314,8 @@ export async function POST(req: NextRequest) {
         hasSummary: false,
         hasNotes: false,
         processing_status: 'processing'
-      }
+      },
+      ...(sizeWarning ? { warning: sizeWarning } : {})
     })
 
   } catch (error) {

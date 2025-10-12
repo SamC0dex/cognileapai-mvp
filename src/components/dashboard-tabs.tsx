@@ -211,8 +211,7 @@ const FlashcardListItem: React.FC<FlashcardListItemProps> = ({ flashcardSet, onC
 
 export function DashboardTabs({
   onViewModeChange,
-  onSearch,
-  onUpload
+  onSearch
 }: DashboardTabsProps) {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
@@ -544,7 +543,16 @@ export function DashboardTabs({
 
               {/* Upload Button */}
               <Button
-                onClick={onUpload}
+                onClick={() => {
+                  // First expand the documents panel to show upload progress
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('expand-documents-panel'))
+                    // Small delay to let panel start opening, then trigger upload
+                    setTimeout(() => {
+                      window.dispatchEvent(new CustomEvent('open-document-upload'))
+                    }, 100)
+                  }
+                }}
                 className="h-10 px-3 lg:px-4 bg-primary text-primary-foreground hover:bg-primary/90 button-primary dark:bg-gradient-to-r dark:from-teal-600 dark:to-teal-700 dark:hover:from-teal-700 dark:hover:to-teal-800 flex-shrink-0"
               >
                 <Plus className="h-4 w-4 mr-1 lg:mr-2" />

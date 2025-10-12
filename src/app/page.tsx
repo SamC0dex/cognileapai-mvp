@@ -7,18 +7,21 @@ import FaqSection from "@/components/landing/faq-section"
 import FinalCtaSection from "@/components/landing/final-cta-section"
 import LandingFooter from "@/components/landing/footer"
 import { Header } from "@/components/header"
+import { LandingAnimationProvider } from "@/lib/landing/landing-animation-context"
 
 export default function HomePage() {
   return (
     <main className="min-h-screen">
       <Header />
-      <HeroSection />
-      <FeaturesSection />
-      <HowItWorksSection />
-      <BenefitsSection />
-      <DemoShowcaseSection />
-      <FaqSection />
-      <FinalCtaSection />
+      <LandingAnimationProvider>
+        <HeroSection />
+        <FeaturesSection />
+        <HowItWorksSection />
+        <BenefitsSection />
+        <DemoShowcaseSection />
+        <FaqSection />
+        <FinalCtaSection />
+      </LandingAnimationProvider>
       <LandingFooter />
     </main>
   )

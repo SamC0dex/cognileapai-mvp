@@ -301,6 +301,7 @@ html.theme-instant, html.theme-instant *, html.theme-instant *::before, html.the
   transition: opacity 45ms ease-out;
   z-index: 9999;
 }
+
   
   .glass-effect {
     @apply bg-background/80 backdrop-blur-sm border border-border/50;

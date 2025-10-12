@@ -7,7 +7,7 @@
 
 import React, { useEffect } from 'react'
 // import { retryManager } from '@/lib/retry-manager'
-import { NetworkStatusIndicator, ErrorBoundary } from './index'
+import { NetworkStatusIndicator } from './index'
 
 interface ErrorManagementProviderProps {
   children: React.ReactNode

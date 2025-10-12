@@ -1,36 +1,21 @@
 "use client"
 
 import Link from "next/link"
-import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion"
+import { motion, useScroll, useTransform } from "framer-motion"
 import { buttonVariants } from "@/components/ui"
-import { Sparkles, Zap, Brain, Rocket, ArrowRight } from "lucide-react"
-import { animationVariants as A, getReducedMotionVariants } from "@/lib/landing/animation-variants"
+import { Sparkles, Rocket, ArrowRight } from "lucide-react"
 import { AnimatedBackground } from "./animated-background"
-import { useRef, useState, useEffect } from "react"
+import { useRef } from "react"
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion"
 
 export default function HeroSection() {
-  const prefersReducedMotion = useReducedMotion()
+  const prefersReducedMotion = usePrefersReducedMotion()
   const sectionRef = useRef<HTMLElement>(null)
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
 
   const { scrollY } = useScroll()
   const y1 = useTransform(scrollY, [0, 500], [0, 100])
   const y2 = useTransform(scrollY, [0, 500], [0, -50])
   const opacity = useTransform(scrollY, [0, 600], [1, 0.3])
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!sectionRef.current) return
-      const rect = sectionRef.current.getBoundingClientRect()
-      setMousePosition({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
-      })
-    }
-
-    window.addEventListener("mousemove", handleMouseMove)
-    return () => window.removeEventListener("mousemove", handleMouseMove)
-  }, [])
 
   // Split headline into words for animated reveal
   const headline = "Learn Anything, Remember Everything"
@@ -41,7 +26,7 @@ export default function HeroSection() {
       {/* Animated mesh gradient background */}
       <AnimatedBackground />
 
-      <div className="relative mx-auto max-w-7xl px-6 py-20 sm:py-28 w-full">
+      <div className="relative mx-auto max-w-7xl px-6 py-10 sm:py-14 w-full">
         <motion.div
           style={{ opacity: prefersReducedMotion ? 1 : opacity }}
           className="mx-auto max-w-4xl text-center"
@@ -50,7 +35,7 @@ export default function HeroSection() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
+            transition={{ duration: 0.4, delay: 0.05 }}
             className="mb-6 inline-flex"
           >
             <div className="group relative inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm backdrop-blur-sm hover:border-primary/40 hover:bg-primary/10 transition-all shadow-sm dark:shadow-none">
@@ -71,8 +56,8 @@ export default function HeroSection() {
                 visible: {
                   opacity: 1,
                   transition: {
-                    staggerChildren: 0.08,
-                    delayChildren: 0.3,
+                    staggerChildren: 0.05,
+                    delayChildren: 0.15,
                   },
                 },
               }}
@@ -89,8 +74,8 @@ export default function HeroSection() {
                       filter: "blur(0px)",
                       transition: {
                         type: "spring",
-                        stiffness: 100,
-                        damping: 15,
+                        stiffness: 150,
+                        damping: 20,
                       },
                     },
                   }}
@@ -113,12 +98,12 @@ export default function HeroSection() {
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.8 }}
+            transition={{ duration: 0.4, delay: 0.4 }}
             className="mx-auto max-w-2xl text-pretty text-lg text-muted-foreground sm:text-xl md:text-2xl leading-relaxed"
           >
             Transform any document into your{" "}
             <span className="font-semibold text-foreground">personal learning companion</span>.
-            AI-powered tools that don't just help you study—they help you{" "}
+            AI-powered tools that don’t just help you study—they help you{" "}
             <span className="font-semibold text-foreground">master anything</span>.
           </motion.p>
 
@@ -126,7 +111,7 @@ export default function HeroSection() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 1 }}
+            transition={{ duration: 0.4, delay: 0.6 }}
             className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4"
           >
             <motion.div
@@ -171,8 +156,8 @@ export default function HeroSection() {
               visible: {
                 opacity: 1,
                 transition: {
-                  staggerChildren: 0.1,
-                  delayChildren: 1.2,
+                  staggerChildren: 0.08,
+                  delayChildren: 0.8,
                 },
               },
             }}
@@ -256,4 +241,3 @@ export default function HeroSection() {
     </section>
   )
 }
-
