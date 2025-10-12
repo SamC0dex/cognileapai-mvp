@@ -4,24 +4,43 @@
  * No API costs, no user downloads, runs on your server
  */
 
-import { pipeline, env, type FeatureExtractionPipeline } from '@huggingface/transformers'
+import type { FeatureExtractionPipeline } from '@huggingface/transformers'
 
-// ✅ SAFE CONFIGURATION - Prevent ONNX/WebGPU errors
-env.allowLocalModels = false
-env.allowRemoteModels = true
+let transformersModulePromise: Promise<typeof import('@huggingface/transformers')> | null = null
+let transformersEnvConfigured = false
 
-// Only configure if we're in a browser environment
-if (typeof window !== 'undefined') {
-  try {
-    // Use simpler WASM backend to avoid CDN issues
-    if (env.backends?.onnx?.wasm) {
-      env.backends.onnx.wasm.proxy = false
-      env.backends.onnx.wasm.simd = false
-      env.backends.onnx.wasm.numThreads = 1
-    }
-  } catch (error) {
-    console.warn('[Embeddings] Backend configuration warning:', error)
+async function getTransformersModule() {
+  if (!transformersModulePromise) {
+    transformersModulePromise = import('@huggingface/transformers')
+      .then((mod) => {
+        if (!transformersEnvConfigured) {
+          mod.env.allowLocalModels = false
+          mod.env.allowRemoteModels = true
+
+          if (typeof window !== 'undefined') {
+            try {
+              if (mod.env.backends?.onnx?.wasm) {
+                mod.env.backends.onnx.wasm.proxy = false
+                mod.env.backends.onnx.wasm.simd = false
+                mod.env.backends.onnx.wasm.numThreads = 1
+              }
+            } catch (error) {
+              console.warn('[Embeddings] Backend configuration warning:', error)
+            }
+          }
+
+          transformersEnvConfigured = true
+        }
+
+        return mod
+      })
+      .catch((error) => {
+        transformersModulePromise = null
+        throw error
+      })
   }
+
+  return transformersModulePromise
 }
 
 // Global pipeline cache to avoid reloading
@@ -65,6 +84,8 @@ async function initializeEmbeddingPipeline(): Promise<FeatureExtractionPipeline 
 
   // ✅ GRACEFUL FALLBACK - Don't break app if embeddings fail
   try {
+    const { pipeline } = await getTransformersModule()
+
     // Try simple WASM backend first to avoid CDN issues
     const pipelineResult = await pipeline('feature-extraction', EMBEDDING_MODEL)
     embeddingPipeline = pipelineResult as FeatureExtractionPipeline

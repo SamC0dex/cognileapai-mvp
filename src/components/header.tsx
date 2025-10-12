@@ -11,14 +11,54 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from '@/components/ui'
+import { useRouter } from 'next/navigation'
 
 export function Header() {
   const { resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
+  const router = useRouter()
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const routes = ['/auth/sign-in', '/auth/sign-up', '/dashboard', '/chat']
+    const win = window as typeof window & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number
+      cancelIdleCallback?: (handle: number) => void
+    }
+
+    const prefetchRoutes = () => {
+      routes.forEach((route) => {
+        try {
+          router.prefetch(route)
+        } catch {
+          // Ignore prefetch errors (e.g., offline)
+        }
+      })
+    }
+
+    let idleHandle: number | null = null
+    let timeoutId: number | null = null
+
+    if (win.requestIdleCallback) {
+      idleHandle = win.requestIdleCallback(prefetchRoutes, { timeout: 1500 })
+    } else {
+      timeoutId = window.setTimeout(prefetchRoutes, 600)
+    }
+
+    return () => {
+      if (idleHandle !== null && win.cancelIdleCallback) {
+        win.cancelIdleCallback(idleHandle)
+      }
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId)
+      }
+    }
+  }, [router])
   
   const toggleTheme = () => {
     const root = document.documentElement

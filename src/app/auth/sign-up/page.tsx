@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
@@ -30,6 +30,44 @@ export default function SignUpPage() {
 
   const redirectParam = searchParams.get('redirect')
   const redirect = redirectParam && isValidRedirect(redirectParam) ? redirectParam : '/dashboard'
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const routes = ['/dashboard', '/chat']
+    const win = window as typeof window & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number
+      cancelIdleCallback?: (handle: number) => void
+    }
+
+    const prefetchRoutes = () => {
+      routes.forEach((route) => {
+        try {
+          router.prefetch(route)
+        } catch {
+          // Ignore prefetch errors
+        }
+      })
+    }
+
+    let idleHandle: number | null = null
+    let timeoutId: number | null = null
+
+    if (win.requestIdleCallback) {
+      idleHandle = win.requestIdleCallback(prefetchRoutes, { timeout: 1500 })
+    } else {
+      timeoutId = window.setTimeout(prefetchRoutes, 500)
+    }
+
+    return () => {
+      if (idleHandle !== null && win.cancelIdleCallback) {
+        win.cancelIdleCallback(idleHandle)
+      }
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId)
+      }
+    }
+  }, [router])
 
   const handleEmailSignUp = async (e: React.FormEvent) => {
     e.preventDefault()

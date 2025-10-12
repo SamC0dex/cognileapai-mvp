@@ -28,6 +28,21 @@ export function useUser(): UserWithProfile {
   useEffect(() => {
     const supabase = createClient()
 
+    const buildFallbackProfile = (currentUser: User): Profile => {
+      const metadata = currentUser.user_metadata || {}
+      const fullName = (metadata.full_name as string | undefined)?.trim()
+        || `${metadata.first_name || ''} ${metadata.last_name || ''}`.trim()
+        || currentUser.email?.split('@')[0]
+        || null
+
+      return {
+        id: currentUser.id,
+        email: currentUser.email || '',
+        full_name: fullName,
+        avatar_url: (metadata.avatar_url as string | undefined) || null
+      }
+    }
+
     // Get initial user
     const getUser = async () => {
       try {
@@ -45,6 +60,9 @@ export function useUser(): UserWithProfile {
 
         // Fetch profile if user exists
         if (currentUser) {
+          setProfile(prev => (prev && prev.id === currentUser.id ? prev : buildFallbackProfile(currentUser)))
+          setLoading(false)
+
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
             .select('*')
@@ -76,6 +94,8 @@ export function useUser(): UserWithProfile {
           } else {
             setProfile(profileData)
           }
+        } else {
+          setLoading(false)
         }
       } catch (error) {
         console.error('Error in useUser:', error)
@@ -91,6 +111,7 @@ export function useUser(): UserWithProfile {
       setUser(session?.user ?? null)
 
       if (session?.user) {
+        setProfile(prev => (prev && prev.id === session.user.id ? prev : buildFallbackProfile(session.user)))
         // Fetch profile when user signs in
         supabase
           .from('profiles')

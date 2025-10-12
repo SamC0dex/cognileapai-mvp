@@ -213,49 +213,66 @@ export function DashboardTabs({
   onSearch,
   onUpload
 }: DashboardTabsProps) {
+  const router = useRouter()
+  const { user } = useAuth()
+
+  const {
+    generatedContent,
+    loadStudyToolsFromDatabase,
+    openCanvas,
+    expandPanel,
+    clearGeneratedContent,
+    setLastLoadedUserId
+  } = useStudyToolsStore()
+  const { flashcardSets, openViewer, clearFlashcardSets } = useFlashcardStore()
+
   const [activeTab, setActiveTab] = useState('all')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [searchQuery, setSearchQuery] = useState('')
   const [isSearchExpanded, setIsSearchExpanded] = useState(false)
-  const [isInitialLoading, setIsInitialLoading] = useState(true)
-  const router = useRouter()
-  const { user } = useAuth()
-
-  // Get study tools data and clear functions
-  const { generatedContent, loadStudyToolsFromDatabase, openCanvas, expandPanel, clearGeneratedContent } = useStudyToolsStore()
-  const { flashcardSets, openViewer, clearFlashcardSets } = useFlashcardStore()
+  const [isInitialLoading, setIsInitialLoading] = useState(() =>
+    generatedContent.length === 0 && flashcardSets.length === 0
+  )
 
   // Clear stores and reload data when user changes (handles account switching)
   useEffect(() => {
-    const loadDataForUser = async () => {
-      if (!user) {
-        console.log('[Dashboard] No user, clearing all data')
-        clearGeneratedContent()
-        clearFlashcardSets()
-        setIsInitialLoading(false)
-        return
-      }
-
-      console.log('[Dashboard] Loading data for user:', user.id)
-      setIsInitialLoading(true)
-
-      // Clear old data first to prevent showing wrong user's data
+    if (!user) {
       clearGeneratedContent()
       clearFlashcardSets()
+      setLastLoadedUserId(null)
+      setIsInitialLoading(false)
+      return
+    }
 
+    const hasLocalData = generatedContent.length > 0 || flashcardSets.length > 0
+    if (!hasLocalData) {
+      setIsInitialLoading(true)
+    } else {
+      setLastLoadedUserId(user.id)
+    }
+
+    let cancelled = false
+
+    void (async () => {
       try {
-        // Load fresh data from database for current user
         await loadStudyToolsFromDatabase()
+        if (!cancelled) {
+          setLastLoadedUserId(user.id)
+        }
       } catch (error) {
         console.error('[Dashboard] Failed to load study tools:', error)
       } finally {
-        setIsInitialLoading(false)
+        if (!cancelled) {
+          setIsInitialLoading(false)
+        }
       }
-    }
+    })()
 
-    loadDataForUser()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]) // Only depend on user ID to trigger reload on account switch
+    return () => {
+      cancelled = true
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id])
 
   // Filter data based on active tab
   const getFilteredData = () => {
@@ -287,6 +304,12 @@ export function DashboardTabs({
 
   const { studyTools, flashcards } = getFilteredData()
   const totalItems = studyTools.length + flashcards.length
+
+  useEffect(() => {
+    if (generatedContent.length > 0 || flashcardSets.length > 0) {
+      setIsInitialLoading(false)
+    }
+  }, [generatedContent.length, flashcardSets.length])
 
   // Click handlers that navigate to chat page and open the content
   const handleStudyToolClick = (content: StudyToolContent) => {

@@ -40,6 +40,9 @@ interface StudyToolsStore {
   collapsePanel: () => void
   togglePanel: () => void
 
+  lastLoadedUserId: string | null
+  setLastLoadedUserId: (userId: string | null) => void
+
   // Highlighting state for dashboard navigation
   highlightedTool: StudyToolType | null
   setHighlightedTool: (tool: StudyToolType | null) => void
@@ -89,6 +92,9 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
   expandPanel: () => set({ isPanelExpanded: true }),
   collapsePanel: () => set({ isPanelExpanded: false }),
   togglePanel: () => set(state => ({ isPanelExpanded: !state.isPanelExpanded })),
+
+  lastLoadedUserId: null,
+  setLastLoadedUserId: (userId: string | null) => set({ lastLoadedUserId: userId }),
 
   // Highlighting state for dashboard navigation
   highlightedTool: null,
@@ -1999,6 +2005,7 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
           ...content,
           createdAt: typeof content.createdAt === 'string' ? content.createdAt : content.createdAt.toISOString() // Handle both Date and string
         })),
+        lastLoadedUserId: state.lastLoadedUserId,
       }),
       onRehydrateStorage: () => (state) => {
         // Deserialize Date strings back to Date objects
@@ -2007,6 +2014,9 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
             ...content,
             createdAt: typeof content.createdAt === 'string' ? new Date(content.createdAt) : content.createdAt
           }))
+        }
+        if (state) {
+          state.lastLoadedUserId = state.lastLoadedUserId ?? null
         }
       }
     }

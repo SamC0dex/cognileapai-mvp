@@ -1,54 +1,611 @@
 "use client"
 
-import { motion } from "framer-motion"
-import { Upload, ListChecks, MessagesSquare, FileDown } from "lucide-react"
-import { animationVariants as A } from "@/lib/landing/animation-variants"
+import { motion, useInView, AnimatePresence } from "framer-motion"
+import { Sparkles, Brain, Zap, Check, CheckCircle2 } from "lucide-react"
+import { useRef, useState, useEffect } from "react"
+import { SectionBackground } from "./animated-background"
 
-const STEPS = [
+/**
+ * How It Works Section - The Processing Chamber
+ *
+ * An immersive, multi-layered visualization showing the document's journey
+ * through the AI system with depth, particle effects, and real transformation
+ */
+
+// Data particles that flow through the system
+interface Particle {
+  id: number
+  x: number
+  y: number
+  targetX: number
+  targetY: number
+  progress: number
+  speed: number
+  size: number
+}
+
+// Processing stages with visual metadata
+const PROCESSING_LAYERS = [
   {
-    icon: <Upload className="h-5 w-5" />, title: "Upload", desc: "Drop in your PDFs — we handle chunking and structure awareness.",
+    id: "input",
+    label: "Document Input",
+    color: "#3b82f6",
+    glow: "rgba(59, 130, 246, 0.5)",
   },
   {
-    icon: <MessagesSquare className="h-5 w-5" />, title: "Chat & Generate", desc: "Ask questions, then create summaries, notes, guides, and flashcards.",
+    id: "extract",
+    label: "Content Extraction",
+    color: "#8b5cf6",
+    glow: "rgba(139, 92, 246, 0.5)",
   },
   {
-    icon: <ListChecks className="h-5 w-5" />, title: "Study", desc: "Learn with interactive cards and guided paths that build mastery.",
+    id: "analyze",
+    label: "AI Analysis",
+    color: "#f59e0b",
+    glow: "rgba(245, 158, 11, 0.5)",
   },
   {
-    icon: <FileDown className="h-5 w-5" />, title: "Export", desc: "Take your knowledge offline with polished PDF/DOCX.",
+    id: "generate",
+    label: "Material Generation",
+    color: "#14b8a6",
+    glow: "rgba(20, 184, 166, 0.5)",
   },
 ]
 
-export default function HowItWorksSection() {
+const AI_PROCESSORS = [
+  { name: "Flash Lite", color: "#3b82f6", speed: "150ms", icon: "⚡" },
+  { name: "Flash", color: "#8b5cf6", speed: "500ms", icon: "✨" },
+  { name: "Pro", color: "#f59e0b", speed: "2s", icon: "🧠" },
+]
+
+const OUTPUT_MATERIALS = [
+  { type: "Summary", icon: "📝", color: "#3b82f6" },
+  { type: "Guide", icon: "📚", color: "#8b5cf6" },
+  { type: "Notes", icon: "✍️", color: "#f59e0b" },
+  { type: "Cards", icon: "🎯", color: "#14b8a6" },
+]
+
+/**
+ * The Processing Chamber - Main visualization component
+ */
+function ProcessingChamber() {
+  const [activeStage, setActiveStage] = useState(0)
+  const [particles, setParticles] = useState<Particle[]>([])
+  const [selectedProcessor, setSelectedProcessor] = useState(0)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const ref = useRef(null)
+  const isInView = useInView(ref, { once: false, margin: "-100px" })
+
+  // Initialize and restart animation when in view
+  useEffect(() => {
+    if (!isInView) {
+      setIsProcessing(false)
+      return
+    }
+
+    const startDelay = setTimeout(() => {
+      setActiveStage(0)
+      setIsProcessing(true)
+      generateParticles()
+    }, 500)
+
+    return () => clearTimeout(startDelay)
+  }, [isInView])
+
+  // Progress through stages
+  useEffect(() => {
+    if (!isProcessing) return
+
+    const stageTimer = setInterval(() => {
+      setActiveStage((prev) => {
+        if (prev >= PROCESSING_LAYERS.length - 1) {
+          setIsProcessing(false)
+          return prev
+        }
+        return prev + 1
+      })
+    }, 2500)
+
+    return () => clearInterval(stageTimer)
+  }, [isProcessing])
+
+  // Cycle through AI processors
+  useEffect(() => {
+    if (!isInView) return
+
+    const processorTimer = setInterval(() => {
+      setSelectedProcessor((prev) => (prev + 1) % AI_PROCESSORS.length)
+    }, 2000)
+
+    return () => clearInterval(processorTimer)
+  }, [isInView])
+
+  // Generate flowing particles
+  const generateParticles = () => {
+    const newParticles: Particle[] = Array.from({ length: 40 }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      targetX: Math.random() * 100,
+      targetY: Math.random() * 100,
+      progress: Math.random(),
+      speed: 0.3 + Math.random() * 0.7,
+      size: 2 + Math.random() * 3,
+    }))
+    setParticles(newParticles)
+  }
+
+  // Animate particles
+  useEffect(() => {
+    if (!isProcessing || particles.length === 0) return
+
+    const animationFrame = setInterval(() => {
+      setParticles((prev) =>
+        prev.map((particle) => {
+          let newProgress = particle.progress + particle.speed * 0.02
+          let newTargetX = particle.targetX
+          let newTargetY = particle.targetY
+
+          if (newProgress >= 1) {
+            newProgress = 0
+            newTargetX = Math.random() * 100
+            newTargetY = Math.random() * 100
+          }
+
+          const newX = particle.x + (newTargetX - particle.x) * newProgress
+          const newY = particle.y + (newTargetY - particle.y) * newProgress
+
+          return {
+            ...particle,
+            x: newX,
+            y: newY,
+            targetX: newTargetX,
+            targetY: newTargetY,
+            progress: newProgress,
+          }
+        })
+      )
+    }, 50)
+
+    return () => clearInterval(animationFrame)
+  }, [isProcessing, particles.length])
+
   return (
-    <section id="how-it-works" className="relative py-16 sm:py-24">
-      <div className="mx-auto max-w-7xl px-6">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-semibold sm:text-4xl">How it works</h2>
-          <p className="mt-3 text-muted-foreground">From file to insight in minutes.</p>
+    <div ref={ref} className="relative mx-auto max-w-7xl">
+      {/* Main Processing Chamber */}
+      <div className="relative min-h-[600px] overflow-hidden rounded-3xl border border-border/50 bg-gradient-to-b from-card/50 to-card/80 backdrop-blur-sm shadow-2xl dark:shadow-none">
+        {/* Background grid */}
+        <div
+          className="absolute inset-0 opacity-20"
+          style={{
+            backgroundImage: `
+              linear-gradient(to right, rgba(100, 100, 100, 0.1) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(100, 100, 100, 0.1) 1px, transparent 1px)
+            `,
+            backgroundSize: "40px 40px",
+          }}
+        />
+
+        {/* Particle system */}
+        <div className="absolute inset-0 overflow-hidden">
+          {particles.map((particle) => (
+            <motion.div
+              key={particle.id}
+              className="absolute rounded-full"
+              style={{
+                left: `${particle.x}%`,
+                top: `${particle.y}%`,
+                width: `${particle.size}px`,
+                height: `${particle.size}px`,
+                background: PROCESSING_LAYERS[activeStage]?.color || "#3b82f6",
+                boxShadow: `0 0 ${particle.size * 2}px ${PROCESSING_LAYERS[activeStage]?.glow || "rgba(59, 130, 246, 0.5)"}`,
+              }}
+              animate={{
+                opacity: [0.3, 0.8, 0.3],
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+              suppressHydrationWarning
+            />
+          ))}
         </div>
 
-        <motion.ol
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.2 }}
-          variants={A.timeline.container}
-          className="mx-auto mt-10 max-w-3xl space-y-6"
-        >
-          {STEPS.map((s, i) => (
-            <motion.li key={i} variants={A.timeline.item} className="relative rounded-xl border bg-card/60 p-4">
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  {s.icon}
+        {/* Processing Layers */}
+        <div className="relative grid grid-cols-1 gap-8 p-8 lg:grid-cols-4">
+          {PROCESSING_LAYERS.map((layer, index) => {
+            const isActive = activeStage === index
+            const isCompleted = activeStage > index
+
+            return (
+              <motion.div
+                key={layer.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{
+                  opacity: isInView ? 1 : 0,
+                  y: isInView ? 0 : 20,
+                  scale: isActive ? 1.05 : 1,
+                }}
+                transition={{ delay: index * 0.1 }}
+                className="relative"
+              >
+                {/* Layer card */}
+                <div
+                  className={`relative overflow-hidden rounded-xl border p-6 transition-all duration-500 ${
+                    isActive
+                      ? "border-primary/50 bg-primary/10 shadow-2xl shadow-primary/10"
+                      : isCompleted
+                        ? "border-teal-500/30 bg-teal-500/5 shadow-lg shadow-teal-500/5"
+                        : "border-border/30 bg-card/40 shadow-md dark:shadow-none"
+                  }`}
+                  style={{
+                    transform: `perspective(1000px) rotateY(${isActive ? "0deg" : "2deg"})`,
+                  }}
+                >
+                  {/* Animated glow */}
+                  {isActive && (
+                    <motion.div
+                      className="pointer-events-none absolute inset-0"
+                      style={{
+                        background: `radial-gradient(circle at 50% 50%, ${layer.glow} 0%, transparent 70%)`,
+                      }}
+                      animate={{
+                        opacity: [0.3, 0.7, 0.3],
+                        scale: [1, 1.1, 1],
+                      }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      }}
+                    />
+                  )}
+
+                  {/* Content */}
+                  <div className="relative">
+                    <motion.div
+                      className="mb-3 text-2xl"
+                      animate={{
+                        scale: isActive ? [1, 1.2, 1] : 1,
+                        rotate: isActive ? [0, 5, -5, 0] : 0,
+                      }}
+                      transition={{
+                        duration: 1,
+                        repeat: isActive ? Infinity : 0,
+                      }}
+                    >
+                      {index === 0 && "📄"}
+                      {index === 1 && "🔍"}
+                      {index === 2 && "🧠"}
+                      {index === 3 && "✨"}
+                    </motion.div>
+
+                    <h4
+                      className="mb-2 text-sm font-semibold"
+                      style={{ color: isActive || isCompleted ? layer.color : undefined }}
+                    >
+                      {layer.label}
+                    </h4>
+
+                    {/* Progress indicator */}
+                    {isActive && (
+                      <div className="mt-3 space-y-1">
+                        <div className="h-1 overflow-hidden rounded-full bg-muted">
+                          <motion.div
+                            className="h-full"
+                            style={{ background: layer.color }}
+                            initial={{ width: "0%" }}
+                            animate={{ width: "100%" }}
+                            transition={{ duration: 2.5, ease: "linear" }}
+                          />
+                        </div>
+                        <motion.p
+                          className="text-[10px] text-muted-foreground"
+                          animate={{ opacity: [0.5, 1, 0.5] }}
+                          transition={{ duration: 1.5, repeat: Infinity }}
+                        >
+                          Processing...
+                        </motion.p>
+                      </div>
+                    )}
+
+                    {/* Completion check */}
+                    {isCompleted && (
+                      <motion.div
+                        initial={{ scale: 0, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        className="mt-3 flex items-center gap-1 text-xs text-teal-500"
+                      >
+                        <Check className="h-3 w-3" />
+                        <span>Complete</span>
+                      </motion.div>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-medium">{i + 1}. {s.title}</h3>
-                  <p className="text-sm text-muted-foreground">{s.desc}</p>
+
+                {/* Connection line to next stage */}
+                {index < PROCESSING_LAYERS.length - 1 && (
+                  <div className="absolute -right-4 top-1/2 z-10 hidden lg:block">
+                    <motion.div
+                      className="h-0.5 w-8"
+                      style={{
+                        background: isCompleted
+                          ? `linear-gradient(to right, ${layer.color}, ${PROCESSING_LAYERS[index + 1].color})`
+                          : "rgba(100, 100, 100, 0.2)",
+                      }}
+                      animate={{
+                        opacity: isCompleted || isActive ? [0.5, 1, 0.5] : 0.2,
+                      }}
+                      transition={{
+                        duration: 1.5,
+                        repeat: Infinity,
+                      }}
+                    />
+                    {(isActive || isCompleted) && (
+                      <motion.div
+                        className="absolute right-0 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full"
+                        style={{ background: layer.color }}
+                        animate={{
+                          x: [0, 32, 32],
+                          opacity: [1, 1, 0],
+                        }}
+                        transition={{
+                          duration: 1.5,
+                          repeat: Infinity,
+                          ease: "linear",
+                        }}
+                      />
+                    )}
+                  </div>
+                )}
+              </motion.div>
+            )
+          })}
+        </div>
+
+        {/* AI Processor Units */}
+        <div className="relative border-t border-border/30 bg-card/20 p-8">
+          <div className="mx-auto max-w-4xl">
+            <div className="mb-4 flex items-center justify-center gap-2">
+              <Brain className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">Intelligent Model Selection</span>
+            </div>
+
+            <div className="flex items-center justify-center gap-4">
+              {AI_PROCESSORS.map((processor, index) => {
+                const isSelected = selectedProcessor === index
+
+                return (
+                  <motion.div
+                    key={processor.name}
+                    animate={{
+                      scale: isSelected ? 1.1 : 1,
+                      opacity: isSelected ? 1 : 0.5,
+                    }}
+                    transition={{ duration: 0.3 }}
+                    className="relative"
+                  >
+                    <div
+                      className={`flex items-center gap-3 rounded-xl border px-4 py-3 transition-all ${
+                        isSelected ? "border-primary/50 bg-primary/10 shadow-lg shadow-primary/10" : "border-border/30 bg-card/40 shadow-md dark:shadow-none"
+                      }`}
+                    >
+                      <span className="text-2xl">{processor.icon}</span>
+                      <div>
+                        <div className="text-xs font-semibold">{processor.name}</div>
+                        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                          <Zap className="h-2.5 w-2.5" />
+                          {processor.speed}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Selection glow */}
+                    {isSelected && (
+                      <motion.div
+                        className="pointer-events-none absolute inset-0 rounded-xl"
+                        style={{
+                          boxShadow: `0 0 20px ${processor.color}`,
+                        }}
+                        animate={{
+                          opacity: [0.3, 0.6, 0.3],
+                        }}
+                        transition={{
+                          duration: 1.5,
+                          repeat: Infinity,
+                        }}
+                      />
+                    )}
+                  </motion.div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Output Materials */}
+        <AnimatePresence>
+          {activeStage >= 3 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="border-t border-border/30 bg-gradient-to-b from-teal-500/5 to-transparent p-8"
+            >
+              <div className="mx-auto max-w-4xl">
+                <div className="mb-6 text-center">
+                  <div className="mb-2 flex items-center justify-center gap-2">
+                    <Sparkles className="h-4 w-4 text-teal-500" />
+                    <span className="text-sm font-medium text-teal-600 dark:text-teal-400">
+                      Study Materials Generated
+                    </span>
+                  </div>
                 </div>
+
+                <div className="grid grid-cols-4 gap-4">
+                  {OUTPUT_MATERIALS.map((material, index) => (
+                    <motion.div
+                      key={material.type}
+                      initial={{ opacity: 0, scale: 0.5, y: 20 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      transition={{
+                        delay: index * 0.1,
+                        type: "spring",
+                        stiffness: 300,
+                        damping: 20,
+                      }}
+                      className="group relative overflow-hidden rounded-xl border border-border/30 bg-card/60 p-4 text-center transition-all hover:border-primary/50 shadow-md hover:shadow-xl dark:shadow-none"
+                    >
+                      <motion.div
+                        className="mb-2 text-3xl"
+                        animate={{
+                          rotate: [0, 5, -5, 0],
+                        }}
+                        transition={{
+                          duration: 2,
+                          repeat: Infinity,
+                          ease: "easeInOut",
+                        }}
+                      >
+                        {material.icon}
+                      </motion.div>
+                      <div className="text-xs font-medium">{material.type}</div>
+
+                      {/* Hover glow */}
+                      <div
+                        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100"
+                        style={{
+                          background: `radial-gradient(circle at 50% 50%, ${material.color}15 0%, transparent 70%)`,
+                        }}
+                      />
+                    </motion.div>
+                  ))}
+                </div>
+
+                {/* Success message */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.6 }}
+                  className="mt-6 flex items-center justify-center gap-2 text-sm font-medium text-teal-600 dark:text-teal-400"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>Complete transformation in &lt; 60 seconds</span>
+                </motion.div>
               </div>
-            </motion.li>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  )
+}
+
+export default function HowItWorksSection() {
+  return (
+    <section id="how-it-works" className="relative overflow-hidden py-20 sm:py-32">
+      <SectionBackground />
+
+      <div className="relative mx-auto max-w-7xl px-6">
+        {/* Section header */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="mx-auto max-w-4xl text-center"
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm backdrop-blur-sm"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-primary" />
+            <span className="font-medium">Behind The Scenes</span>
+          </motion.div>
+
+          <h2 className="text-balance text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
+            See The{" "}
+            <span
+              className="bg-gradient-to-r from-primary via-amber-500 to-primary bg-clip-text text-transparent animate-gradient"
+              style={{ backgroundSize: "200% auto" }}
+            >
+              Magic Happen
+            </span>
+          </h2>
+
+          <p className="mt-6 text-lg text-muted-foreground sm:text-xl">
+            Watch your document transform through our AI processing chamber. Every stage, every decision, visualized in
+            real-time.
+          </p>
+        </motion.div>
+
+        {/* Processing Chamber */}
+        <div className="mt-16">
+          <ProcessingChamber />
+        </div>
+
+        {/* Key features */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+          className="mt-20 grid grid-cols-1 gap-6 sm:grid-cols-3"
+        >
+          {[
+            {
+              icon: <Brain className="h-6 w-6" />,
+              title: "Intelligent Processing",
+              desc: "Multi-layered AI analysis with semantic understanding",
+              color: "from-blue-500 to-cyan-400",
+            },
+            {
+              icon: <Sparkles className="h-6 w-6" />,
+              title: "Real-time Generation",
+              desc: "Watch materials being created as processing happens",
+              color: "from-purple-500 to-pink-400",
+            },
+            {
+              icon: <Zap className="h-6 w-6" />,
+              title: "Optimized Speed",
+              desc: "Smart model selection for perfect speed-quality balance",
+              color: "from-amber-500 to-orange-400",
+            },
+          ].map((feature, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, scale: 0.9 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.5 + index * 0.1, type: "spring", stiffness: 200 }}
+              className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/80 p-6 text-center backdrop-blur-sm transition-all hover:border-primary/50 shadow-lg hover:shadow-2xl dark:shadow-none"
+            >
+              <motion.div
+                className={`mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br ${feature.color} text-white shadow-lg`}
+                whileHover={{ rotate: 360, scale: 1.1 }}
+                transition={{ duration: 0.6 }}
+              >
+                {feature.icon}
+              </motion.div>
+              <h3 className="mb-2 font-semibold">{feature.title}</h3>
+              <p className="text-sm text-muted-foreground">{feature.desc}</p>
+
+              {/* Hover glow effect */}
+              <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100">
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    background: `radial-gradient(circle at 50% 50%, ${feature.color.includes("blue") ? "rgba(59, 130, 246, 0.1)" : feature.color.includes("purple") ? "rgba(139, 92, 246, 0.1)" : "rgba(245, 158, 11, 0.1)"} 0%, transparent 70%)`,
+                  }}
+                />
+              </div>
+            </motion.div>
           ))}
-        </motion.ol>
+        </motion.div>
       </div>
     </section>
   )

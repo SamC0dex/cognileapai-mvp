@@ -1,67 +1,259 @@
 "use client"
 
 import Link from "next/link"
-import { motion, useReducedMotion } from "framer-motion"
+import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion"
 import { buttonVariants } from "@/components/ui"
-import { Sparkles, Route, PanelsTopLeft, FileDown } from "lucide-react"
+import { Sparkles, Zap, Brain, Rocket, ArrowRight } from "lucide-react"
 import { animationVariants as A, getReducedMotionVariants } from "@/lib/landing/animation-variants"
+import { AnimatedBackground } from "./animated-background"
+import { useRef, useState, useEffect } from "react"
 
 export default function HeroSection() {
   const prefersReducedMotion = useReducedMotion()
+  const sectionRef = useRef<HTMLElement>(null)
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+
+  const { scrollY } = useScroll()
+  const y1 = useTransform(scrollY, [0, 500], [0, 100])
+  const y2 = useTransform(scrollY, [0, 500], [0, -50])
+  const opacity = useTransform(scrollY, [0, 600], [1, 0.3])
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!sectionRef.current) return
+      const rect = sectionRef.current.getBoundingClientRect()
+      setMousePosition({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      })
+    }
+
+    window.addEventListener("mousemove", handleMouseMove)
+    return () => window.removeEventListener("mousemove", handleMouseMove)
+  }, [])
+
+  // Split headline into words for animated reveal
+  const headline = "Learn Anything, Remember Everything"
+  const words = headline.split(" ")
 
   return (
-    <section className="relative overflow-hidden">
-      {/* Background aesthetics */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute -top-40 left-1/2 h-96 w-[40rem] -translate-x-1/2 rounded-full blur-3xl opacity-25 bg-[radial-gradient(ellipse_at_center,theme(colors.brand.teal.500),transparent_60%)] dark:opacity-30" />
-        <div className="absolute -bottom-40 right-0 h-96 w-[36rem] rounded-full blur-3xl opacity-20 bg-[radial-gradient(ellipse_at_center,theme(colors.brand.amber.500),transparent_60%)] dark:opacity-25" />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/5 to-transparent" />
-      </div>
+    <section ref={sectionRef} className="relative min-h-[90vh] overflow-hidden flex items-center">
+      {/* Animated mesh gradient background */}
+      <AnimatedBackground />
 
-      <div className="mx-auto max-w-7xl px-6 pt-20 pb-16 sm:pt-28 sm:pb-24">
+      <div className="relative mx-auto max-w-7xl px-6 py-20 sm:py-28 w-full">
         <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={prefersReducedMotion ? getReducedMotionVariants(A.hero) : A.hero}
-          className="mx-auto max-w-3xl text-center"
+          style={{ opacity: prefersReducedMotion ? 1 : opacity }}
+          className="mx-auto max-w-4xl text-center"
         >
-          <motion.h1
-            variants={A.heroHeadline}
-            className="text-balance text-4xl font-semibold tracking-tight sm:text-5xl md:text-6xl"
+          {/* Floating badge */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="mb-6 inline-flex"
           >
-            Turn PDFs into an A‑grade study kit
-          </motion.h1>
-
-          <motion.p variants={A.heroChild} className="mt-4 text-pretty text-base text-muted-foreground sm:text-lg">
-            Drop in a paper or chapter. Get crisp summaries, guided steps, and interactive flashcards — ready in minutes.
-            Built to impress in class and make revision actually enjoyable.
-          </motion.p>
-
-          <motion.div variants={A.heroChild} className="mt-8 flex items-center justify-center gap-3">
-            <Link href="/auth/sign-up" className={buttonVariants({ size: "lg", variant: "default" }) + " shadow-glow"}>Sign up</Link>
-            <Link href="/auth/sign-in" className={buttonVariants({ size: "lg", variant: "outline" })}>Sign in</Link>
+            <div className="group relative inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm backdrop-blur-sm hover:border-primary/40 hover:bg-primary/10 transition-all shadow-sm dark:shadow-none">
+              <Sparkles className="h-3.5 w-3.5 text-primary animate-pulse" />
+              <span className="bg-gradient-to-r from-primary to-amber-500 bg-clip-text text-transparent font-medium">
+                Powered by Google Gemini AI • Next-Gen Learning
+              </span>
+            </div>
           </motion.div>
 
-          <motion.ul variants={A.heroChild} className="mt-8 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <li className="flex items-center justify-center gap-2 rounded-full border border-border/60 bg-card/60 px-4 py-2 text-xs text-foreground/80 shadow-soft backdrop-blur-sm">
-              <Sparkles className="h-3.5 w-3.5 text-primary" />
-              Smart Summaries
-            </li>
-            <li className="flex items-center justify-center gap-2 rounded-full border border-border/60 bg-card/60 px-4 py-2 text-xs text-foreground/80 shadow-soft backdrop-blur-sm">
-              <Route className="h-3.5 w-3.5 text-primary" />
-              Guided Study
-            </li>
-            <li className="flex items-center justify-center gap-2 rounded-full border border-border/60 bg-card/60 px-4 py-2 text-xs text-foreground/80 shadow-soft backdrop-blur-sm">
-              <PanelsTopLeft className="h-3.5 w-3.5 text-primary" />
-              Flashcards
-            </li>
-            <li className="flex items-center justify-center gap-2 rounded-full border border-border/60 bg-card/60 px-4 py-2 text-xs text-foreground/80 shadow-soft backdrop-blur-sm">
-              <FileDown className="h-3.5 w-3.5 text-primary" />
-              PDF/DOCX Export
-            </li>
-          </motion.ul>
+          {/* Main headline with word-by-word animation */}
+          <div className="mb-6">
+            <motion.h1
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: { opacity: 0 },
+                visible: {
+                  opacity: 1,
+                  transition: {
+                    staggerChildren: 0.08,
+                    delayChildren: 0.3,
+                  },
+                },
+              }}
+              className="text-balance text-5xl font-bold tracking-tight sm:text-6xl md:text-7xl lg:text-8xl"
+            >
+              {words.map((word, index) => (
+                <motion.span
+                  key={index}
+                  variants={{
+                    hidden: { opacity: 0, y: 20, filter: "blur(10px)" },
+                    visible: {
+                      opacity: 1,
+                      y: 0,
+                      filter: "blur(0px)",
+                      transition: {
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15,
+                      },
+                    },
+                  }}
+                  className={`inline-block mr-3 ${
+                    index === 2 || index === 5 // "Remember" and "Everything"
+                      ? "bg-gradient-to-r from-primary via-amber-500 to-primary bg-clip-text text-transparent animate-gradient"
+                      : ""
+                  }`}
+                  style={{
+                    backgroundSize: index === 2 || index === 5 ? "200% auto" : undefined,
+                  }}
+                >
+                  {word}
+                </motion.span>
+              ))}
+            </motion.h1>
+          </div>
+
+          {/* Subheadline - Vision focused */}
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.8 }}
+            className="mx-auto max-w-2xl text-pretty text-lg text-muted-foreground sm:text-xl md:text-2xl leading-relaxed"
+          >
+            Transform any document into your{" "}
+            <span className="font-semibold text-foreground">personal learning companion</span>.
+            AI-powered tools that don't just help you study—they help you{" "}
+            <span className="font-semibold text-foreground">master anything</span>.
+          </motion.p>
+
+          {/* CTA Buttons with magnetic effect */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 1 }}
+            className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4"
+          >
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Link
+                href="/auth/sign-up"
+                className={buttonVariants({ size: "lg", variant: "default" }) + " relative group overflow-hidden text-base px-8 py-6 shadow-lg shadow-primary/25 dark:shadow-glow"}
+              >
+                <span className="relative z-10 flex items-center gap-2 font-semibold">
+                  Start Learning Free
+                  <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </span>
+                <div className="absolute inset-0 bg-gradient-to-r from-primary via-amber-500 to-primary opacity-0 group-hover:opacity-100 transition-opacity blur-xl" />
+              </Link>
+            </motion.div>
+
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Link
+                href="#demo"
+                className={buttonVariants({ size: "lg", variant: "outline" }) + " text-base px-8 py-6 group backdrop-blur-sm shadow-md dark:shadow-none"}
+              >
+                <span className="flex items-center gap-2">
+                  <Rocket className="h-4 w-4 group-hover:rotate-12 transition-transform" />
+                  See It In Action
+                </span>
+              </Link>
+            </motion.div>
+          </motion.div>
+
+          {/* Study Tools Showcase */}
+          <motion.div
+            style={{ y: prefersReducedMotion ? 0 : y2 }}
+            initial="hidden"
+            animate="visible"
+            variants={{
+              hidden: { opacity: 0 },
+              visible: {
+                opacity: 1,
+                transition: {
+                  staggerChildren: 0.1,
+                  delayChildren: 1.2,
+                },
+              },
+            }}
+            className="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-4xl mx-auto"
+          >
+            {[
+              { icon: <span className="text-2xl">📝</span>, label: "Smart Summary", color: "from-blue-500 to-cyan-400" },
+              { icon: <span className="text-2xl">📚</span>, label: "Study Guide", color: "from-purple-500 to-pink-400" },
+              { icon: <span className="text-2xl">✍️</span>, label: "Smart Notes", color: "from-amber-500 to-orange-400" },
+              { icon: <span className="text-2xl">🎯</span>, label: "Flashcards", color: "from-teal-500 to-emerald-400" },
+            ].map((feature, index) => (
+              <motion.div
+                key={index}
+                variants={{
+                  hidden: { opacity: 0, y: 20, scale: 0.9 },
+                  visible: {
+                    opacity: 1,
+                    y: 0,
+                    scale: 1,
+                    transition: {
+                      type: "spring",
+                      stiffness: 150,
+                      damping: 20,
+                    },
+                  },
+                }}
+                whileHover={{
+                  scale: 1.05,
+                  y: -5,
+                  transition: { duration: 0.2 },
+                }}
+                className="group relative"
+              >
+                <div className="relative flex items-center justify-center gap-3 rounded-2xl border border-border/50 bg-card/60 px-6 py-4 backdrop-blur-sm hover:border-primary/50 hover:bg-card/80 transition-all shadow-md hover:shadow-lg dark:shadow-none">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${feature.color} text-white shadow-lg group-hover:shadow-xl transition-shadow`}>
+                    {feature.icon}
+                  </div>
+                  <span className="text-sm font-medium">{feature.label}</span>
+
+                  {/* Glow effect on hover */}
+                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary/0 via-primary/5 to-primary/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
         </motion.div>
       </div>
+
+      {/* Floating decorative elements with parallax */}
+      {!prefersReducedMotion && (
+        <>
+          <motion.div
+            style={{ y: y1 }}
+            className="absolute top-1/4 left-[10%] h-2 w-2 rounded-full bg-primary/30 blur-sm"
+            animate={{
+              scale: [1, 1.5, 1],
+              opacity: [0.3, 0.6, 0.3],
+            }}
+            transition={{
+              duration: 4,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
+          <motion.div
+            style={{ y: y2 }}
+            className="absolute top-1/3 right-[15%] h-3 w-3 rounded-full bg-amber-500/30 blur-sm"
+            animate={{
+              scale: [1, 1.3, 1],
+              opacity: [0.4, 0.7, 0.4],
+            }}
+            transition={{
+              duration: 5,
+              repeat: Infinity,
+              ease: "easeInOut",
+              delay: 1,
+            }}
+          />
+        </>
+      )}
     </section>
   )
 }
+

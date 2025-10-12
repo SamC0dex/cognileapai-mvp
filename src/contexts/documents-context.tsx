@@ -1,6 +1,12 @@
 'use client'
 
-import React, { createContext, useContext, useState, useCallback } from 'react'
+import React, { createContext, useContext, useState, useCallback, useMemo, useRef, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import type { Database } from '@/lib/supabase'
+import type { DocumentUploadedDetail } from '@/types/documents'
+import { useAuth } from '@/contexts/auth-context'
+
+type DocumentItem = Database['public']['Tables']['documents']['Row']
 
 interface SelectedDocument {
   id: string
@@ -10,6 +16,11 @@ interface SelectedDocument {
 }
 
 interface DocumentsContextValue {
+  documents: DocumentItem[]
+  documentsLoading: boolean
+  refreshDocuments: (options?: { force?: boolean }) => Promise<void>
+  upsertDocument: (document: DocumentItem) => void
+  removeDocumentFromContext: (documentId: string) => void
   selectedDocuments: SelectedDocument[]
   addSelectedDocument: (doc: SelectedDocument) => void
   removeSelectedDocument: (documentId: string) => void
@@ -21,12 +32,151 @@ interface DocumentsContextValue {
 
 const DocumentsContext = createContext<DocumentsContextValue | null>(null)
 
+const DOCUMENTS_CACHE_KEY = 'cognileap-documents-cache-v1'
+const DOCUMENTS_CACHE_TTL = 2 * 60 * 1000 // 2 minutes
+
+const toSelectedDocument = (doc: DocumentItem): SelectedDocument => ({
+  id: doc.id,
+  title: doc.title,
+  size: doc.bytes ?? undefined,
+  processing_status: doc.processing_status ?? undefined
+})
+
 export function DocumentsProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth()
+  const supabase = useMemo(() => createClient(), [])
+  const cacheRef = useRef<DocumentItem[]>([])
+
+  const readCache = () => {
+    if (typeof window === 'undefined') return []
+    try {
+      const cached = window.sessionStorage.getItem(DOCUMENTS_CACHE_KEY)
+      if (!cached) return []
+      const parsed = JSON.parse(cached) as { timestamp: number; documents: DocumentItem[] }
+      if (!parsed?.documents || !Array.isArray(parsed.documents)) return []
+      if (Date.now() - (parsed.timestamp || 0) > DOCUMENTS_CACHE_TTL) {
+        return []
+      }
+      cacheRef.current = parsed.documents
+      return parsed.documents
+    } catch {
+      return []
+    }
+  }
+
+  const persistCache = (docs: DocumentItem[]) => {
+    if (typeof window === 'undefined') return
+    try {
+      window.sessionStorage.setItem(
+        DOCUMENTS_CACHE_KEY,
+        JSON.stringify({ timestamp: Date.now(), documents: docs })
+      )
+    } catch {
+      // ignore storage errors
+    }
+  }
+
+  const [documents, setDocuments] = useState<DocumentItem[]>(() => readCache())
+  const [documentsLoading, setDocumentsLoading] = useState(() => cacheRef.current.length === 0)
   const [selectedDocuments, setSelectedDocuments] = useState<SelectedDocument[]>([])
+
+  const applyDocumentsUpdate = useCallback((updater: (current: DocumentItem[]) => DocumentItem[]) => {
+    setDocuments(prev => {
+      const next = updater(prev)
+      cacheRef.current = next
+      persistCache(next)
+      return next
+    })
+  }, [])
+
+  const upsertDocument = useCallback((document: DocumentItem) => {
+    applyDocumentsUpdate(prev => {
+      const existingIndex = prev.findIndex(item => item.id === document.id)
+      if (existingIndex === -1) {
+        return [document, ...prev]
+      }
+      const next = [...prev]
+      next[existingIndex] = document
+      return next
+    })
+
+    setSelectedDocuments(prev =>
+      prev.map(item => (item.id === document.id ? toSelectedDocument(document) : item))
+    )
+  }, [applyDocumentsUpdate])
+
+  const removeDocumentFromContext = useCallback((documentId: string) => {
+    applyDocumentsUpdate(prev => prev.filter(doc => doc.id !== documentId))
+    setSelectedDocuments(prev => prev.filter(doc => doc.id !== documentId))
+  }, [applyDocumentsUpdate])
+
+  const refreshDocuments = useCallback(async (options?: { force?: boolean }) => {
+    if (!user) {
+      applyDocumentsUpdate(() => [])
+      setDocumentsLoading(false)
+      return
+    }
+
+    const shouldForceLoading = options?.force || cacheRef.current.length === 0
+    if (shouldForceLoading) {
+      setDocumentsLoading(true)
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('[Documents] Failed to fetch documents:', error)
+        return
+      }
+
+      const nextDocs = data ?? []
+      applyDocumentsUpdate(() => nextDocs)
+
+      setSelectedDocuments(prev =>
+        prev
+          .map(item => {
+            const updated = nextDocs.find(doc => doc.id === item.id)
+            return updated ? toSelectedDocument(updated) : item
+          })
+          .filter(item => nextDocs.some(doc => doc.id === item.id))
+      )
+    } finally {
+      setDocumentsLoading(false)
+    }
+  }, [applyDocumentsUpdate, supabase, user])
+
+  useEffect(() => {
+    if (!user) {
+      applyDocumentsUpdate(() => [])
+      setSelectedDocuments([])
+      setDocumentsLoading(false)
+      return
+    }
+
+    void refreshDocuments({ force: cacheRef.current.length === 0 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleDocumentUploaded = (event: Event) => {
+      const customEvent = event as CustomEvent<DocumentUploadedDetail>
+      const uploadedDocument = customEvent.detail?.document
+      if (!uploadedDocument) return
+      upsertDocument(uploadedDocument as DocumentItem)
+    }
+
+    window.addEventListener('document-uploaded', handleDocumentUploaded as EventListener)
+    return () => window.removeEventListener('document-uploaded', handleDocumentUploaded as EventListener)
+  }, [upsertDocument])
 
   const addSelectedDocument = useCallback((doc: SelectedDocument) => {
     setSelectedDocuments(prev => {
-      // Check if already selected
       if (prev.some(d => d.id === doc.id)) {
         return prev
       }
@@ -56,10 +206,14 @@ export function DocumentsProvider({ children }: { children: React.ReactNode }) {
     )
   }, [])
 
-  // For now, use the first selected document as primary (we can enhance this later)
   const primaryDocument = selectedDocuments.length > 0 ? selectedDocuments[0] : null
 
   const value: DocumentsContextValue = {
+    documents,
+    documentsLoading,
+    refreshDocuments,
+    upsertDocument,
+    removeDocumentFromContext,
     selectedDocuments,
     addSelectedDocument,
     removeSelectedDocument,

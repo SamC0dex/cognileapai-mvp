@@ -1,10 +1,11 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import { clearAllClientStorage, signOutAndClear } from '@/lib/auth-utils'
-import { useRef } from 'react'
+import { useStudyToolsStore } from '@/lib/study-tools-store'
+import { useFlashcardStore } from '@/lib/flashcard-store'
 
 interface AuthContextType {
   user: User | null
@@ -22,6 +23,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
   const lastUserIdRef = useRef<string | null>(null)
+  const prefetchUserRef = useRef<string | null>(null)
+  const userId = user?.id ?? null
 
   useEffect(() => {
     // Get initial session
@@ -53,6 +56,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => subscription.unsubscribe()
   }, [supabase])
+
+  useEffect(() => {
+    const studyToolsStore = useStudyToolsStore.getState()
+    const flashcardStore = useFlashcardStore.getState()
+
+    if (!userId) {
+      if (!loading) {
+        prefetchUserRef.current = null
+        studyToolsStore.clearGeneratedContent()
+        studyToolsStore.setLastLoadedUserId(null)
+        flashcardStore.clearFlashcardSets()
+      }
+      return
+    }
+
+    if (prefetchUserRef.current === userId && studyToolsStore.generatedContent.length > 0) {
+      return
+    }
+
+    prefetchUserRef.current = userId
+
+    void (async () => {
+      try {
+        await studyToolsStore.loadStudyToolsFromDatabase()
+      } catch (error) {
+        console.error('[Auth] Prefetch study tools failed:', error)
+      } finally {
+        studyToolsStore.setLastLoadedUserId(userId)
+      }
+    })()
+  }, [userId, loading])
 
   const signOut = async () => {
     await signOutAndClear('/')

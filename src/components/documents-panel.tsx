@@ -11,7 +11,6 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useDocuments } from '@/contexts/documents-context'
 import type { Database } from '@/lib/supabase'
-import type { DocumentUploadedDetail } from '@/types/documents'
 
 type DocumentItem = Database['public']['Tables']['documents']['Row']
 
@@ -23,9 +22,17 @@ interface DocumentsPanelProps {
 
 export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: DocumentsPanelProps) {
   const router = useRouter()
-  const { selectedDocuments: contextSelectedDocs, addSelectedDocument, removeSelectedDocument, isDocumentSelected } = useDocuments()
-  const [documents, setDocuments] = useState<DocumentItem[]>([])
-  const [isLoading, setIsLoading] = useState(false)
+  const {
+    documents,
+    documentsLoading,
+    refreshDocuments,
+    selectedDocuments: contextSelectedDocs,
+    addSelectedDocument,
+    removeSelectedDocument,
+    isDocumentSelected,
+    upsertDocument,
+    removeDocumentFromContext
+  } = useDocuments()
   const [isUploading, setIsUploading] = useState(false)
   const [selectAll, setSelectAll] = useState(false)
   const [renameDialog, setRenameDialog] = useState<{open: boolean, document: DocumentItem | null}>({open: false, document: null})
@@ -35,60 +42,11 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
   // Memoized Supabase client to prevent recreating on every render
   const supabase = React.useMemo(() => createClient(), [])
 
-  // Fetch documents from Supabase
-  const fetchDocuments = React.useCallback(async () => {
-    setIsLoading(true)
-    try {
-      console.log('[DocumentsPanel] Fetching documents...')
-      const { data, error } = await supabase
-        .from('documents')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        console.error('[DocumentsPanel] Failed to fetch documents:', error)
-        toast.error('Failed to load documents')
-      } else {
-        console.log('[DocumentsPanel] Fetched documents:', data?.length || 0, 'documents')
-        setDocuments(data || [])
-      }
-    } catch (error) {
-      console.error('Failed to fetch documents:', error)
-      toast.error('Failed to load documents')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [supabase])
-
   useEffect(() => {
     if (isOpen) {
-      fetchDocuments()
+      void refreshDocuments()
     }
-  }, [fetchDocuments, isOpen])
-
-  useEffect(() => {
-    const handleDocumentUploaded = (event: Event) => {
-      const customEvent = event as CustomEvent<DocumentUploadedDetail>
-      const uploadedDocument = customEvent.detail?.document
-      if (!uploadedDocument) return
-
-      setDocuments(prev => {
-        const existingIndex = prev.findIndex(doc => doc.id === uploadedDocument.id)
-        const updatedDocument: DocumentItem = uploadedDocument
-        if (existingIndex !== -1) {
-          const next = [...prev]
-          next[existingIndex] = updatedDocument
-          return next
-        }
-        return [updatedDocument, ...prev]
-      })
-    }
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('document-uploaded', handleDocumentUploaded as EventListener)
-      return () => window.removeEventListener('document-uploaded', handleDocumentUploaded as EventListener)
-    }
-  }, [])
+  }, [isOpen, refreshDocuments])
 
   const handleFileUpload = React.useCallback(async (files: FileList) => {
     if (!files || files.length === 0) return
@@ -121,14 +79,14 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
       }
 
       // Refresh the list after all uploads
-      await fetchDocuments()
+      await refreshDocuments({ force: true })
     } catch (error) {
       toast.error('Upload failed')
       console.error('Upload error:', error)
     } finally {
       setIsUploading(false)
     }
-  }, [fetchDocuments])
+  }, [refreshDocuments])
 
   const handleUpload = React.useCallback(() => {
     if (isUploading) return
@@ -179,9 +137,6 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
       })
     }
 
-    // Update select all state based on selection
-    const selectedCount = contextSelectedDocs.length + (isDocumentSelected(documentId) ? 0 : 1)
-    setSelectAll(selectedCount === documents.length && documents.length > 0)
   }
 
   const handleSelectAll = () => {
@@ -227,7 +182,9 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
         toast.error('Failed to rename document')
       } else {
         toast.success('Document renamed successfully!')
-        await fetchDocuments() // Refresh the list
+        if (renameDialog.document) {
+          upsertDocument({ ...renameDialog.document, title: newDocumentName.trim() })
+        }
       }
     } catch (error) {
       console.error('Failed to rename document:', error)
@@ -258,7 +215,7 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
         toast.error('Failed to remove document')
       } else {
         toast.success('Document removed successfully!')
-        await fetchDocuments() // Refresh the list
+        removeDocumentFromContext(removeDialog.document.id)
       }
     } catch (error) {
       console.error('Failed to remove document:', error)
@@ -347,7 +304,7 @@ export function DocumentsPanel({ isOpen, onClose, sidebarCollapsed = true }: Doc
 
             {/* Document List */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {isLoading ? (
+              {documentsLoading && documents.length === 0 ? (
                 <div className="space-y-3">
                   {[1, 2, 3].map((i) => (
                     <div
