@@ -157,7 +157,7 @@ function FAQAccordionItem({
 }
 
 export default function FaqSection() {
-  const [openIndex, setOpenIndex] = useState<number | null>(0)
+  const [openIndex, setOpenIndex] = useState<number | null>(null)
   const { shouldAnimate } = useLandingAnimation()
 
   const handleToggle = (index: number) => {

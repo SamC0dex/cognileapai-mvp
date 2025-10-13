@@ -137,30 +137,38 @@ function InteractiveDemoShowcase() {
   const [currentStage, setCurrentStage] = useState<number>(0)
   const [isRunning, setIsRunning] = useState(false)
   const [hasCompleted, setHasCompleted] = useState(false)
+  const [hasBeenOutOfView, setHasBeenOutOfView] = useState(false)
   const ref = useRef(null)
   const isInView = useInView(ref, { once: false, margin: "-100px" })
   const { shouldAnimate } = useLandingAnimation()
 
-  // Reset and restart demo when coming into view
+  // Track when component leaves viewport
+  useEffect(() => {
+    if (!isInView && hasCompleted) {
+      setHasBeenOutOfView(true)
+    }
+  }, [isInView, hasCompleted])
+
+  // Reset and restart demo only when coming back into view after being out
   useEffect(() => {
     if (!isInView) {
-      setIsRunning(false)
       return
     }
 
-    // Only restart if not already on final stage or if scrolling back
-    if (!hasCompleted || !isRunning) {
+    // Start initial animation or restart after scrolling away
+    if (!hasCompleted || hasBeenOutOfView) {
       const startDelay = setTimeout(() => {
         setCurrentStage(0)
         setIsRunning(true)
         setHasCompleted(false)
-      }, 500)
+        setHasBeenOutOfView(false)
+      }, 300)
 
       return () => clearTimeout(startDelay)
     }
-  }, [isInView, hasCompleted, isRunning])
+  }, [isInView, hasCompleted, hasBeenOutOfView])
 
-  // Progress through stages
+  // Progress through stages (faster)
   useEffect(() => {
     if (!isRunning || currentStage >= PROCESSING_STAGES.length) return
 
@@ -172,7 +180,7 @@ function InteractiveDemoShowcase() {
         setHasCompleted(true)
         setIsRunning(false)
       }
-    }, PROCESSING_STAGES[currentStage].duration)
+    }, PROCESSING_STAGES[currentStage].duration * 0.7) // 30% faster
 
     return () => clearTimeout(stageTimer)
   }, [currentStage, isRunning])

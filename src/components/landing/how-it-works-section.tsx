@@ -73,52 +73,66 @@ function ProcessingChamber() {
   const [particles, setParticles] = useState<Particle[]>([])
   const [selectedProcessor, setSelectedProcessor] = useState(0)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [hasCompleted, setHasCompleted] = useState(false)
+  const [hasBeenOutOfView, setHasBeenOutOfView] = useState(false)
   const ref = useRef(null)
   const isInView = useInView(ref, { once: false, margin: "-100px" })
 
-  // Initialize and restart animation when in view
+  // Track when component leaves viewport
+  useEffect(() => {
+    if (!isInView && hasCompleted) {
+      setHasBeenOutOfView(true)
+    }
+  }, [isInView, hasCompleted])
+
+  // Initialize and restart animation only when coming back into view after being out
   useEffect(() => {
     if (!isInView) {
-      setIsProcessing(false)
       return
     }
 
-    const startDelay = setTimeout(() => {
-      setActiveStage(0)
-      setIsProcessing(true)
-      generateParticles()
-    }, 500)
+    // Start initial animation or restart after scrolling away
+    if (!hasCompleted || hasBeenOutOfView) {
+      const startDelay = setTimeout(() => {
+        setActiveStage(0)
+        setIsProcessing(true)
+        setHasCompleted(false)
+        setHasBeenOutOfView(false)
+        generateParticles()
+      }, 300)
 
-    return () => clearTimeout(startDelay)
-  }, [isInView])
+      return () => clearTimeout(startDelay)
+    }
+  }, [isInView, hasCompleted, hasBeenOutOfView])
 
-  // Progress through stages
+  // Progress through stages (faster, no loop)
   useEffect(() => {
     if (!isProcessing) return
 
-    const stageTimer = setInterval(() => {
+    const stageTimer = setTimeout(() => {
       setActiveStage((prev) => {
         if (prev >= PROCESSING_LAYERS.length - 1) {
           setIsProcessing(false)
+          setHasCompleted(true)
           return prev
         }
         return prev + 1
       })
-    }, 1200)
+    }, 800) // Faster: 800ms instead of 1200ms
 
-    return () => clearInterval(stageTimer)
-  }, [isProcessing])
+    return () => clearTimeout(stageTimer)
+  }, [activeStage, isProcessing])
 
-  // Cycle through AI processors
+  // Cycle through AI processors (faster, only when processing)
   useEffect(() => {
-    if (!isInView) return
+    if (!isProcessing) return
 
     const processorTimer = setInterval(() => {
       setSelectedProcessor((prev) => (prev + 1) % AI_PROCESSORS.length)
-    }, 1000)
+    }, 700) // Faster: 700ms instead of 1000ms
 
     return () => clearInterval(processorTimer)
-  }, [isInView])
+  }, [isProcessing])
 
   // Generate flowing particles
   const generateParticles = () => {
@@ -135,14 +149,14 @@ function ProcessingChamber() {
     setParticles(newParticles)
   }
 
-  // Animate particles
+  // Animate particles (only while processing, faster)
   useEffect(() => {
     if (!isProcessing || particles.length === 0) return
 
     const animationFrame = setInterval(() => {
       setParticles((prev) =>
         prev.map((particle) => {
-          let newProgress = particle.progress + particle.speed * 0.02
+          let newProgress = particle.progress + particle.speed * 0.03 // 50% faster
           let newTargetX = particle.targetX
           let newTargetY = particle.targetY
 
@@ -165,7 +179,7 @@ function ProcessingChamber() {
           }
         })
       )
-    }, 50)
+    }, 40) // Faster: 40ms instead of 50ms
 
     return () => clearInterval(animationFrame)
   }, [isProcessing, particles.length])
@@ -298,7 +312,7 @@ function ProcessingChamber() {
                             style={{ background: layer.color }}
                             initial={{ width: "0%" }}
                             animate={{ width: "100%" }}
-                            transition={{ duration: 1.2, ease: "linear" }}
+                            transition={{ duration: 0.8, ease: "linear" }}
                           />
                         </div>
                         <p className="text-[10px] text-muted-foreground animate-pulse">
