@@ -534,30 +534,47 @@ export async function POST(req: NextRequest) {
 
     let outputId: string | null = null
 
-    // For conversation-based study tools, get the associated document if available
+    // For conversation-based study tools, validate and get the associated document if available
     let saveDocumentId = documentId
-    if (!saveDocumentId && conversationId) {
-      // Try to get the document from conversation (optional association)
-      const { data: conversation } = await supabase
+    let validatedConversationId = conversationId
+    
+    if (conversationId) {
+      // Validate that the conversation still exists before saving
+      // This prevents foreign key constraint violations
+      const { data: conversationCheck, error: conversationCheckError } = await supabase
         .from('conversations')
-        .select('document_id')
+        .select('id, document_id')
         .eq('id', conversationId)
-        .single()
+        .eq('user_id', user.id)
+        .maybeSingle()
 
-      saveDocumentId = conversation?.document_id || undefined
+      if (conversationCheckError || !conversationCheck) {
+        console.warn('[StudyTools] Conversation not found or inaccessible during save:', {
+          conversationId,
+          error: conversationCheckError,
+          exists: !!conversationCheck
+        })
+        // Conversation doesn't exist - set to null to prevent FK violation
+        validatedConversationId = undefined
+      } else {
+        // Conversation exists - use its document_id if we don't have one
+        if (!saveDocumentId && conversationCheck.document_id) {
+          saveDocumentId = conversationCheck.document_id
+        }
+      }
     }
 
     try {
       const nowIso = new Date().toISOString()
       const resolvedDocumentId = saveDocumentId ?? null
-      const resolvedConversationId = conversationId ?? null
+      const resolvedConversationId = validatedConversationId ?? null
 
       const payload: Record<string, unknown> = {
         title: generatedTitle,
         content: processedContent,
         type,
         documentId,
-        conversationId,
+        conversationId: validatedConversationId,
         createdAt: nowIso,
         ...(type === 'flashcards' && flashcardData
           ? {
@@ -679,6 +696,8 @@ export async function POST(req: NextRequest) {
     } catch (saveError) {
       console.error('[StudyTools] Database save error:', saveError)
       // Don't throw - return generated content even if save fails
+      // But signal that database save failed
+      outputId = null
     }
 
     return NextResponse.json({
@@ -688,7 +707,9 @@ export async function POST(req: NextRequest) {
       content: processedContent,
       type,
       documentId,
-      conversationId,
+      conversationId: validatedConversationId,
+      // Signal if database save failed
+      savedToDatabase: outputId !== null,
       // Include flashcard-specific data in response
       ...(type === 'flashcards' && flashcardData ? {
         cards: flashcardData,

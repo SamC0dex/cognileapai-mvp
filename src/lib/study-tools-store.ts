@@ -116,6 +116,7 @@ interface StudyToolsStore {
   ) => Promise<void>
   _updateGenerationState: () => void // Internal helper
   _cleanupGenerationTracking: (generationId: string) => void
+  cancelGeneration: (generationId: string) => void // Manually cancel a stuck generation
   retryLastGeneration: () => Promise<void>
   setFriendlyError: (error: UserFacingError | null) => void
   clearError: () => void
@@ -378,6 +379,36 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
     })
 
     get()._updateGenerationState()
+  },
+  cancelGeneration: (generationId: string) => {
+    console.log('[StudyToolsStore] Manually cancelling generation:', generationId)
+    
+    const currentState = get()
+    const generation = currentState.activeGenerations.get(generationId)
+    
+    if (!generation) {
+      console.warn('[StudyToolsStore] Generation not found:', generationId)
+      return
+    }
+    
+    // Mark content as cancelled
+    set(state => ({
+      generatedContent: state.generatedContent.map(content =>
+        content.id === generationId
+          ? {
+              ...content,
+              isGenerating: false,
+              generationProgress: 0,
+              statusMessage: 'Generation cancelled'
+            }
+          : content
+      )
+    }))
+    
+    // Clean up tracking
+    get()._cleanupGenerationTracking(generationId)
+    
+    console.log('[StudyToolsStore] Generation cancelled successfully')
   },
   retryLastGeneration: async () => {
     const last = get().lastFailedGeneration
@@ -691,8 +722,38 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
 
             // Store current progress before database load to prevent overwriting
             const currentState = get()
-            const currentProgress = currentState.generatedContent.find(c => c.id === generationId)?.generationProgress ?? 0
+            const currentContent = currentState.generatedContent.find(c => c.id === generationId)
+            const currentProgress = currentContent?.generationProgress ?? 0
             const currentActiveGeneration = currentState.activeGenerations.get(generationId)
+            
+            // Detect if stuck at very high progress (95%+) for extended time
+            // BUT: Respect fallback mechanism timing (90s-300s window)
+            const isFallbackActive = currentContent?.statusMessage?.includes('Fallback')
+            const stuckThreshold = isFallbackActive ? 330000 : 120000 // 5.5 minutes for fallback, 2 minutes otherwise
+            
+            if (currentProgress >= 95 && elapsedTime > stuckThreshold) {
+              console.warn(`[StudyToolsStore] Generation stuck at ${currentProgress}% for ${elapsedTime}ms (fallback: ${isFallbackActive})`)
+              
+              // If we have content locally, complete the generation
+              if (currentContent && currentContent.content && currentContent.content.trim().length > 0) {
+                console.log('[StudyToolsStore] Found content locally after DB save failure, forcing completion')
+                set(state => ({
+                  generatedContent: state.generatedContent.map(content =>
+                    content.id === generationId
+                      ? {
+                          ...content,
+                          isGenerating: false,
+                          generationProgress: 100,
+                          statusMessage: undefined
+                        }
+                      : content
+                  )
+                }))
+                cleanupGeneration(generationId)
+                get().enqueueAutoOpen(currentContent.id, currentContent.type)
+                return
+              }
+            }
             
             await get().loadStudyToolsFromDatabase(effectiveDocumentId, effectiveConversationId)
 
@@ -987,6 +1048,11 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
 
       const result = await response.json()
       console.log('[StudyToolsStore] Generation successful:', result)
+
+      // Check if database save failed
+      if (result.savedToDatabase === false) {
+        console.warn('[StudyToolsStore] Content generated but database save failed, completing locally')
+      }
 
       // Get current progress and status before completion animation
       const currentState = get()
