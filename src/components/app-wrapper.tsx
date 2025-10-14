@@ -3,7 +3,6 @@
 import { useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 import { useExtensionBlocker } from '@/hooks/use-extension-blocker'
-import { preloadEmbeddingPipeline } from '@/lib/embeddings'
 
 export function AppWrapper({ children }: { children: React.ReactNode }) {
   useExtensionBlocker()
@@ -12,6 +11,7 @@ export function AppWrapper({ children }: { children: React.ReactNode }) {
   const hasQueuedPreload = useRef(false)
 
   // ✅ Only warm up embeddings on routes that need them
+  // CRITICAL: Use dynamic import to prevent blocking layout.js compilation
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -27,8 +27,14 @@ export function AppWrapper({ children }: { children: React.ReactNode }) {
     let timeoutId: number | null = null
 
     const schedulePreload = () => {
-      const runPreload = () => {
-        void preloadEmbeddingPipeline()
+      const runPreload = async () => {
+        try {
+          // Dynamic import to avoid blocking layout.js chunk loading
+          const { preloadEmbeddingPipeline } = await import('@/lib/embeddings')
+          void preloadEmbeddingPipeline()
+        } catch (error) {
+          console.warn('[AppWrapper] Failed to preload embeddings:', error)
+        }
       }
 
       const win = window as typeof window & {
@@ -37,9 +43,9 @@ export function AppWrapper({ children }: { children: React.ReactNode }) {
       }
 
       if (win.requestIdleCallback) {
-        idleHandle = win.requestIdleCallback(() => runPreload(), { timeout: 2000 })
+        idleHandle = win.requestIdleCallback(() => void runPreload(), { timeout: 2000 })
       } else {
-        timeoutId = window.setTimeout(runPreload, 1200)
+        timeoutId = window.setTimeout(() => void runPreload(), 1200)
       }
     }
 
