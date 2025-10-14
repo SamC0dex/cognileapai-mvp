@@ -11,7 +11,7 @@ import { LandingAnimationProvider } from "@/lib/landing/landing-animation-contex
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen overflow-x-hidden w-full">
       <Header />
       <LandingAnimationProvider>
         <HeroSection />

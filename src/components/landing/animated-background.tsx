@@ -81,13 +81,13 @@ export function AnimatedBackground() {
 
       {/* Primary gradient orb - Teal */}
       <motion.div
-        className="absolute -top-[40%] left-[10%] h-[600px] w-[600px] rounded-full opacity-[0.55] blur-[120px] dark:opacity-30"
+        className="absolute -top-[40%] left-[10%] h-[min(600px,80vw)] w-[min(600px,80vw)] max-w-[600px] rounded-full opacity-[0.55] blur-[80px] sm:blur-[120px] dark:opacity-30"
         style={{
           background: "radial-gradient(circle, rgba(20, 184, 166, 0.4) 0%, transparent 70%)",
         }}
         animate={{
-          x: [0, 50, 0],
-          y: [0, 30, 0],
+          x: [0, 30, 0],
+          y: [0, 20, 0],
           scale: [1, 1.1, 1],
         }}
         transition={{
@@ -99,13 +99,13 @@ export function AnimatedBackground() {
 
       {/* Secondary gradient orb - Amber */}
       <motion.div
-        className="absolute -right-[10%] top-[20%] h-[500px] w-[500px] rounded-full opacity-[0.45] blur-[110px] dark:opacity-25"
+        className="absolute -right-[10%] top-[20%] h-[min(500px,70vw)] w-[min(500px,70vw)] max-w-[500px] rounded-full opacity-[0.45] blur-[70px] sm:blur-[110px] dark:opacity-25"
         style={{
           background: "radial-gradient(circle, rgba(245, 158, 11, 0.35) 0%, transparent 70%)",
         }}
         animate={{
-          x: [0, -30, 0],
-          y: [0, 50, 0],
+          x: [0, -20, 0],
+          y: [0, 30, 0],
           scale: [1, 1.15, 1],
         }}
         transition={{
@@ -118,13 +118,13 @@ export function AnimatedBackground() {
 
       {/* Tertiary gradient orb - Purple accent */}
       <motion.div
-        className="absolute bottom-[10%] left-[40%] h-[400px] w-[400px] rounded-full opacity-[0.35] blur-[95px] dark:opacity-20"
+        className="absolute bottom-[10%] left-[40%] h-[min(400px,60vw)] w-[min(400px,60vw)] max-w-[400px] rounded-full opacity-[0.35] blur-[60px] sm:blur-[95px] dark:opacity-20"
         style={{
           background: "radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, transparent 70%)",
         }}
         animate={{
-          x: [0, 40, 0],
-          y: [0, -40, 0],
+          x: [0, 25, 0],
+          y: [0, -25, 0],
           scale: [1, 1.2, 1],
         }}
         transition={{

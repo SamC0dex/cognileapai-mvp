@@ -144,12 +144,30 @@
   
   * {
     @apply border-border;
+    box-sizing: border-box;
   }
   
+  *::before, *::after {
+    box-sizing: border-box;
+  }
+  
+  html {
+    overflow-x: hidden;
+    width: 100%;
+  }
+
   body {
     @apply bg-background text-foreground font-sans;
     font-feature-settings: "rlig" 1, "calt" 1;
     transition: none;
+    overflow-x: hidden;
+    width: 100%;
+    position: relative;
+  }
+
+  main {
+    overflow-x: hidden;
+    width: 100%;
   }
   
   /* Instant theme switching - keep things snappy without animating layout transforms globally. */

@@ -185,9 +185,9 @@ function ProcessingChamber() {
   }, [isProcessing, particles.length])
 
   return (
-    <div ref={ref} className="relative mx-auto max-w-7xl">
+    <div ref={ref} className="relative mx-auto max-w-7xl px-4 sm:px-6">
       {/* Main Processing Chamber */}
-      <div className="relative min-h-[600px] overflow-hidden rounded-3xl border border-border/50 bg-gradient-to-b from-card/50 to-card/80 backdrop-blur-sm shadow-2xl dark:shadow-none">
+      <div className="relative min-h-[500px] sm:min-h-[600px] overflow-hidden rounded-2xl sm:rounded-3xl border border-border/50 bg-gradient-to-b from-card/50 to-card/80 backdrop-blur-sm shadow-2xl dark:shadow-none">
         {/* Background grid */}
         <div
           className="absolute inset-0 opacity-20"
@@ -228,7 +228,7 @@ function ProcessingChamber() {
         </div>
 
         {/* Processing Layers */}
-        <div className="relative grid grid-cols-1 gap-8 p-8 lg:grid-cols-4">
+        <div className="relative grid grid-cols-1 gap-4 p-4 sm:gap-6 sm:p-6 md:grid-cols-2 lg:grid-cols-4 lg:gap-8 lg:p-8">
           {PROCESSING_LAYERS.map((layer, index) => {
             const isActive = activeStage === index
             const isCompleted = activeStage > index
@@ -372,14 +372,14 @@ function ProcessingChamber() {
         </div>
 
         {/* AI Processor Units */}
-        <div className="relative border-t border-border/30 bg-card/20 p-8">
+        <div className="relative border-t border-border/30 bg-card/20 p-4 sm:p-8">
           <div className="mx-auto max-w-4xl">
-            <div className="mb-4 flex items-center justify-center gap-2">
-              <Brain className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">Intelligent Model Selection</span>
+            <div className="mb-4 flex items-center justify-center gap-2 px-2">
+              <Brain className="h-4 w-4 text-primary flex-shrink-0" />
+              <span className="text-xs sm:text-sm font-medium text-center">Intelligent Model Selection</span>
             </div>
 
-            <div className="flex items-center justify-center gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 max-w-md sm:max-w-none mx-auto">
               {AI_PROCESSORS.map((processor, index) => {
                 const isSelected = selectedProcessor === index
 
@@ -387,23 +387,23 @@ function ProcessingChamber() {
                   <motion.div
                     key={processor.name}
                     animate={{
-                      scale: isSelected ? 1.1 : 1,
+                      scale: isSelected ? 1.05 : 1,
                       opacity: isSelected ? 1 : 0.5,
                     }}
                     transition={{ duration: 0.3 }}
                     className="relative"
                   >
                     <div
-                      className={`flex items-center gap-3 rounded-xl border px-4 py-3 transition-all ${
+                      className={`flex items-center gap-2 sm:gap-3 rounded-xl border px-3 sm:px-4 py-2.5 sm:py-3 transition-all ${
                         isSelected ? "border-primary/50 bg-primary/10 shadow-lg shadow-primary/10" : "border-border/30 bg-card/40 shadow-md dark:shadow-none"
                       }`}
                     >
-                      <span className="text-2xl">{processor.icon}</span>
-                      <div>
-                        <div className="text-xs font-semibold">{processor.name}</div>
+                      <span className="text-xl sm:text-2xl flex-shrink-0">{processor.icon}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-semibold truncate">{processor.name}</div>
                         <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                          <Zap className="h-2.5 w-2.5" />
-                          {processor.speed}
+                          <Zap className="h-2.5 w-2.5 flex-shrink-0" />
+                          <span className="truncate">{processor.speed}</span>
                         </div>
                       </div>
                     </div>
@@ -451,7 +451,7 @@ function ProcessingChamber() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
                   {OUTPUT_MATERIALS.map((material, index) => (
                     <motion.div
                       key={material.type}
@@ -461,10 +461,10 @@ function ProcessingChamber() {
                         delay: index * 0.1,
                         duration: 0.3,
                       }}
-                      className="group relative overflow-hidden rounded-xl border border-border/30 bg-card/60 p-4 text-center transition-all hover:border-primary/50 shadow-md hover:shadow-xl dark:shadow-none"
+                      className="group relative overflow-hidden rounded-xl border border-border/30 bg-card/60 p-3 sm:p-4 text-center transition-all hover:border-primary/50 shadow-md hover:shadow-xl dark:shadow-none"
                     >
                       <motion.div
-                        className="mb-2 text-3xl"
+                        className="mb-2 text-2xl sm:text-3xl"
                         animate={{
                           rotate: [0, 5, -5, 0],
                         }}
@@ -505,10 +505,10 @@ function ProcessingChamber() {
 
 export default function HowItWorksSection() {
   return (
-    <section id="how-it-works" className="relative overflow-hidden py-10 sm:py-16">
+    <section id="how-it-works" className="relative overflow-hidden py-10 sm:py-16 w-full">
       <SectionBackground />
 
-      <div className="relative mx-auto max-w-7xl px-6">
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6">
         {/* Section header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -549,7 +549,7 @@ export default function HowItWorksSection() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.4 }}
-          className="mt-20 grid grid-cols-1 gap-6 sm:grid-cols-3"
+          className="mt-12 sm:mt-16 md:mt-20 grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-3"
         >
           {[
             {

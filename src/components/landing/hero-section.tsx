@@ -22,11 +22,11 @@ export default function HeroSection() {
   const words = headline.split(" ")
 
   return (
-    <section ref={sectionRef} className="relative min-h-[90vh] overflow-hidden flex items-center">
+    <section ref={sectionRef} className="relative min-h-[90vh] overflow-hidden flex items-center w-full">
       {/* Animated mesh gradient background */}
       <AnimatedBackground />
 
-      <div className="relative mx-auto max-w-7xl px-6 py-10 sm:py-14 w-full">
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 py-10 sm:py-14 w-full">
         <motion.div
           style={{ opacity: prefersReducedMotion ? 1 : opacity }}
           className="mx-auto max-w-4xl text-center"
@@ -36,11 +36,11 @@ export default function HeroSection() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.05 }}
-            className="mb-6 inline-flex"
+            className="mb-6 inline-flex px-4"
           >
-            <div className="group relative inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm backdrop-blur-sm hover:border-primary/40 hover:bg-primary/10 transition-all shadow-sm dark:shadow-none">
-              <Sparkles className="h-3.5 w-3.5 text-primary animate-pulse" />
-              <span className="bg-gradient-to-r from-primary to-amber-500 bg-clip-text text-transparent font-medium">
+            <div className="group relative inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 sm:px-4 py-1.5 text-xs sm:text-sm backdrop-blur-sm hover:border-primary/40 hover:bg-primary/10 transition-all shadow-sm dark:shadow-none">
+              <Sparkles className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-primary animate-pulse flex-shrink-0" />
+              <span className="bg-gradient-to-r from-primary to-amber-500 bg-clip-text text-transparent font-medium whitespace-nowrap">
                 Powered by Google Gemini AI • Next-Gen Learning
               </span>
             </div>
@@ -61,7 +61,7 @@ export default function HeroSection() {
                   },
                 },
               }}
-              className="text-balance text-5xl font-bold tracking-tight sm:text-6xl md:text-7xl lg:text-8xl"
+              className="text-balance text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl max-w-full"
             >
               {words.map((word, index) => (
                 <motion.span
@@ -161,13 +161,13 @@ export default function HeroSection() {
                 },
               },
             }}
-            className="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-4xl mx-auto"
+            className="mt-12 sm:mt-16 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 max-w-4xl mx-auto px-2"
           >
             {[
-              { icon: <span className="text-2xl">📝</span>, label: "Smart Summary", color: "from-blue-500 to-cyan-400" },
-              { icon: <span className="text-2xl">📚</span>, label: "Study Guide", color: "from-purple-500 to-pink-400" },
-              { icon: <span className="text-2xl">✍️</span>, label: "Smart Notes", color: "from-amber-500 to-orange-400" },
-              { icon: <span className="text-2xl">🎯</span>, label: "Flashcards", color: "from-teal-500 to-emerald-400" },
+              { icon: <span className="text-xl sm:text-2xl">📝</span>, label: "Smart Summary", color: "from-blue-500 to-cyan-400" },
+              { icon: <span className="text-xl sm:text-2xl">📚</span>, label: "Study Guide", color: "from-purple-500 to-pink-400" },
+              { icon: <span className="text-xl sm:text-2xl">✍️</span>, label: "Smart Notes", color: "from-amber-500 to-orange-400" },
+              { icon: <span className="text-xl sm:text-2xl">🎯</span>, label: "Flashcards", color: "from-teal-500 to-emerald-400" },
             ].map((feature, index) => (
               <motion.div
                 key={index}
@@ -191,14 +191,14 @@ export default function HeroSection() {
                 }}
                 className="group relative"
               >
-                <div className="relative flex items-center justify-center gap-3 rounded-2xl border border-border/50 bg-card/60 px-6 py-4 backdrop-blur-sm hover:border-primary/50 hover:bg-card/80 transition-all shadow-md hover:shadow-lg dark:shadow-none">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${feature.color} text-white shadow-lg group-hover:shadow-xl transition-shadow`}>
+                <div className="relative flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 rounded-xl sm:rounded-2xl border border-border/50 bg-card/60 px-3 sm:px-6 py-3 sm:py-4 backdrop-blur-sm hover:border-primary/50 hover:bg-card/80 transition-all shadow-md hover:shadow-lg dark:shadow-none">
+                  <div className={`flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-xl bg-gradient-to-br ${feature.color} text-white shadow-lg group-hover:shadow-xl transition-shadow flex-shrink-0`}>
                     {feature.icon}
                   </div>
-                  <span className="text-sm font-medium">{feature.label}</span>
+                  <span className="text-xs sm:text-sm font-medium text-center sm:text-left">{feature.label}</span>
 
                   {/* Glow effect on hover */}
-                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary/0 via-primary/5 to-primary/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="absolute inset-0 rounded-xl sm:rounded-2xl bg-gradient-to-r from-primary/0 via-primary/5 to-primary/0 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
               </motion.div>
             ))}

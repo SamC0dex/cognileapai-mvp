@@ -253,10 +253,10 @@ function FeatureCard3D({ feature, index }: { feature: typeof FEATURES[number]; i
 
 export default function FeaturesSection() {
   return (
-    <section id="features" className="relative py-10 sm:py-16 overflow-hidden">
+    <section id="features" className="relative py-10 sm:py-16 overflow-hidden w-full">
       <SectionBackground />
 
-      <div className="relative mx-auto max-w-7xl px-6">
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6">
         {/* Section header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
