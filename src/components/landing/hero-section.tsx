@@ -36,10 +36,10 @@ export default function HeroSection() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.05 }}
-            className="mb-6 inline-flex px-4"
+            className="mb-6 flex justify-center w-full"
           >
-            <div className="group relative inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 sm:px-4 py-1.5 text-xs sm:text-sm backdrop-blur-sm hover:border-primary/40 hover:bg-primary/10 transition-all shadow-sm dark:shadow-none">
-              <Sparkles className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-primary animate-pulse flex-shrink-0" />
+            <div className="group relative inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-full border border-primary/20 bg-primary/5 px-2.5 sm:px-4 py-1.5 text-[10px] sm:text-xs md:text-sm backdrop-blur-sm hover:border-primary/40 hover:bg-primary/10 transition-all shadow-sm dark:shadow-none max-w-full">
+              <Sparkles className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-3.5 md:w-3.5 text-primary animate-pulse flex-shrink-0" />
               <span className="bg-gradient-to-r from-primary to-amber-500 bg-clip-text text-transparent font-medium whitespace-nowrap">
                 Powered by Google Gemini AI • Next-Gen Learning
               </span>
