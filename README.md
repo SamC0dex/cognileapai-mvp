@@ -48,12 +48,11 @@ CogniLeapAI is a web application built for students, researchers, and profession
 - **Quality Preservation** - Maintain AI response quality through intelligent context management
 - **Multi-Level Indicators** - Visual feedback (green → yellow → red) for context usage
 
-### Semantic Search
-- **Free Embeddings** - Client-side semantic search using Transformers.js (no API costs)
-- **Hybrid Search** - Combines semantic similarity with keyword matching for optimal results
-- **Intelligent Chunking** - Structure-aware document segmentation with configurable overlap
-- **Relevance Scoring** - Cosine similarity calculations for accurate context retrieval
-- **Performance Caching** - Multi-layer caching for embeddings and search results
+### Document Intelligence
+- **Smart Context Management** - Efficient document processing for optimal AI responses
+- **Intelligent Chunking** - Structure-aware document segmentation when needed
+- **Large Document Support** - Handles documents up to 1M tokens using Gemini's context window
+- **Performance Optimization** - Efficient context management for fast responses
 
 ### User Interface
 - **Modern Design** - Clean, professional interface with teal/amber color scheme
@@ -79,11 +78,11 @@ CogniLeapAI is a web application built for students, researchers, and profession
 - **@supabase/ssr** - Server-side Supabase client for Next.js integration
 - **Next.js API Routes** - RESTful endpoints with Server-Sent Events for response streaming
 
-### AI & Embeddings
+### AI Processing
 - **Google Gemini** - Large language models (2.5 Pro, Flash, Lite) via @google/genai SDK
-- **Transformers.js** - In-browser ML library for client-side semantic embeddings
-- **mixedbread-ai/mxbai-embed-xsmall-v1** - Lightweight embedding model (384 dimensions, 22MB)
-- **Smart Context System** - Custom RAG implementation with hybrid search and relevance scoring
+- **1M Token Context** - Gemini's massive context window handles large documents natively
+- **Smart Model Selection** - Automatic model choice based on query complexity
+- **Streaming Responses** - Real-time AI output via Server-Sent Events
 
 ### State Management
 - **Zustand 5.0** - Lightweight state management with middleware support
@@ -223,15 +222,12 @@ Intelligent conversation length tracking with progressive warnings:
 - Automatic conversation optimization with summarization
 - Dynamic document context sizing based on conversation length
 
-#### Smart Context System  
-**File**: `src/lib/smart-context.ts`
-
-RAG implementation with free semantic search:
-- Hybrid search (semantic + keyword matching)
-- Client-side embeddings via Transformers.js (no API costs)
-- Structure-aware document chunking with configurable overlap
-- Cosine similarity for relevance scoring
-- Multi-layer caching for performance (embeddings + search results)
+#### Document Context Management
+Efficient document processing leveraging Gemini's 1M token context window:
+- Simple concatenation for most documents (under 100K tokens)
+- Structure-aware chunking for very large documents
+- Token budget management based on conversation length
+- Automatic context sizing for optimal quality
 
 #### Chat System
 **Files**: `src/lib/chat-store.ts`, `src/lib/use-chat.ts`

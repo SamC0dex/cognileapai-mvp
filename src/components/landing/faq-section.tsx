@@ -21,7 +21,7 @@ const FAQ_ITEMS = [
   {
     question: "What makes this different from other study tools?",
     answer:
-      "CogniLeap uses production-grade AI with Google Gemini 2.5 Pro's massive 2M token context window. Unlike basic note-taking apps, we build complete knowledge structures from your documents, enabling deep understanding rather than surface-level summaries. The system understands context, relationships, and can answer complex questions about your materials.",
+      "CogniLeap uses production-grade AI with Google Gemini 2.5 Pro's massive 1M token context window. Unlike basic note-taking apps, we build complete knowledge structures from your documents, enabling deep understanding rather than surface-level summaries. The system understands context, relationships, and can answer complex questions about your materials.",
   },
   {
     question: "How does the AI processing work?",

@@ -39,7 +39,7 @@ const FEATURES = [
   {
     icon: <Search className="h-6 w-6" />,
     title: "Smart Document Chat",
-    desc: "Ask questions about your documents and get instant, intelligent answers. Powered by Google Gemini's massive 2M token context window for deep understanding.",
+    desc: "Ask questions about your documents and get instant, intelligent answers. Powered by Google Gemini's 1M token context window for deep understanding.",
     color: "from-emerald-500 to-teal-400",
     glow: "rgba(16, 185, 129, 0.3)",
   },
