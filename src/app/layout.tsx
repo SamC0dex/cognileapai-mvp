@@ -147,7 +147,7 @@ export default function RootLayout({
             <ErrorManagementProvider>
               <ThemeProvider
                 attribute="class"
-                defaultTheme="light"
+                defaultTheme="dark"
                 enableSystem={false}
                 disableTransitionOnChange
                 storageKey="cognileap-theme"
