@@ -15,20 +15,21 @@ CogniLeapAI is a web application built for students, researchers, and profession
 - **Session Persistence** - Automatic session refresh and state management
 
 ### Document Processing
-- **PDF Upload & Parsing** - Extract text and structure from PDF documents
-- **Section Detection** - Automatic identification of document hierarchy and organization
+- **PDF Upload & Parsing** - Extract complete text content from PDF documents using pdf2json
+- **Full Text Extraction** - Stores entire document content for comprehensive AI analysis
 - **Document Management** - Upload, organize, and delete documents with isolated user storage
 - **Content Extraction Pipeline** - Asynchronous processing with status tracking
-- **Secure File Storage** - Private Supabase storage with time-limited access URLs
+- **Secure File Storage** - Private Supabase storage with time-limited signed URLs
 
 ### Intelligent Chat System
-- **Contextual Conversations** - Chat with documents using relevant sections as context
-- **Streaming Responses** - Real-time AI responses with smooth character-by-character display
-- **Conversation History** - Persistent chat sessions with database and local storage backup
-- **Token Management** - Smart tracking of conversation length with context window monitoring
+- **Contextual Conversations** - Chat with documents using full document content as context
+- **Streaming Responses** - Real-time AI responses with smooth character-by-character display via Server-Sent Events
+- **Stateful Sessions** - Persistent chat sessions with database storage that survive server restarts
+- **Conversation History** - Dual persistence (Supabase database + IndexedDB) with automatic sync
+- **Token Management** - Real-time tracking with progressive warnings (150K caution, 180K warning, 200K critical)
 - **Context Optimization** - Automatic conversation summarization to maintain quality in long chats
 - **Multi-Document Support** - Select and chat with multiple documents simultaneously
-- **Model Selection** - Choose between Gemini models based on response speed vs quality needs
+- **Model Selection** - Choose between Gemini Flash Lite, Flash, or Pro based on response speed vs quality needs
 - **Keyboard Shortcuts** - Efficient navigation (Enter to send, Shift+Enter for newline, Cmd/Ctrl+K to focus)
 
 ### Study Tools Generation
@@ -49,10 +50,10 @@ CogniLeapAI is a web application built for students, researchers, and profession
 - **Multi-Level Indicators** - Visual feedback (green → yellow → red) for context usage
 
 ### Document Intelligence
-- **Smart Context Management** - Efficient document processing for optimal AI responses
-- **Intelligent Chunking** - Structure-aware document segmentation when needed
-- **Large Document Support** - Handles documents up to 1M tokens using Gemini's context window
-- **Performance Optimization** - Efficient context management for fast responses
+- **Full Context Processing** - Leverages Gemini's 1M token context window for complete document understanding
+- **Smart Token Budgeting** - Dynamic context sizing based on conversation length (adapts from 20K to 100K tokens)
+- **Large Document Support** - Handles documents up to 1M tokens efficiently using Gemini's massive context window
+- **Optimized Performance** - Efficient document processing for fast, high-quality AI responses
 
 ### User Interface
 - **Modern Design** - Clean, professional interface with teal/amber color scheme
@@ -195,14 +196,18 @@ src/
 │
 ├── lib/                      # Core utilities
 │   ├── supabase/            # Supabase clients (client, server, middleware)
-│   ├── chat-store.ts        # Chat state management
-│   ├── study-tools-store.ts # Study tools state
-│   ├── flashcard-store.ts   # Flashcard state
-│   ├── token-manager.ts     # Token tracking & optimization
-│   ├── smart-context.ts     # RAG and semantic search
-│   ├── embeddings.ts        # Client-side embeddings
-│   ├── genai-client.ts      # Gemini API integration
-│   └── errors/              # Error handling system
+│   ├── chat-store.ts        # Chat state management (Zustand)
+│   ├── use-chat.ts          # Custom hook for chat operations
+│   ├── study-tools-store.ts # Study tools state (Zustand)
+│   ├── flashcard-store.ts   # Flashcard state (Zustand)
+│   ├── token-manager.ts     # Token tracking & conversation optimization
+│   ├── genai-client.ts      # Google GenAI SDK integration with stateful sessions
+│   ├── session-store.ts     # Database persistence for chat sessions
+│   ├── chat-history.ts      # IndexedDB storage for offline chat access
+│   ├── ai-config.ts         # AI model configuration and selection
+│   ├── study-tools-prompts.ts # AI prompts for study materials
+│   ├── export-utils.ts      # PDF/DOCX export functionality
+│   └── errors/              # Error handling system (translator, logger, types)
 │
 ├── contexts/                 # React contexts
 ├── hooks/                    # Custom hooks
@@ -223,21 +228,23 @@ Intelligent conversation length tracking with progressive warnings:
 - Dynamic document context sizing based on conversation length
 
 #### Document Context Management
-Efficient document processing leveraging Gemini's 1M token context window:
-- Simple concatenation for most documents (under 100K tokens)
-- Structure-aware chunking for very large documents
-- Token budget management based on conversation length
-- Automatic context sizing for optimal quality
+**Implementation**: Full document processing leveraging Gemini's 1M token context window
+- **Complete Context**: Entire document content available to AI for comprehensive understanding
+- **Dynamic Token Budgeting**: Intelligently adjusts document context size based on conversation length (20K to 100K tokens)
+- **Multi-Document Support**: Handles multiple documents simultaneously within optimized token budget
+- **Native Long-Context**: Leverages Gemini's advanced long-context capabilities for superior comprehension
 
 #### Chat System
-**Files**: `src/lib/chat-store.ts`, `src/lib/use-chat.ts`
+**Files**: `src/lib/chat-store.ts`, `src/lib/use-chat.ts`, `src/lib/genai-client.ts`
 
-State management with Zustand:
-- Server-Sent Events for response streaming
-- Dual persistence (Supabase + IndexedDB)
-- Optimistic UI updates with rollback
-- Conversation optimization for long chats
-- Multi-document context support
+Comprehensive state management with Zustand and Google GenAI SDK:
+- **Stateful Sessions**: Database-persistent chat sessions via `genai-client.ts` that survive server restarts
+- **Server-Sent Events**: Real-time streaming with timeout protection (60s total, 10s per chunk)
+- **Dual Persistence**: Supabase database + IndexedDB for offline access
+- **Optimistic UI Updates**: Immediate feedback with automatic rollback on errors
+- **Conversation Optimization**: Automatic summarization to maintain quality in long conversations
+- **Multi-Document Context**: Support for chatting with multiple documents simultaneously
+- **Session Caching**: In-memory session cache with automatic cleanup (1 hour TTL)
 
 #### Study Tools System
 **File**: `src/lib/study-tools-store.ts` (2800+ lines)
@@ -271,24 +278,27 @@ Comprehensive error handling:
 ### Performance
 
 - **Code Splitting** - Dynamic imports for study tools and flashcards
-- **Component Memoization** - React.memo for expensive renders
-- **State Persistence** - localStorage for offline access
-- **Efficient Streaming** - Smooth SSE with character-by-character display
+- **Component Memoization** - React.memo for expensive renders (chat messages, markdown)
+- **State Persistence** - localStorage and IndexedDB for offline access
+- **Efficient Streaming** - Smooth SSE with batched character rendering (8 chars per 100ms)
 - **Bundle Optimization** - Tree shaking and optimized imports
-- **Caching** - Multi-layer caching for embeddings, search, and API responses
+- **Document Caching** - In-memory document context cache (5 minute TTL)
+- **Session Caching** - Active chat sessions cached in memory with automatic cleanup
 
 ## Database Schema
 
 Core tables in Supabase PostgreSQL:
-- **users** - User accounts and authentication
-- **documents** - PDF metadata and file storage references
+- **users** - User accounts and authentication (via Supabase Auth)
+- **documents** - PDF metadata, storage paths, and full extracted text content (`document_content` field)
 - **sections** - Hierarchical document sections with parent-child relationships
-- **conversations** - Chat session metadata
-- **messages** - Chat messages with role, content, and token counts
+- **conversations** - Chat session metadata with token breakdown tracking
+- **messages** - Chat messages with role, content, sequence numbers, and metadata (tokens, model info)
 - **outputs** - Generated study materials (guides, summaries, notes) stored as JSONB
-- **chat_sessions** - Stateful sessions for persistent conversation memory
+- **chat_sessions** - Persistent session data for stateful conversations (conversation history, model config)
 
 All tables protected by Row Level Security policies ensuring complete user data isolation.
+
+
 
 ## Contributing
 

@@ -26,17 +26,17 @@ const FAQ_ITEMS = [
   {
     question: "How does the AI processing work?",
     answer:
-      "We use a sophisticated multi-stage pipeline: (1) PDF parsing with structure-aware extraction, (2) Neural processing with Google Gemini for concept identification and relationship mapping, (3) Intelligent content generation tailored to your learning style. All processing happens in under 60 seconds using Gemini's advanced language understanding.",
+      "We use a sophisticated multi-stage pipeline: (1) PDF parsing with complete text extraction, (2) AI analysis with Google Gemini for concept identification and relationship mapping, (3) Intelligent content generation tailored to your learning style. All processing happens in under 60 seconds using Gemini's advanced language understanding.",
   },
   {
     question: "What document formats are supported?",
     answer:
-      "Currently optimized for PDF documents including research papers, textbooks, lecture slides, and technical documentation. Our OCR and structure-aware parsing handles complex layouts, tables, equations, and images while preserving document hierarchy and contextual relationships.",
+      "Currently optimized for PDF documents including research papers, textbooks, lecture slides, and technical documentation. Our advanced text extraction handles complex layouts, text-based tables, and structured content while preserving document hierarchy and contextual relationships.",
   },
   {
     question: "Can I export the generated study materials?",
     answer:
-      "Yes! All generated content (summaries, notes, study guides, and flashcards) can be exported to professionally formatted PDF or DOCX files. Exports maintain proper formatting, include all visual elements, and are ready for printing or sharing. You can also access everything offline once generated.",
+      "Yes! All generated content (summaries, notes, study guides, and flashcards) can be exported to professionally formatted PDF or DOCX files. Exports maintain proper formatting, include all visual elements, and are ready for printing or sharing. Generated materials are cached locally for quick access.",
   },
   {
     question: "Is my data secure and private?",
