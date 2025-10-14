@@ -67,6 +67,7 @@ export interface RetryableError {
   isRetryable: boolean
   retryAfterMs?: number
   reason?: string
+  isModelOverload?: boolean // Flag to distinguish model overload from other retryable errors
 }
 
 class BackgroundRetryManager {
@@ -210,79 +211,107 @@ class BackgroundRetryManager {
    * Classify error as retryable or not - Enhanced for Google GenAI SDK
    */
   static classifyError(error: Error): RetryableError {
-    const message = error.message.toLowerCase()
+    // Extract actual error message from nested Google GenAI error structure
+    let message = error.message
+    let statusCode: number | null = null
+    
+    // Google GenAI SDK returns errors as stringified JSON objects
+    // Format: {"error":{"code":503,"message":"The model is overloaded...","status":"UNAVAILABLE"}}
+    try {
+      const parsed = JSON.parse(message)
+      if (parsed.error && typeof parsed.error.message === 'string') {
+        message = parsed.error.message
+        statusCode = parsed.error.code || null
+        console.log('[RetryManager] Parsed nested error:', { message, code: statusCode, status: parsed.error.status })
+      } else if (typeof parsed.message === 'string') {
+        message = parsed.message
+      }
+    } catch {
+      // Not JSON, use as-is
+    }
+    
+    const messageLower = message.toLowerCase()
 
-    // Google GenAI specific patterns - Extract GoogleRpcStatus if present
-    const googleRpcMatch = error.message.match(/status:\s*(\d+)/) ||
-                          message.match(/code:\s*(\d+)/)
-    const statusCode = googleRpcMatch ? parseInt(googleRpcMatch[1]) : null
+    // Use statusCode from parsed error if available, otherwise try to extract from message
+    if (!statusCode) {
+      const googleRpcMatch = error.message.match(/status:\s*(\d+)/) ||
+                            messageLower.match(/code:\s*(\d+)/)
+      statusCode = googleRpcMatch ? parseInt(googleRpcMatch[1]) : null
+    }
 
     // Google GenAI specific rate limiting (429 or status 8)
     if (statusCode === 429 || statusCode === 8 ||
-        message.includes('rate limit') || message.includes('too many requests') ||
-        message.includes('quota exceeded') || message.includes('resource_exhausted')) {
+        messageLower.includes('rate limit') || messageLower.includes('too many requests') ||
+        messageLower.includes('quota exceeded') || messageLower.includes('resource_exhausted')) {
       return { isRetryable: true, retryAfterMs: 90000, reason: 'Google AI rate limited' }
+    }
+
+    // Google GenAI model overloaded (503-like behavior)
+    // CRITICAL: Model overload should trigger immediate fallback, not retries
+    // Check this BEFORE generic "unavailable" to ensure proper handling
+    if (messageLower.includes('overloaded') || messageLower.includes('model is overloaded') ||
+        (statusCode === 503 && messageLower.includes('overload'))) {
+      return { 
+        isRetryable: true, 
+        retryAfterMs: 0, // Immediate fallback, no delay
+        reason: 'Google AI model overloaded',
+        isModelOverload: true // Flag for smart fallback logic
+      }
     }
 
     // Google GenAI server unavailable (503 or status 14)
     if (statusCode === 503 || statusCode === 14 ||
-        message.includes('service unavailable') || message.includes('unavailable')) {
+        messageLower.includes('service unavailable') || messageLower.includes('unavailable')) {
       return { isRetryable: true, retryAfterMs: 30000, reason: 'Google AI service unavailable' }
     }
 
     // Google GenAI internal errors (500 or status 13)
     if (statusCode === 500 || statusCode === 13 ||
-        message.includes('internal error') || message.includes('internal_error')) {
+        messageLower.includes('internal error') || messageLower.includes('internal_error')) {
       return { isRetryable: true, retryAfterMs: 45000, reason: 'Google AI internal error' }
     }
 
     // Google GenAI timeout errors (504 or status 4)
     if (statusCode === 504 || statusCode === 4 ||
-        message.includes('deadline exceeded') || message.includes('timeout')) {
+        messageLower.includes('deadline exceeded') || messageLower.includes('timeout')) {
       return { isRetryable: true, retryAfterMs: 60000, reason: 'Google AI timeout' }
     }
 
     // Network/connectivity issues
-    if (message.includes('network') || message.includes('connection') ||
-        message.includes('failed to fetch') || message.includes('fetch')) {
+    if (messageLower.includes('network') || messageLower.includes('connection') ||
+        messageLower.includes('failed to fetch') || messageLower.includes('fetch')) {
       return { isRetryable: true, reason: 'Network error' }
     }
 
     // Google GenAI authentication/permission errors (401, 403, status 7, 16)
     if (statusCode === 401 || statusCode === 403 || statusCode === 7 || statusCode === 16 ||
-        message.includes('unauthorized') || message.includes('forbidden') ||
-        message.includes('api key') || message.includes('authentication') ||
-        message.includes('permission_denied') || message.includes('unauthenticated')) {
+        messageLower.includes('unauthorized') || messageLower.includes('forbidden') ||
+        messageLower.includes('api key') || messageLower.includes('authentication') ||
+        messageLower.includes('permission_denied') || messageLower.includes('unauthenticated')) {
       return { isRetryable: false, reason: 'Google AI authentication error' }
     }
 
     // Google GenAI invalid request errors (400, status 3)
     if (statusCode === 400 || statusCode === 3 ||
-        message.includes('invalid_argument') || message.includes('bad request')) {
+        messageLower.includes('invalid_argument') || messageLower.includes('bad request')) {
       return { isRetryable: false, reason: 'Google AI invalid request' }
     }
 
     // Google GenAI not found errors (404, status 5)
     if (statusCode === 404 || statusCode === 5 ||
-        message.includes('not_found') || message.includes('not found')) {
+        messageLower.includes('not_found') || messageLower.includes('not found')) {
       return { isRetryable: false, reason: 'Google AI resource not found' }
     }
 
     // Google GenAI content filtering/safety errors (status 3 with safety)
-    if (message.includes('safety') || message.includes('content filter') ||
-        message.includes('blocked') || message.includes('policy violation')) {
+    if (messageLower.includes('safety') || messageLower.includes('content filter') ||
+        messageLower.includes('blocked') || messageLower.includes('policy violation')) {
       return { isRetryable: false, reason: 'Google AI content safety block' }
     }
 
-    // Google GenAI model overloaded (503-like behavior)
-    if (message.includes('overloaded') || message.includes('busy') ||
-        message.includes('capacity') || message.includes('model unavailable')) {
-      return { isRetryable: true, retryAfterMs: 120000, reason: 'Google AI model overloaded' }
-    }
-
     // Legacy patterns for backward compatibility
-    if (message.includes('500') || message.includes('502') ||
-        message.includes('503') || message.includes('504')) {
+    if (messageLower.includes('500') || messageLower.includes('502') ||
+        messageLower.includes('503') || messageLower.includes('504')) {
       return { isRetryable: true, reason: 'Server error' }
     }
 

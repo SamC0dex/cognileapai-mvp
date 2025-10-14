@@ -1034,6 +1034,42 @@ export const useStudyToolsStore = create<StudyToolsStore>()(
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
         console.error('[StudyToolsStore] API Error:', errorData)
 
+        // CRITICAL: Handle "all models overloaded" specially - clean UI, no empty card
+        if (errorData.errorType === 'all_models_overloaded') {
+          console.log('[StudyToolsStore] All models overloaded detected - removing placeholder and showing friendly error')
+          
+          // Remove the placeholder content completely (don't keep empty failed card)
+          set(state => ({
+            generatedContent: state.generatedContent.filter(content => content.id !== generationId),
+            error: errorData.error,
+            friendlyError: {
+              id: crypto.randomUUID(),
+              category: 'model-overload',
+              severity: 'warning',
+              title: 'AI Temporarily Unavailable',
+              message: errorData.error || 'Our AI is experiencing high demand. Please try again in a few minutes.',
+              icon: 'robot',
+              details: errorData.details,
+              actions: [
+                { id: 'dismiss', label: 'Got it', variant: 'primary', intent: 'dismiss' },
+                { id: 'retry', label: 'Try Again', variant: 'secondary', intent: 'retry', icon: 'refresh' }
+              ]
+            },
+            lastFailedGeneration: null // Clear this since we removed the placeholder
+          }))
+
+          // Also remove flashcard placeholder if applicable
+          if (type === 'flashcards') {
+            const flashcardStoreHook = useFlashcardStoreRef ?? await ensureFlashcardStore()
+            const flashcardStore = flashcardStoreHook.getState()
+            const updatedSets = flashcardStore.flashcardSets.filter((set: FlashcardSet) => set.id !== generationId)
+            flashcardStoreHook.setState({ flashcardSets: updatedSets })
+          }
+
+          cleanupGeneration(generationId)
+          return // Exit early - don't throw error to prevent normal error handling
+        }
+
         // Handle specific error cases
         if (response.status === 503 || errorData.error?.includes('overloaded')) {
           throw new Error(`${STUDY_TOOLS[type].name} service is temporarily overloaded. Please try again in a few minutes.`)

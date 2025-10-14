@@ -19,6 +19,18 @@ export const maxDuration = 60
  * Multi-Model Fallback Strategy with Content Chunking
  * Implements sophisticated retry and fallback mechanisms for study tool generation
  */
+
+/**
+ * Custom error for when all models are overloaded
+ * This gets special handling in the UI (removes empty card, shows friendly popup)
+ */
+class AllModelsOverloadedError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'AllModelsOverloadedError'
+  }
+}
+
 interface FallbackResult {
   resultText: string
   modelUsed: string
@@ -176,6 +188,9 @@ async function generateWithFallback(
   const estimatedTokens = Math.ceil((systemPrompt.length + userPrompt.length) / 4)
   console.log(`[Fallback] Estimated input tokens: ${estimatedTokens}`)
 
+  // Track if all models failed due to overload specifically
+  let allModelsOverloaded = true
+
   for (let modelIndex = 0; modelIndex < MODEL_HIERARCHY.length; modelIndex++) {
     const modelConfig = MODEL_HIERARCHY[modelIndex]
     const modelStartTime = Date.now()
@@ -239,6 +254,26 @@ async function generateWithFallback(
         const retryConfig = getRetryConfigForError(errorInstance.message)
         const errorClassification = classifyError(errorInstance)
 
+        // DEBUG: Log the classification result
+        console.log(`[Fallback] Error classification for ${modelConfig.name}:`, {
+          isRetryable: errorClassification.isRetryable,
+          isModelOverload: errorClassification.isModelOverload,
+          reason: errorClassification.reason,
+          messageSnippet: errorInstance.message.substring(0, 200)
+        })
+
+        // Track if this is NOT a model overload error
+        if (!errorClassification.isModelOverload) {
+          allModelsOverloaded = false
+        }
+
+        // CRITICAL: For model overload, skip retries and immediately fallback to next model
+        // Retries don't help with overload (it's indefinite), but they DO help with rate limits
+        if (errorClassification.isModelOverload) {
+          console.log(`[Fallback] Model overload detected - skipping retries for ${modelConfig.name}, immediate fallback to next model`)
+          break // Immediately try next model in hierarchy
+        }
+
         // If this is the last attempt for this model, or error is non-retryable, break to try next model
         if (attempt >= modelConfig.maxRetries || !errorClassification.isRetryable) {
           console.log(`[Fallback] ${modelConfig.name} exhausted (${attempt}/${modelConfig.maxRetries} attempts) or non-retryable error`)
@@ -257,9 +292,17 @@ async function generateWithFallback(
     }
 
     // If we get here, all attempts for this model failed
-    // For the last model, rethrow the error
+    // For the last model, check if all models failed due to overload
     if (modelIndex === MODEL_HIERARCHY.length - 1) {
       console.error(`[Fallback] All models exhausted`)
+      
+      // If all models failed specifically due to overload, throw special error
+      if (allModelsOverloaded) {
+        console.log(`[Fallback] All models overloaded - throwing AllModelsOverloadedError`)
+        throw new AllModelsOverloadedError('All AI models are currently experiencing high demand. Please try again in a few minutes.')
+      }
+      
+      // Otherwise throw the last error
       throw lastError || new Error('All fallback models failed')
     }
 
@@ -636,8 +679,8 @@ export async function POST(req: NextRequest) {
           .update({
             payload,
             document_id: resolvedDocumentId,
-            conversation_id: resolvedConversationId,
-            updated_at: nowIso
+            conversation_id: resolvedConversationId
+            // Note: outputs table doesn't have updated_at column, only created_at
           })
           .eq('id', existingOutput.id)
           .select('id')
@@ -737,6 +780,21 @@ export async function POST(req: NextRequest) {
     console.error('[StudyTools] Error name:', errorInstance.name)
     console.error('[StudyTools] Error message:', errorInstance.message)
     console.error('[StudyTools] Error stack:', errorInstance.stack)
+
+    // SPECIAL HANDLING: All models overloaded - return special error for clean UI handling
+    if (errorInstance instanceof AllModelsOverloadedError) {
+      console.log('[StudyTools] All models overloaded - returning special error response')
+      return NextResponse.json(
+        {
+          error: errorInstance.message,
+          errorType: 'all_models_overloaded', // Special flag for frontend
+          retryable: false, // Don't auto-retry, user should manually retry later
+          reason: 'All AI models temporarily overloaded',
+          details: 'Our AI is experiencing unusually high demand right now. Please try again in a few minutes.'
+        },
+        { status: 503 }
+      )
+    }
 
     // Classify error for retry eligibility
     const errorClassification = classifyError(errorInstance)
