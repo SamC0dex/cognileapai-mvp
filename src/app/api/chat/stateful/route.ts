@@ -1,8 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createClient as createAuthClient } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
-import { buildContextPrompt } from '@/lib/smart-context'
-import { isEmbeddingsReady } from '@/lib/embeddings'
 import {
   createStatefulChat,
   sendStatefulMessage,
@@ -177,55 +175,17 @@ export async function POST(req: NextRequest) {
 
                 console.log(`[StatefulChat] Total document tokens: ${totalTokens.toLocaleString()}`)
 
-                if (totalTokens >= 100000) {
-                  // Use Smart RAG for large documents
-                  console.log(`[StatefulChat] Using Smart RAG for large document collection`)
+                // Simple concatenation for all documents - let Gemini handle the context
+                console.log(`[StatefulChat] Using simple concatenation for documents`)
+                const budgetChars = documentTokenBudget * 4
+                let remainingChars = budgetChars
 
-                  try {
-                    const embeddingsAvailable = await isEmbeddingsReady()
-                    const combinedContent = processedDocs.map(doc =>
-                      `=== ${doc.title} ===\n${doc.content}`).join('\n\n')
-
-                    documentContext = await buildContextPrompt(
-                      lastMessage.content,
-                      `${processedDocs.length} Documents`,
-                      combinedContent,
-                      {
-                        maxTokens: documentTokenBudget,
-                        chunkSize: 800,
-                        overlap: 200,
-                        useSemanticSearch: embeddingsAvailable,
-                        hybridWeight: 0.6,
-                        generateEmbeddings: true,
-                        minRelevanceScore: 0.05,
-                        maxChunks: 20
-                      }
-                    )
-                  } catch (contextError) {
-                    console.warn('[StatefulChat] RAG failed, using simple context:', contextError)
-                    const fallbackBudgetChars = documentTokenBudget * 4
-                    let remainingChars = fallbackBudgetChars
-
-                    documentContext = processedDocs.map(doc => {
-                      if (remainingChars <= 0) return ''
-                      const snippet = doc.content.slice(0, remainingChars)
-                      remainingChars = Math.max(0, remainingChars - snippet.length)
-                      return `\n\n=== ${doc.title} ===\n${snippet}`
-                    }).join('').slice(0, fallbackBudgetChars)
-                  }
-                } else {
-                  // Simple concatenation for smaller documents
-                  console.log(`[StatefulChat] Using simple concatenation for small documents`)
-                  const budgetChars = documentTokenBudget * 4
-                  let remainingChars = budgetChars
-
-                  documentContext = processedDocs.map(doc => {
-                    if (remainingChars <= 0) return ''
-                    const snippet = doc.content.slice(0, remainingChars)
-                    remainingChars = Math.max(0, remainingChars - snippet.length)
-                    return `\n\n=== ${doc.title} ===\n${snippet}`
-                  }).join('').slice(0, budgetChars)
-                }
+                documentContext = processedDocs.map(doc => {
+                  if (remainingChars <= 0) return ''
+                  const snippet = doc.content.slice(0, remainingChars)
+                  remainingChars = Math.max(0, remainingChars - snippet.length)
+                  return `\n\n=== ${doc.title} ===\n${snippet}`
+                }).join('').slice(0, budgetChars)
               }
             }
           } catch (error) {

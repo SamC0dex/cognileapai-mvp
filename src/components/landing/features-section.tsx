@@ -38,8 +38,8 @@ const FEATURES = [
   },
   {
     icon: <Search className="h-6 w-6" />,
-    title: "FREE Semantic Search",
-    desc: "Find exactly what you need with advanced AI-powered search. Understands context and meaning, not just keywords—completely FREE with no API costs.",
+    title: "Smart Document Chat",
+    desc: "Ask questions about your documents and get instant, intelligent answers. Powered by Google Gemini's massive 2M token context window for deep understanding.",
     color: "from-emerald-500 to-teal-400",
     glow: "rgba(16, 185, 129, 0.3)",
   },
@@ -300,7 +300,7 @@ export default function FeaturesSection() {
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-6 py-3 text-sm font-medium backdrop-blur-sm">
             <Brain className="h-4 w-4" />
             <span>
-              Built with <span className="font-semibold text-primary">Google Gemini Pro</span> • <span className="font-semibold text-primary">Transformers.js</span> • <span className="font-semibold text-primary">Next.js 15</span>
+              Built with <span className="font-semibold text-primary">Google Gemini 2.5 Pro</span> • <span className="font-semibold text-primary">Next.js 15</span>
             </span>
           </div>
         </motion.div>

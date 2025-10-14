@@ -555,7 +555,7 @@ export default function HowItWorksSection() {
             {
               icon: <Brain className="h-6 w-6" />,
               title: "Intelligent Processing",
-              desc: "Multi-layered AI analysis with semantic understanding",
+              desc: "Multi-layered AI analysis with deep document understanding",
               color: "from-blue-500 to-cyan-400",
             },
             {

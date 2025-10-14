@@ -21,12 +21,12 @@ const FAQ_ITEMS = [
   {
     question: "What makes this different from other study tools?",
     answer:
-      "CogniLeap uses production-grade AI with Gemini 2.5 Pro and FREE semantic search via Transformers.js. Unlike basic note-taking apps, we build complete knowledge graphs from your documents, enabling deep understanding rather than surface-level summaries. The system understands context, relationships, and can answer complex questions about your materials.",
+      "CogniLeap uses production-grade AI with Google Gemini 2.5 Pro's massive 2M token context window. Unlike basic note-taking apps, we build complete knowledge structures from your documents, enabling deep understanding rather than surface-level summaries. The system understands context, relationships, and can answer complex questions about your materials.",
   },
   {
     question: "How does the AI processing work?",
     answer:
-      "We use a sophisticated multi-stage pipeline: (1) PDF parsing with structure-aware extraction, (2) Semantic embedding generation using 384-dimensional vectors, (3) Neural processing with Google Gemini for concept identification and relationship mapping, (4) Intelligent content generation tailored to your learning style. All processing happens in under 60 seconds.",
+      "We use a sophisticated multi-stage pipeline: (1) PDF parsing with structure-aware extraction, (2) Neural processing with Google Gemini for concept identification and relationship mapping, (3) Intelligent content generation tailored to your learning style. All processing happens in under 60 seconds using Gemini's advanced language understanding.",
   },
   {
     question: "What document formats are supported?",
@@ -41,12 +41,12 @@ const FAQ_ITEMS = [
   {
     question: "Is my data secure and private?",
     answer:
-      "Absolutely. All documents are stored in private Supabase storage with Row Level Security (RLS) enabled. Your data is isolated per user, processing happens on secure servers, and we never share or train models on your content. Semantic search runs locally in your browser using Transformers.js for zero API costs and complete privacy.",
+      "Absolutely. All documents are stored in private Supabase storage with Row Level Security (RLS) enabled. Your data is isolated per user, processing happens on secure servers, and we never share or train models on your content. All AI processing uses Google's secure infrastructure with enterprise-grade security.",
   },
   {
     question: "What are the technical requirements?",
     answer:
-      "CogniLeap runs in any modern web browser (Chrome, Firefox, Safari, Edge). For optimal performance, we recommend 8GB+ RAM and a stable internet connection during document upload and AI processing. Once materials are generated, they're cached locally for offline access. The semantic search model (22MB) downloads once and runs entirely in your browser.",
+      "CogniLeap runs in any modern web browser (Chrome, Firefox, Safari, Edge). For optimal performance, we recommend 4GB+ RAM and a stable internet connection during document upload and AI processing. Once materials are generated, they're cached locally for offline access and fast retrieval.",
   },
 ]
 
@@ -239,7 +239,7 @@ export default function FaqSection() {
               </p>
               <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                 <span className="inline-flex h-2 w-2 rounded-full bg-teal-500" />
-                <span>Built with Next.js 15 • Google Gemini 2.5 Pro • Transformers.js</span>
+                <span>Built with Next.js 15 • Google Gemini 2.5 Pro</span>
               </div>
             </div>
           </div>

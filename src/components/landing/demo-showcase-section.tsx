@@ -26,7 +26,7 @@ const PROCESSING_STAGES = [
     id: "analyze",
     icon: <Brain className="h-5 w-5" />,
     title: "AI Analysis",
-    description: "Generating semantic embeddings and building knowledge graph",
+    description: "Processing document structure and identifying key concepts",
     duration: 1000,
     color: "from-purple-500 to-pink-400",
   },
@@ -399,8 +399,7 @@ export default function DemoShowcaseSection() {
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-6 py-3 text-sm font-medium backdrop-blur-sm shadow-md dark:shadow-none">
             <Brain className="h-4 w-4" />
             <span>
-              Powered by <span className="font-semibold text-primary">Gemini 2.5 Pro</span> •{" "}
-              <span className="font-semibold text-primary">Transformers.js</span> •{" "}
+              Powered by <span className="font-semibold text-primary">Google Gemini 2.5 Pro</span> •{" "}
               <span className="font-semibold text-primary">Real-time Streaming</span>
             </span>
           </div>
