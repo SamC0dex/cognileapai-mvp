@@ -12,8 +12,9 @@ const serviceSupabase = createClient(
 )
 
 
-// Allow longer execution time for comprehensive generation
-export const maxDuration = 60
+// Vercel Hobby (free) tier: 10s max for serverless functions
+// Pro tier allows up to 60s
+export const maxDuration = 10
 
 /**
  * Multi-Model Fallback Strategy with Content Chunking
