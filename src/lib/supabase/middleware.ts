@@ -27,13 +27,17 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // Get session - this will automatically refresh if refresh token is valid
-  // If refresh token is invalid/missing, it returns null without throwing
-  const { data: { session }, error } = await supabase.auth.getSession()
+  // IMPORTANT: Call getUser() instead of using session.user directly
+  // This validates the JWT with Supabase Auth server for security
+  // It also automatically refreshes expired tokens
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
 
-  // Handle refresh token errors gracefully
+  // Handle authentication errors gracefully
   if (error) {
-    console.error('Session refresh error:', error.message)
+    console.error('Session validation error:', error.message)
     
     // Clear invalid session cookies
     const cookiesToClear = [
@@ -51,19 +55,11 @@ export async function updateSession(request: NextRequest) {
       const url = request.nextUrl.clone()
       url.pathname = '/auth/login'
       url.searchParams.set('redirect', request.nextUrl.pathname)
-      
-      // Add appropriate error message based on error type
-      if (error.message.includes('refresh_token_not_found')) {
-        url.searchParams.set('error', 'refresh_token_not_found')
-      } else {
-        url.searchParams.set('error', 'session_expired')
-      }
+      url.searchParams.set('error', 'session_expired')
       
       return NextResponse.redirect(url)
     }
   }
-
-  const user = session?.user
 
   // Protect routes that require authentication
   if (
