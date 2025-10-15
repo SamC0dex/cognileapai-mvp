@@ -9,6 +9,18 @@ const serviceSupabase = createServiceClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+// Trusted hosts for production security (prevents header spoofing)
+const ALLOWED_HOSTS = [
+  'cognileapai.com',
+  'www.cognileapai.com',
+  'localhost',
+  'localhost:3000',
+  'localhost:8080',
+]
+
+// Helper to check if we're in development mode
+const isDevelopment = process.env.NODE_ENV === 'development'
+
 function isValidRedirect(url: string | null): url is string {
   if (!url) return false
   if (!url.startsWith('/')) return false
@@ -19,10 +31,15 @@ function isValidRedirect(url: string | null): url is string {
 
 /**
  * OAuth Callback Route Handler
- *
- * Handles the OAuth redirect after Google login.
- * Exchanges the authorization code for a session and redirects the user.
- *
+ * 
+ * Handles OAuth redirects after Google login and email confirmation.
+ * Exchanges authorization code for session and redirects to dashboard.
+ * 
+ * Security Features:
+ * - Validates forwarded headers against allowed hosts
+ * - Validates redirect URLs are relative paths only
+ * - Emergency profile creation fallback with service role
+ * 
  * @param request - The incoming request with code and optional next parameter
  * @returns Redirect response to dashboard or error page
  */
@@ -32,24 +49,30 @@ export async function GET(request: NextRequest) {
     const code = requestUrl.searchParams.get('code')
     const nextParam = requestUrl.searchParams.get('next') ?? requestUrl.searchParams.get('redirect')
 
-    // DEBUG: Log request info to diagnose localhost:8080 issue
-    console.log('?? CALLBACK DEBUG:', {
-      url: request.url,
-      origin: requestUrl.origin,
-      host: request.headers.get('host'),
-      'x-forwarded-host': request.headers.get('x-forwarded-host'),
-      'x-forwarded-proto': request.headers.get('x-forwarded-proto'),
-      nextParam,
-    })
-
     // Get proper origin from headers (handles Railway/Vercel proxies)
+    // Security: Validate forwarded host against allowed list to prevent header spoofing
     const forwardedHost = request.headers.get('x-forwarded-host')
     const forwardedProto = request.headers.get('x-forwarded-proto')
-    const origin = forwardedHost && forwardedProto
+    
+    // Validate that forwarded host is trusted
+    const isValidHost = forwardedHost && ALLOWED_HOSTS.includes(forwardedHost)
+    
+    const origin = isValidHost && forwardedProto
       ? `${forwardedProto}://${forwardedHost}`
       : requestUrl.origin
 
-    console.log('?? USING ORIGIN:', origin)
+    // Debug logging (development only)
+    if (isDevelopment) {
+      console.log('Auth Callback Debug:', {
+        url: request.url,
+        requestOrigin: requestUrl.origin,
+        forwardedHost,
+        forwardedProto,
+        isValidHost,
+        computedOrigin: origin,
+        nextParam,
+      })
+    }
 
     // Validate code parameter
     if (!code) {
@@ -89,11 +112,10 @@ export async function GET(request: NextRequest) {
 
       if (!existingProfile) {
         // ALERT: Profile should have been created by trigger!
-        console.error('?? CRITICAL: Database trigger failed to create profile!', {
+        console.error('CRITICAL: Database trigger failed to create profile', {
           userId: data.user.id,
           email: data.user.email,
           timestamp: new Date().toISOString(),
-          message: 'Trigger on_auth_user_created may be disabled. Check Supabase Dashboard ? Database ? Triggers'
         })
 
         // Emergency fallback: Create profile manually using service role
@@ -112,28 +134,37 @@ export async function GET(request: NextRequest) {
         })
 
         if (profileError) {
-          console.error('? Emergency profile creation failed:', profileError.message)
+          console.error('Emergency profile creation failed:', profileError.message)
           // Fail auth flow - user cannot proceed without profile due to RLS
           return NextResponse.redirect(
             `${origin}/auth/login?error=profile_creation_failed`
           )
         } else {
-          console.warn('?? Profile created via emergency fallback (trigger bypassed)')
+          console.warn('Profile created via emergency fallback (trigger bypassed)')
         }
       }
     }
 
     // Success - redirect to the requested page or dashboard
     const finalRedirect = `${origin}${redirectUrl}`
-    console.log('? REDIRECTING TO:', finalRedirect)
+    
+    if (isDevelopment) {
+      console.log('Auth successful, redirecting to:', finalRedirect)
+    }
+    
     return NextResponse.redirect(finalRedirect)
   } catch (error) {
     console.error('Unexpected error in OAuth callback:', error)
+    
+    // Get origin for error redirect with same validation
     const errorHost = request.headers.get('x-forwarded-host')
     const errorProto = request.headers.get('x-forwarded-proto')
-    const errorOrigin = errorHost && errorProto
+    const isValidErrorHost = errorHost && ALLOWED_HOSTS.includes(errorHost)
+    
+    const errorOrigin = isValidErrorHost && errorProto
       ? `${errorProto}://${errorHost}`
       : new URL(request.url).origin
+      
     return NextResponse.redirect(
       `${errorOrigin}/auth/login?error=auth_callback_error`
     )
