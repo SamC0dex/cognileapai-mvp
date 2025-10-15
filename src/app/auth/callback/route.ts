@@ -67,14 +67,18 @@ export async function GET(request: NextRequest) {
         const avatarUrl = data.user.user_metadata?.avatar_url || null
 
         // Create profile
-        await supabase.from('profiles').insert({
+        const { error: profileError } = await supabase.from('profiles').insert({
           id: data.user.id,
           email: data.user.email || '',
           full_name: fullName,
           avatar_url: avatarUrl
         })
 
-        console.log('Profile created for user:', data.user.id)
+        if (profileError) {
+          console.error('Profile creation error (may be created by trigger):', profileError.message)
+        } else {
+          console.log('Profile created for user:', data.user.id)
+        }
       }
     }
 
