@@ -27,11 +27,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const userId = user?.id ?? null
 
   useEffect(() => {
-    // Get initial session
+    // Get initial session with error handling
     const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setUser(session?.user ?? null)
-      setLoading(false)
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        // Handle refresh token errors
+        if (error) {
+          console.error('[Auth] Session error:', error.message)
+          
+          // If it's a refresh token error, clear the session
+          if (
+            error.message.includes('refresh_token_not_found') ||
+            error.message.includes('Invalid Refresh Token')
+          ) {
+            console.log('[Auth] Invalid refresh token detected, clearing session')
+            await supabase.auth.signOut()
+            
+            // Redirect to login if on protected route
+            if (typeof window !== 'undefined' && window.location.pathname.startsWith('/dashboard')) {
+              window.location.href = '/auth/login?error=session_expired'
+            }
+          }
+          
+          setUser(null)
+          setLoading(false)
+          return
+        }
+        
+        setUser(session?.user ?? null)
+        setLoading(false)
+      } catch (err) {
+        console.error('[Auth] Unexpected error getting session:', err)
+        setUser(null)
+        setLoading(false)
+      }
     }
 
     getSession()

@@ -4,7 +4,8 @@ import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Loader2 } from 'lucide-react'
+import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { EmailVerificationDialog } from '@/components/auth/email-verification-dialog'
 
 // Validate redirect URL to prevent open redirect vulnerability
 function isValidRedirect(url: string): boolean {
@@ -26,8 +27,37 @@ function LoginForm() {
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showVerificationDialog, setShowVerificationDialog] = useState(false)
+  const [unverifiedEmail, setUnverifiedEmail] = useState('')
+
+  // Handle URL error parameters (session expired, etc.)
+  useEffect(() => {
+    const errorParam = searchParams.get('error')
+    if (errorParam) {
+      switch (errorParam) {
+        case 'session_expired':
+          setError('Your session has expired. Please log in again.')
+          break
+        case 'refresh_token_not_found':
+          setError('Authentication error. Please log in again.')
+          break
+        case 'auth_callback_error':
+          setError('Authentication failed. Please try again.')
+          break
+        case 'missing_code':
+          setError('Authentication was incomplete. Please try again.')
+          break
+        case 'profile_creation_failed':
+          setError('Failed to create your profile. Please contact support.')
+          break
+        default:
+          setError('An authentication error occurred. Please try logging in again.')
+      }
+    }
+  }, [searchParams])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -82,7 +112,9 @@ function LoginForm() {
         if (error.message.includes('Invalid login credentials')) {
           setError('Invalid email or password')
         } else if (error.message.includes('Email not confirmed')) {
-          setError('Please verify your email address')
+          // Show verification dialog for unverified users
+          setUnverifiedEmail(email)
+          setShowVerificationDialog(true)
         } else {
           setError(error.message)
         }
@@ -141,6 +173,13 @@ function LoginForm() {
               {error}
             </div>
           )}
+
+          {/* Email Verification Dialog */}
+          <EmailVerificationDialog
+            email={unverifiedEmail}
+            open={showVerificationDialog}
+            onClose={() => setShowVerificationDialog(false)}
+          />
 
           {/* Log In Form */}
           <div className="space-y-4">
@@ -220,16 +259,30 @@ function LoginForm() {
                   Forgot?
                 </Link>
               </div>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                placeholder="••••••••"
-                disabled={loading}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  placeholder="••••••••"
+                  disabled={loading}
+                  className="w-full px-3 py-2 pr-10 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <button

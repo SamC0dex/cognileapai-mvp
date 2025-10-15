@@ -27,13 +27,43 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // IMPORTANT: Avoid writing any logic between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
+  // Get session - this will automatically refresh if refresh token is valid
+  // If refresh token is invalid/missing, it returns null without throwing
+  const { data: { session }, error } = await supabase.auth.getSession()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Handle refresh token errors gracefully
+  if (error) {
+    console.error('Session refresh error:', error.message)
+    
+    // Clear invalid session cookies
+    const cookiesToClear = [
+      'sb-access-token',
+      'sb-refresh-token',
+      `sb-${process.env.NEXT_PUBLIC_SUPABASE_URL?.split('//')[1]?.split('.')[0]}-auth-token`,
+    ]
+    
+    cookiesToClear.forEach(name => {
+      supabaseResponse.cookies.delete(name)
+    })
+
+    // If user is on a protected route, redirect to login with error
+    if (request.nextUrl.pathname.startsWith('/dashboard')) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/auth/login'
+      url.searchParams.set('redirect', request.nextUrl.pathname)
+      
+      // Add appropriate error message based on error type
+      if (error.message.includes('refresh_token_not_found')) {
+        url.searchParams.set('error', 'refresh_token_not_found')
+      } else {
+        url.searchParams.set('error', 'session_expired')
+      }
+      
+      return NextResponse.redirect(url)
+    }
+  }
+
+  const user = session?.user
 
   // Protect routes that require authentication
   if (
