@@ -4,7 +4,8 @@ import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Loader2 } from 'lucide-react'
+import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { EmailVerificationDialog } from '@/components/auth/email-verification-dialog'
 
 function isValidRedirect(url: string): boolean {
   if (!url) return false
@@ -24,9 +25,12 @@ function SignUpForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
+  const [showVerificationDialog, setShowVerificationDialog] = useState(false)
+  const [verificationEmail, setVerificationEmail] = useState('')
 
   const redirectParam = searchParams.get('redirect')
   const redirect = redirectParam && isValidRedirect(redirectParam) ? redirectParam : '/dashboard'
@@ -73,7 +77,6 @@ function SignUpForm() {
     e.preventDefault()
     setLoading(true)
     setError(null)
-    setMessage(null)
 
     // Validation
     if (!firstName.trim() || !lastName.trim()) {
@@ -115,8 +118,9 @@ function SignUpForm() {
       if (data.user.identities?.length === 0) {
         setError('Email already registered. Please log in.')
       } else {
-        setMessage('Account created! Check your email to confirm.')
-        setTimeout(() => router.push(redirect), 2000)
+        // Show verification dialog instead of simple message
+        setVerificationEmail(email)
+        setShowVerificationDialog(true)
       }
     }
   }
@@ -168,12 +172,16 @@ function SignUpForm() {
             </div>
           )}
 
-          {/* Success Message */}
-          {message && (
-            <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 text-primary text-sm">
-              {message}
-            </div>
-          )}
+          {/* Email Verification Dialog */}
+          <EmailVerificationDialog
+            email={verificationEmail}
+            open={showVerificationDialog}
+            onClose={() => {
+              setShowVerificationDialog(false)
+              // Optionally redirect to login after closing
+              router.push('/auth/login')
+            }}
+          />
 
           {/* Sign Up Form */}
           <div className="space-y-4">
@@ -279,17 +287,31 @@ function SignUpForm() {
               <label htmlFor="password" className="text-sm font-medium">
                 Password
               </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={8}
-                placeholder="••••••••"
-                disabled={loading}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  placeholder="••••••••"
+                  disabled={loading}
+                  className="w-full px-3 py-2 pr-10 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
               <p className="text-xs text-muted-foreground">At least 8 characters</p>
             </div>
 
@@ -297,17 +319,31 @@ function SignUpForm() {
               <label htmlFor="confirmPassword" className="text-sm font-medium">
                 Confirm Password
               </label>
-              <input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                minLength={8}
-                placeholder="••••••••"
-                disabled={loading}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
-              />
+              <div className="relative">
+                <input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  placeholder="••••••••"
+                  disabled={loading}
+                  className="w-full px-3 py-2 pr-10 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <button
