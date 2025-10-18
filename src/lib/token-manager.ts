@@ -43,6 +43,7 @@ export interface ConversationTokens {
   systemTokens: number
   lastUpdated: Date
   warningLevel: 'none' | 'caution' | 'warning' | 'critical'
+  method?: 'estimation' | 'api_count' // Track how tokens were counted (no more mixed)
 }
 
 export interface Message {
@@ -92,6 +93,34 @@ export function estimateTokensFromText(text: string): TokenCount {
     confidence,
     method: 'estimation',
     timestamp: new Date()
+  }
+}
+
+/**
+ * Create conversation tokens with actual API counts
+ * @param messages - Array of messages to count
+ * @param actualTokens - Actual token counts from Gemini API
+ */
+export function createConversationTokensWithActual(
+  messages: Message[],
+  actualTokens: {
+    systemPrompt: number
+    documentContext: number
+    method: 'api_count' | 'estimation'
+  }
+): ConversationTokens {
+  // Use actual counts for system and document, estimate for messages
+  const messageTokens = estimateConversationTokens(messages, {
+    systemPrompt: actualTokens.systemPrompt,
+    documentContext: actualTokens.documentContext
+  })
+
+  return {
+    ...messageTokens,
+    method: actualTokens.method,
+    systemTokens: actualTokens.systemPrompt,
+    documentTokens: actualTokens.documentContext,
+    totalTokens: messageTokens.messageTokens + actualTokens.systemPrompt + actualTokens.documentContext
   }
 }
 
@@ -162,7 +191,64 @@ export function estimateConversationTokens(
     documentTokens,
     systemTokens,
     lastUpdated: new Date(),
-    warningLevel
+    warningLevel,
+    method: externalTokens ? 'api_count' : 'estimation' // api_count if using external, estimation if all calculated
+  }
+}
+
+/**
+ * Validate estimated tokens against actual API counts
+ * @param estimated - Estimated conversation tokens
+ * @param actual - Actual token counts from API
+ * @returns Updated tokens with accuracy delta
+ */
+export function validateWithActualCounts(
+  estimated: ConversationTokens,
+  actual: {
+    systemPrompt?: number
+    documentContext?: number
+    totalMessages?: number
+  }
+): ConversationTokens & { accuracyDelta: number } {
+  let correctedTotal = estimated.totalTokens
+  let correctedSystem = estimated.systemTokens
+  let correctedDocument = estimated.documentTokens
+
+  // Use actual counts if provided
+  if (actual.systemPrompt !== undefined) {
+    correctedTotal = correctedTotal - estimated.systemTokens + actual.systemPrompt
+    correctedSystem = actual.systemPrompt
+  }
+
+  if (actual.documentContext !== undefined) {
+    correctedTotal = correctedTotal - estimated.documentTokens + actual.documentContext
+    correctedDocument = actual.documentContext
+  }
+
+  // Calculate accuracy delta (percentage difference)
+  const delta = estimated.totalTokens > 0
+    ? Math.abs(correctedTotal - estimated.totalTokens) / estimated.totalTokens * 100
+    : 0
+
+  // Determine warning level with corrected total
+  let warningLevel: 'none' | 'caution' | 'warning' | 'critical' = 'none'
+  if (correctedTotal >= CONTEXT_LIMITS.PRACTICAL_INPUT_MAX) {
+    warningLevel = 'critical'
+  } else if (correctedTotal >= CONTEXT_LIMITS.CRITICAL_THRESHOLD) {
+    warningLevel = 'warning'
+  } else if (correctedTotal >= CONTEXT_LIMITS.WARNING_THRESHOLD) {
+    warningLevel = 'caution'
+  }
+
+  return {
+    ...estimated,
+    totalTokens: correctedTotal,
+    systemTokens: correctedSystem,
+    documentTokens: correctedDocument,
+    warningLevel,
+    method: (actual.systemPrompt || actual.documentContext) ? 'api_count' : estimated.method,
+    lastUpdated: new Date(),
+    accuracyDelta: delta
   }
 }
 
@@ -369,6 +455,8 @@ export function getOptimalDocumentContextSize(conversationTokens: number): numbe
 export const TokenManager = {
   estimate: estimateTokensFromText,
   estimateConversation: estimateConversationTokens,
+  createWithActual: createConversationTokensWithActual,
+  validate: validateWithActualCounts,
   canAdd: canAddContent,
   getWarning: getContextWarningMessage,
   optimize: optimizeConversationLength,

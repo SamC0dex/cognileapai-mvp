@@ -127,10 +127,10 @@ export async function POST(req: NextRequest) {
     
     // Track token counts for system prompt and document context
     // Token counts tracked from new session creation
-    // eslint-disable-next-line prefer-const
     let systemPromptTokens = 0
-    // eslint-disable-next-line prefer-const
     let documentContextTokens = 0
+    let tokenCountMethod: 'api_count' | 'estimation' = 'estimation'
+    
     if (!sessionId || !getSessionInfo(sessionId)) {
       // Create new session
       isNewSession = true
@@ -138,7 +138,6 @@ export async function POST(req: NextRequest) {
 
       // Build system prompt and context
       const systemPrompt = getSystemPrompt(chatType, documentId, selectedModelKey)
-      systemPromptTokens = TokenManager.estimate(systemPrompt).estimated
       let documentContext = ''
 
       // Handle document context for new sessions
@@ -151,10 +150,10 @@ export async function POST(req: NextRequest) {
 
         if (documentsToProcess.length > 0) {
           try {
-            // Fetch document content (filtered by user_id through RLS)
+            // Fetch document content AND actual tokens (filtered by user_id through RLS)
             const { data: documents, error: docError } = await supabase
               .from('documents')
-              .select('id, title, page_count, processing_status, document_content')
+              .select('id, title, page_count, processing_status, document_content, actual_tokens, token_count_method')
               .in('id', documentsToProcess.map(d => d.id))
               .eq('user_id', user.id) // Explicit user filter for security
 
@@ -166,17 +165,39 @@ export async function POST(req: NextRequest) {
                 .map(doc => ({
                   id: doc.id,
                   title: doc.title,
-                  content: doc.document_content
+                  content: doc.document_content,
+                  actualTokens: doc.actual_tokens,
+                  tokenMethod: doc.token_count_method
                 }))
 
               if (processedDocs.length > 0) {
-                const totalTokens = processedDocs.reduce((sum, doc) =>
-                  sum + Math.ceil(doc.content.length / 4), 0)
+                // Check if all documents have accurate token counts
+                const docsWithoutTokens = processedDocs.filter(doc => !doc.actualTokens || doc.tokenMethod !== 'api_count')
+                
+                if (docsWithoutTokens.length > 0) {
+                  // Block chat if any document doesn't have accurate tokens
+                  const missingDocs = docsWithoutTokens.map(d => d.title).join(', ')
+                  return new Response(
+                    JSON.stringify({ 
+                      error: 'Document processing incomplete',
+                      message: `These documents need reprocessing: ${missingDocs}. Please re-upload them for accurate token counting.`,
+                      details: 'Only documents with accurate token counts can be used for chat.'
+                    }),
+                    { status: 400, headers: { 'Content-Type': 'application/json' } }
+                  )
+                }
+                
+                // All documents have accurate tokens - use them
+                const totalActualTokens = processedDocs.reduce((sum, doc) => 
+                  sum + (doc.actualTokens || 0), 0)
 
-                console.log(`[StatefulChat] Total document tokens: ${totalTokens.toLocaleString()}`)
+                console.log(`[StatefulChat] Document tokens: ${totalActualTokens.toLocaleString()} (api_count)`)
 
-                // Simple concatenation for all documents - let Gemini handle the context
-                console.log(`[StatefulChat] Using simple concatenation for documents`)
+                // Store actual document token count
+                documentContextTokens = totalActualTokens
+                tokenCountMethod = 'api_count'
+
+                // Build document context (full content, within budget)
                 const budgetChars = documentTokenBudget * 4
                 let remainingChars = budgetChars
 
@@ -186,6 +207,8 @@ export async function POST(req: NextRequest) {
                   remainingChars = Math.max(0, remainingChars - snippet.length)
                   return `\n\n=== ${doc.title} ===\n${snippet}`
                 }).join('').slice(0, budgetChars)
+                
+                console.log(`[StatefulChat] Built document context: ${documentContext.length} chars`)
               }
             }
           } catch (error) {
@@ -194,40 +217,55 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Calculate document context tokens after building context
-      if (documentContext) {
-        documentContextTokens = TokenManager.estimate(documentContext).estimated
-        console.log(`[StatefulChat] New session - calculated document context tokens: ${documentContextTokens.toLocaleString()}`)
-      }
-
       // Convert conversation history to GenAI format (excluding the last message)
       const conversationHistory = messages.slice(0, -1).map(msg => ({
         role: msg.role === 'user' ? 'user' as const : 'model' as const,
         parts: [{ text: msg.content }]
       }))
 
-      // Create stateful chat session
+      // Estimate system prompt tokens only (NOT including document)
+      if (!systemPromptTokens) {
+        systemPromptTokens = Math.ceil(systemPrompt.length / 4)
+      }
+      
+      console.log(`[StatefulChat] Token breakdown BEFORE session: system=${systemPromptTokens}, document=${documentContextTokens}, method=${tokenCountMethod}`)
+
+      // Create stateful chat session - genai-client will combine systemPrompt + documentContext
       const createOptions: CreateChatOptions = {
         conversationId,
         modelKey: selectedModelKey,
-        systemPrompt: systemPrompt + (documentContext || ''),
-        documentContext,
-        history: conversationHistory
+        systemPrompt: systemPrompt,  // Just the system prompt
+        documentContext: documentContext || undefined,  // Separate document context
+        history: conversationHistory,
+        countActualTokens: false,  // We already have actual document tokens from database
+        preCountedSystemTokens: systemPromptTokens,  // Pass pre-counted tokens
+        preCountedDocumentTokens: documentContextTokens,  // Pass pre-counted tokens
+        tokenCountMethod: tokenCountMethod  // Pass token counting method
       }
 
       sessionId = await createStatefulChat(createOptions)
       conversationSessionCache.set(conversationId, sessionId)
 
       console.log(`[StatefulChat] Created session: ${sessionId}`)
+      console.log(`[StatefulChat] System tokens: ${systemPromptTokens}, Document tokens: ${documentContextTokens}`)
     } else {
       console.log(`[StatefulChat] Using existing session: ${sessionId}`)
       
-      // For existing sessions, document context was already added during session creation
-      // We DON'T send new values to avoid duplication/confusion in the frontend
-      // The frontend will keep the original values from session creation
-      systemPromptTokens = 0  // Don't update - already tracked from session creation
-      documentContextTokens = 0  // Don't update - already tracked from session creation
-      console.log(`[StatefulChat] Existing session - not sending system/document token breakdown (already tracked from session creation)`)
+      // For existing sessions, get actual token counts from the session
+      const existingSession = getSessionInfo(sessionId)
+      if (existingSession) {
+        // Use the token counts stored in the session
+        systemPromptTokens = existingSession.actualSystemTokens ?? 0
+        documentContextTokens = existingSession.actualDocumentTokens ?? 0
+        tokenCountMethod = existingSession.tokenCountMethod || 'estimation'
+        
+        console.log(`[StatefulChat] Existing session - retrieved tokens: system=${systemPromptTokens}, document=${documentContextTokens}, method=${tokenCountMethod}`)
+      } else {
+        console.log(`[StatefulChat] Existing session - couldn't retrieve session info, using defaults`)
+        systemPromptTokens = 0
+        documentContextTokens = 0
+        tokenCountMethod = 'estimation'
+      }
     }
 
     // Send message to session and stream response
@@ -254,10 +292,40 @@ export async function POST(req: NextRequest) {
             }
 
             if (chunk.isComplete) {
+              // Count actual tokens for user message and assistant response
+              let userMessageTokens = Math.ceil(lastMessage.content.length / 4) // Fallback estimate
+              let assistantMessageTokens = Math.ceil(fullResponse.length / 4) // Fallback estimate
+              let messageTokenMethod: 'api_count' | 'estimation' = 'estimation'
+
+              try {
+                const { getTokenCounter } = await import('@/lib/token-counter')
+                const tokenCounter = getTokenCounter()
+                
+                // Count tokens in parallel for speed
+                const [userResult, assistantResult] = await Promise.all([
+                  tokenCounter.countTokens({
+                    model: modelConfig.name,
+                    content: lastMessage.content
+                  }),
+                  tokenCounter.countTokens({
+                    model: modelConfig.name,
+                    content: fullResponse
+                  })
+                ])
+
+                userMessageTokens = userResult.totalTokens
+                assistantMessageTokens = assistantResult.totalTokens
+                messageTokenMethod = 'api_count'
+
+                console.log(`[StatefulChat] Message tokens (API): user=${userMessageTokens}, assistant=${assistantMessageTokens}`)
+              } catch (error) {
+                console.warn('[StatefulChat] Failed to count message tokens via API, using estimates:', error)
+              }
+
               // Send completion metadata
               const metadata = {
                 usage: {
-                  totalTokens: chunk.usage?.totalTokens || Math.ceil(fullResponse.length / 4),
+                  totalTokens: chunk.usage?.totalTokens || (userMessageTokens + assistantMessageTokens),
                   promptTokens: chunk.usage?.promptTokens,
                   completionTokens: chunk.usage?.completionTokens
                 },
@@ -269,20 +337,27 @@ export async function POST(req: NextRequest) {
                   conversation: conversationTokenSummary.totalTokens,
                   conversationLevel: conversationTokenSummary.warningLevel,
                   document: documentTokenBudget
-                }
-,
+                },
                 // Token breakdown for accurate tracking
                 tokenBreakdown: {
                   systemPrompt: systemPromptTokens,
                   documentContext: documentContextTokens,
+                  method: tokenCountMethod,
                   isNewSession: isNewSession
+                },
+                // Accurate message token counts
+                messageTokens: {
+                  user: userMessageTokens,
+                  assistant: assistantMessageTokens,
+                  method: messageTokenMethod
                 }
               }
 
               const metadataData = JSON.stringify(metadata)
               console.log('[StatefulChat] Sending metadata with token breakdown:', {
                 systemPrompt: metadata.tokenBreakdown.systemPrompt,
-                documentContext: metadata.tokenBreakdown.documentContext
+                documentContext: metadata.tokenBreakdown.documentContext,
+                method: metadata.tokenBreakdown.method
               })
               controller.enqueue(new TextEncoder().encode(`8:${metadataData}\n`))
 
@@ -352,6 +427,7 @@ export async function POST(req: NextRequest) {
                           metadata: {
                             systemPromptTokens,
                             documentContextTokens,
+                            tokenCountMethod,
                             savedAt: new Date().toISOString()
                           }
                         })
@@ -361,7 +437,7 @@ export async function POST(req: NextRequest) {
                       if (updateError) {
                         console.error('[StatefulChat] Failed to save token breakdown to conversation:', updateError)
                       } else {
-                        console.log(`[StatefulChat] Saved token breakdown to conversation: system=${systemPromptTokens}, document=${documentContextTokens}`)
+                        console.log(`[StatefulChat] Saved token breakdown to conversation: system=${systemPromptTokens}, document=${documentContextTokens}, method=${tokenCountMethod}`)
                       }
                     } else {
                       console.log(`[StatefulChat] Metadata already exists, skipping update`)

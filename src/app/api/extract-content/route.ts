@@ -113,13 +113,36 @@ export async function POST(req: NextRequest) {
       console.log(preview + '...')
       console.log('='.repeat(50))
 
-      // Update document with extracted content
+      // Count actual tokens using Gemini API
+      let actualTokens: number | null = null
+      let tokenCountMethod: 'api_count' | 'estimation' = 'estimation'
+      
+      try {
+        const { countDocumentTokens } = await import('@/lib/token-counter')
+        const result = await countDocumentTokens(
+          documentId,
+          'gemini-2.0-flash-exp', // Use the model for counting
+          extractedText
+        )
+        actualTokens = result.totalTokens
+        tokenCountMethod = result.method
+        console.log(`Document tokens: ${actualTokens} (${tokenCountMethod})`)
+      } catch (tokenError) {
+        console.warn(`Failed to count tokens, will use estimation:`, tokenError)
+        // Estimate as fallback
+        actualTokens = Math.ceil(extractedText.length / 4)
+        tokenCountMethod = 'estimation'
+      }
+
+      // Update document with extracted content and token count
       const { error: updateError } = await supabase
         .from('documents')
         .update({
           document_content: extractedText,
           processing_status: 'completed',
-          chunk_count: 1
+          chunk_count: 1,
+          actual_tokens: actualTokens,
+          token_count_method: tokenCountMethod
         })
         .eq('id', documentId)
 
@@ -128,12 +151,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `Failed to update document: ${updateError.message}` }, { status: 500 })
       }
 
-      console.log('✅ Successfully extracted and saved PDF content!')
+      console.log(`✅ Successfully extracted and saved PDF content! (${actualTokens} tokens, ${tokenCountMethod})`)
 
       return NextResponse.json({
         success: true,
         message: 'Content extracted and saved successfully',
         contentLength: extractedText.length,
+        actualTokens,
+        tokenCountMethod,
         preview: preview
       })
 

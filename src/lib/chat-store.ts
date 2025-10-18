@@ -165,6 +165,7 @@ export function useChatStore(): StoreShape {
   // token tracking state
   const [systemPromptTokens, setSystemPromptTokens] = useState<number>(0)
   const [documentContextTokens, setDocumentContextTokens] = useState<number>(0)
+  const [tokenCountMethod, setTokenCountMethod] = useState<'api_count' | 'estimation'>('estimation')
   const [conversationTokens, setConversationTokens] = useState<ConversationTokens | null>(null)
   const [contextWarning, setContextWarning] = useState<string | null>(null)
 
@@ -199,6 +200,10 @@ export function useChatStore(): StoreShape {
         contextStateRef.current = DEFAULT_CONTEXT_STATE
         return DEFAULT_CONTEXT_STATE
       })
+      // Reset token state to avoid stale data from previous conversation
+      setSystemPromptTokens(0)
+      setDocumentContextTokens(0)
+      setTokenCountMethod('estimation')
       setCurrentConversation(conversationId)
       conversationRef.current = conversationId
 
@@ -246,6 +251,10 @@ export function useChatStore(): StoreShape {
           if (typeof metadata.documentContextTokens === 'number') {
             setDocumentContextTokens(metadata.documentContextTokens)
             console.log(`[Chat] Restored document context tokens: ${metadata.documentContextTokens}`)
+          }
+          if (metadata.tokenCountMethod === 'api_count' || metadata.tokenCountMethod === 'estimation') {
+            setTokenCountMethod(metadata.tokenCountMethod)
+            console.log(`[Chat] Restored token count method: ${metadata.tokenCountMethod}`)
           }
         }
       }
@@ -340,6 +349,9 @@ export function useChatStore(): StoreShape {
     setPendingMessage(content)
     let user: Message | null = null
     let finalTokenUsage: number | undefined // Declare at function scope for both finalUpdate functions
+    let finalUserTokens: number | undefined // Accurate user message token count
+    let finalAssistantTokens: number | undefined // Accurate assistant message token count
+    let finalMessageTokenMethod: 'api_count' | 'estimation' | undefined // Token counting method for messages
 
     // Add user message unless this is a regeneration
     if (!skipUserMessage) {
@@ -583,24 +595,36 @@ export function useChatStore(): StoreShape {
                     finalTokenUsage = metadata.usage.totalTokens
                     console.log('[Chat] Received token usage:', finalTokenUsage)
                   }
+                  // Capture accurate message token counts
+                  if (metadata?.messageTokens) {
+                    console.log('[Chat] Accurate message tokens:', metadata.messageTokens)
+                    // Store for use in final update
+                    finalUserTokens = metadata.messageTokens.user
+                    finalAssistantTokens = metadata.messageTokens.assistant
+                    finalMessageTokenMethod = metadata.messageTokens.method
+                  }
                   // Capture system and document context tokens ONLY for new sessions
                   // For existing sessions, these values don't change and should not be updated
                   if (metadata?.tokenBreakdown) {
                     console.log('[Chat] Token breakdown found:', metadata.tokenBreakdown)
                     const isNewSession = metadata.tokenBreakdown.isNewSession
+                    const countMethod = metadata.tokenBreakdown.method || 'estimation'
                     
                     // Only update system/document tokens for NEW sessions
                     if (isNewSession) {
                       if (metadata.tokenBreakdown.systemPrompt) {
                         setSystemPromptTokens(metadata.tokenBreakdown.systemPrompt)
-                        console.log(`[Chat] NEW SESSION - System prompt tokens: ${metadata.tokenBreakdown.systemPrompt}`)
+                        console.log(`[Chat] NEW SESSION - System prompt tokens: ${metadata.tokenBreakdown.systemPrompt} (${countMethod})`)
                       }
                       if (metadata.tokenBreakdown.documentContext) {
                         setDocumentContextTokens(metadata.tokenBreakdown.documentContext)
-                        console.log(`[Chat] NEW SESSION - Document context tokens: ${metadata.tokenBreakdown.documentContext}`)
+                        console.log(`[Chat] NEW SESSION - Document context tokens: ${metadata.tokenBreakdown.documentContext} (${countMethod})`)
                       }
+                      // Update token count method
+                      setTokenCountMethod(countMethod)
+                      console.log(`[Chat] NEW SESSION - Token count method: ${countMethod}`)
                     } else {
-                      console.log(`[Chat] EXISTING SESSION - Keeping previous system/document context token values`)
+                      console.log(`[Chat] EXISTING SESSION - Keeping previous system/document context token values (${countMethod})`)
                     }
                   } else {
                     console.warn('[Chat] No tokenBreakdown in metadata')
@@ -642,26 +666,47 @@ export function useChatStore(): StoreShape {
 
       // Final update with metadata (will be handled by the interval completion)
       const finalUpdate = () => {
-        const assistantTokenCount = TokenManager.estimate(serverBuffer)
-        setMessages(prev => prev.map(msg =>
-          msg.id === assistantId
-            ? {
-                ...msg,
-                content: serverBuffer,
-                isStreaming: false,
-                tokenCount: {
-                  estimated: assistantTokenCount.estimated,
-                  confidence: assistantTokenCount.confidence
-                },
-                metadata: {
-                  model: modelConfig.displayName,
-                  modelKey: modelToUse,
-                  duration,
-                  tokens: finalTokenUsage || assistantTokenCount.estimated // Use API tokens if available
-                }
+        // Use accurate token counts if available, fallback to estimation
+        const assistantTokenCount = finalAssistantTokens 
+          ? { estimated: finalAssistantTokens, confidence: 'high' as const }
+          : TokenManager.estimate(serverBuffer)
+        
+        const userTokenCount = finalUserTokens
+          ? { estimated: finalUserTokens, confidence: 'high' as const }
+          : (user?.tokenCount || TokenManager.estimate(content))
+
+        // Update assistant message with accurate tokens
+        setMessages(prev => prev.map(msg => {
+          if (msg.id === assistantId) {
+            return {
+              ...msg,
+              content: serverBuffer,
+              isStreaming: false,
+              tokenCount: assistantTokenCount,
+              metadata: {
+                model: modelConfig.displayName,
+                modelKey: modelToUse,
+                duration,
+                tokens: finalAssistantTokens || assistantTokenCount.estimated,
+                tokenMethod: finalMessageTokenMethod || 'estimation'
               }
-            : msg
-        ))
+            }
+          } else if (user && msg.id === user.id) {
+            // Update user message with accurate tokens
+            return {
+              ...msg,
+              tokenCount: userTokenCount,
+              metadata: {
+                ...msg.metadata,
+                tokens: finalUserTokens || userTokenCount.estimated,
+                tokenMethod: finalMessageTokenMethod || 'estimation'
+              }
+            }
+          }
+          return msg
+        }))
+
+        console.log(`[Chat] Final token counts: user=${finalUserTokens || 'estimated'}, assistant=${finalAssistantTokens || 'estimated'}, method=${finalMessageTokenMethod || 'estimation'}`)
 
         // Update token tracking after message is complete
         updateTokenTracking()
@@ -1086,6 +1131,7 @@ export function useChatStore(): StoreShape {
       documentContext: documentContextTokens
     })
     tokens.conversationId = currentConversation || 'temp-conversation'
+    tokens.method = tokenCountMethod // Pass through token counting method for UI display
 
     // Generate warning message
     const warning = TokenManager.getWarning(tokens)
@@ -1143,7 +1189,7 @@ export function useChatStore(): StoreShape {
     })
 
     console.log(`[TokenTracker] Conversation ${currentConversation}: ${tokens.totalTokens.toLocaleString()} tokens (${tokens.warningLevel})`)
-  }, [messages, currentConversation, systemPromptTokens, documentContextTokens])
+  }, [messages, currentConversation, systemPromptTokens, documentContextTokens, tokenCountMethod])
 
   const canAddMessage = useCallback((content: string): { canAdd: boolean; warning?: string } => {
     if (!conversationTokens) {

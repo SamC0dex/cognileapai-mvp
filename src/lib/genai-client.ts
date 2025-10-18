@@ -3,12 +3,14 @@
  * Provides stateful chat sessions with conversation memory
  * Compatible with existing model selection and streaming patterns
  * Now with database persistence to survive server restarts
+ * Includes accurate token counting via Gemini API
  */
 
 import { GoogleGenAI } from '@google/genai'
 import type { GeminiModelKey } from './ai-config'
 import { GeminiModelSelector } from './ai-config'
 import { saveSession, loadSession, findSessionByConversation, updateSessionActivity } from './session-store'
+import { getTokenCounter } from './token-counter'
 
 // Environment validation
 function validateGeminiConfig(): { isValid: boolean; error?: string } {
@@ -68,6 +70,9 @@ export interface StatefulChatSession {
   modelKey: GeminiModelKey
   createdAt: Date
   lastActivityAt: Date
+  actualSystemTokens?: number
+  actualDocumentTokens?: number
+  tokenCountMethod?: 'api_count' | 'estimation'
 }
 
 // Session storage (in-memory for now, can be moved to Redis later)
@@ -94,6 +99,10 @@ export interface CreateChatOptions {
     role: 'user' | 'model'
     parts: Array<{ text: string }>
   }>
+  countActualTokens?: boolean // If true, use API to count tokens accurately
+  preCountedSystemTokens?: number // Pass pre-counted system prompt tokens
+  preCountedDocumentTokens?: number // Pass pre-counted document context tokens
+  tokenCountMethod?: 'api_count' | 'estimation' // Token counting method used
 }
 
 export interface SendMessageOptions {
@@ -113,6 +122,7 @@ export interface StreamChunk {
 
 /**
  * Create a new stateful chat session with database persistence
+ * Now includes accurate token counting via Gemini API
  */
 export async function createStatefulChat(options: CreateChatOptions): Promise<string> {
   try {
@@ -131,7 +141,10 @@ export async function createStatefulChat(options: CreateChatOptions): Promise<st
         history: existingSession.conversation_history,
         modelKey: existingSession.model_key,
         createdAt: new Date(existingSession.created_at),
-        lastActivityAt: new Date()
+        lastActivityAt: new Date(),
+        actualSystemTokens: existingSession.actual_system_tokens,
+        actualDocumentTokens: existingSession.actual_document_tokens,
+        tokenCountMethod: existingSession.token_count_method
       }
 
       activeSessions.set(existingSession.id, session)
@@ -150,6 +163,53 @@ export async function createStatefulChat(options: CreateChatOptions): Promise<st
     // Generate session ID
     const sessionId = crypto.randomUUID()
 
+    // Use pre-counted tokens if provided, otherwise count them
+    let actualSystemTokens: number | undefined = options.preCountedSystemTokens
+    let actualDocumentTokens: number | undefined = options.preCountedDocumentTokens
+    let tokenCountMethod: 'api_count' | 'estimation' = options.tokenCountMethod || 'estimation'
+
+    // Only count if not already provided and counting is requested
+    if (!actualSystemTokens && !actualDocumentTokens && options.countActualTokens !== false) {
+      try {
+        const tokenCounter = getTokenCounter()
+
+        // Count system prompt tokens
+        if (options.systemPrompt) {
+          const systemResult = await tokenCounter.countTokens({
+            model: modelName,
+            content: '',
+            systemInstruction: options.systemPrompt
+          })
+          actualSystemTokens = systemResult.totalTokens
+          console.log(`[GenAI] System prompt tokens: ${actualSystemTokens} (${systemResult.method})`)
+        }
+
+        // Count document context tokens
+        if (options.documentContext) {
+          const docResult = await tokenCounter.countTokensCached(
+            `doc:${options.conversationId}:${modelKey}`,
+            {
+              model: modelName,
+              content: options.documentContext
+            }
+          )
+          actualDocumentTokens = docResult.totalTokens
+          tokenCountMethod = docResult.method
+          console.log(`[GenAI] Document context tokens: ${actualDocumentTokens} (${docResult.method})`)
+        }
+
+        // If both succeeded with API counts, mark as api_count
+        if (actualSystemTokens !== undefined && actualDocumentTokens !== undefined) {
+          tokenCountMethod = 'api_count'
+        }
+      } catch (error) {
+        console.warn('[GenAI] Failed to count actual tokens, will use estimates:', error)
+        tokenCountMethod = 'estimation'
+      }
+    } else if (actualSystemTokens || actualDocumentTokens) {
+      console.log(`[GenAI] Using pre-counted tokens: system=${actualSystemTokens || 0}, document=${actualDocumentTokens || 0}, method=${tokenCountMethod}`)
+    }
+
     // Create session object
     const session: StatefulChatSession = {
       id: sessionId,
@@ -159,7 +219,10 @@ export async function createStatefulChat(options: CreateChatOptions): Promise<st
       history: options.history || [],
       modelKey,
       createdAt: new Date(),
-      lastActivityAt: new Date()
+      lastActivityAt: new Date(),
+      actualSystemTokens,
+      actualDocumentTokens,
+      tokenCountMethod
     }
 
     // Store in memory first
@@ -172,7 +235,10 @@ export async function createStatefulChat(options: CreateChatOptions): Promise<st
       modelKey,
       systemPrompt: options.systemPrompt,
       documentContext: options.documentContext,
-      history: options.history || []
+      history: options.history || [],
+      actualSystemTokens,
+      actualDocumentTokens,
+      tokenCountMethod
     })
 
     if (!saved) {
@@ -180,7 +246,7 @@ export async function createStatefulChat(options: CreateChatOptions): Promise<st
       // Continue anyway - session will work in memory
     }
 
-    console.log(`[GenAI] Created stateful session: ${sessionId} for conversation: ${options.conversationId}`)
+    console.log(`[GenAI] Created stateful session: ${sessionId} for conversation: ${options.conversationId} (tokens: ${tokenCountMethod})`)
 
     return sessionId
   } catch (error) {
@@ -233,11 +299,17 @@ export async function* sendStatefulMessage(options: SendMessageOptions): AsyncGe
     // Prepare conversation context
     const contents = []
 
+    // Build full system prompt (system instructions + document context)
+    let fullSystemPrompt = session.systemPrompt || ''
+    if (session.documentContext) {
+      fullSystemPrompt += '\n\n' + session.documentContext
+    }
+
     // Add system prompt as first message if exists
-    if (session.systemPrompt) {
+    if (fullSystemPrompt) {
       contents.push({
         role: 'user' as const,
-        parts: [{ text: session.systemPrompt }]
+        parts: [{ text: fullSystemPrompt }]
       })
       contents.push({
         role: 'model' as const,

@@ -55,6 +55,8 @@ export type Database = {
           chunk_count: number
           error_message: string | null
           document_content: string | null
+          actual_tokens: number | null
+          token_count_method: string
           created_at: string
           updated_at: string
           user_id: string | null
@@ -70,6 +72,8 @@ export type Database = {
           chunk_count?: number
           error_message?: string | null
           document_content?: string | null
+          actual_tokens?: number | null
+          token_count_method?: string
           created_at?: string
           updated_at?: string
           user_id?: string | null
@@ -85,6 +89,8 @@ export type Database = {
           chunk_count?: number
           error_message?: string | null
           document_content?: string | null
+          actual_tokens?: number | null
+          token_count_method?: string
           created_at?: string
           updated_at?: string
           user_id?: string | null

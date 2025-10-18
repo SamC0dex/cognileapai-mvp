@@ -436,7 +436,7 @@ const DetailedTokenView: React.FC<{ tokens: ConversationTokens | null; isCalcula
 
       {/* Last updated */}
       {tokens && (
-        <div className="text-center text-[10px] text-muted-foreground/70">
+        <div className="text-center text-[10px] text-muted-foreground/70 mt-2">
           Last updated: {tokens.lastUpdated.toLocaleString('en-US', { 
             month: 'short', 
             day: 'numeric', 

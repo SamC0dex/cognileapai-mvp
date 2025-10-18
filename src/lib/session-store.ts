@@ -21,6 +21,9 @@ export interface PersistedChatSession {
     role: 'user' | 'model'
     parts: Array<{ text: string }>
   }>
+  actual_system_tokens?: number
+  actual_document_tokens?: number
+  token_count_method?: 'api_count' | 'estimation'
   created_at: string
   last_activity_at: string
 }
@@ -35,6 +38,9 @@ export async function saveSession(session: {
   systemPrompt: string
   documentContext?: string
   history: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }>
+  actualSystemTokens?: number
+  actualDocumentTokens?: number
+  tokenCountMethod?: 'api_count' | 'estimation'
 }): Promise<boolean> {
   try {
     const { error } = await supabase
@@ -46,6 +52,9 @@ export async function saveSession(session: {
         system_prompt: session.systemPrompt,
         document_context: session.documentContext,
         conversation_history: session.history,
+        actual_system_tokens: session.actualSystemTokens,
+        actual_document_tokens: session.actualDocumentTokens,
+        token_count_method: session.tokenCountMethod || 'estimation',
         last_activity_at: new Date().toISOString()
       })
 

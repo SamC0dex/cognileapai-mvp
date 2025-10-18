@@ -67,9 +67,8 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
-    // File size validation
+    // File size validation (only validate binary file size)
     const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB hard limit
-    const WARN_FILE_SIZE = 50 * 1024 * 1024 // 50MB warning threshold
     
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json({ 
@@ -81,29 +80,7 @@ export async function POST(req: NextRequest) {
       }, { status: 413 })
     }
 
-    // Estimate tokens and warn for large files
-    // Rough estimation: For PDFs, 1 byte ≈ 0.2 tokens (conservative estimate)
-    // This accounts for text extraction compression
-    const estimatedTokens = Math.ceil(file.size * 0.2)
-    const TOKEN_WARNING_THRESHOLD = 200000 // 200K tokens
-    const TOKEN_CRITICAL_THRESHOLD = 500000 // 500K tokens
-
-    let sizeWarning = null
-    if (estimatedTokens > TOKEN_CRITICAL_THRESHOLD) {
-      return NextResponse.json({ 
-        error: 'Document too large for optimal processing',
-        message: `This PDF is very large (estimated ~${Math.round(estimatedTokens / 1000)}K tokens, ~${Math.round(file.size / (1024 * 1024))}MB). Maximum recommended size is ~500 pages.`,
-        details: 'Large documents may experience degraded AI quality and slower processing. Consider splitting into smaller sections.',
-        estimatedTokens,
-        threshold: TOKEN_CRITICAL_THRESHOLD
-      }, { status: 413 })
-    } else if (estimatedTokens > TOKEN_WARNING_THRESHOLD) {
-      sizeWarning = `Large document detected (~${Math.round(estimatedTokens / 1000)}K tokens). Processing may take longer, and AI features will use intelligent chunking for optimal quality.`
-    } else if (file.size > WARN_FILE_SIZE) {
-      sizeWarning = `Large file detected (${Math.round(file.size / (1024 * 1024))}MB). Processing may take a few minutes.`
-    }
-
-    console.log('Processing file:', file.name, file.size, 'bytes, estimated:', estimatedTokens, 'tokens')
+    console.log('Processing file:', file.name, file.size, 'bytes')
 
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
@@ -154,8 +131,7 @@ export async function POST(req: NextRequest) {
           hasStudyGuide: false,
           hasSummary: false,
           hasNotes: false
-        },
-        ...(sizeWarning ? { warning: sizeWarning } : {})
+        }
       })
     }
 
@@ -278,18 +254,33 @@ export async function POST(req: NextRequest) {
           .eq('user_id', user.id)
           .maybeSingle()
 
+        // Clean up the newly uploaded file since we'll use the existing one
         await serviceSupabase.storage.from('documents').remove([uploadData.path])
 
         if (conflictError && conflictError.code !== 'PGRST116') {
           console.error('Failed to retrieve conflicting document:', conflictError)
+          return NextResponse.json({ 
+            error: 'Document already exists',
+            message: 'This document has already been uploaded. Please check your Sources panel.',
+            details: 'If you need to re-upload, please delete the existing document first.'
+          }, { status: 409 })
         } else if (conflictingDocument) {
           return handleDuplicate(conflictingDocument)
+        } else {
+          // Checksum exists but not for this user (shouldn't happen due to unique constraint)
+          // Return generic error without revealing other users' documents
+          console.error('Checksum exists but no matching document found for user:', user.id)
+          return NextResponse.json({ 
+            error: 'Upload failed',
+            message: 'Unable to process this document. Please try again with a different file.',
+            details: 'If the problem persists, please contact support.'
+          }, { status: 409 })
         }
       }
 
       console.error('Database error:', dbError)
       await serviceSupabase.storage.from('documents').remove([uploadData.path])
-      return NextResponse.json({ error: 'Failed to save document' }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to save document', details: dbError.message }, { status: 500 })
     }
 
     console.log('Document created successfully:', document.id)
@@ -314,8 +305,7 @@ export async function POST(req: NextRequest) {
         hasSummary: false,
         hasNotes: false,
         processing_status: 'processing'
-      },
-      ...(sizeWarning ? { warning: sizeWarning } : {})
+      }
     })
 
   } catch (error) {
@@ -382,17 +372,40 @@ async function startBackgroundProcessing(documentId: string, buffer: Buffer) {
       extractedText = await extractText()
       console.log(`[Background] Extracted ${extractedText.length} characters from PDF`)
 
-      // Store the extracted text in the document_content column (using service role)
+      // Count actual tokens using Gemini API
+      let actualTokens: number | null = null
+      let tokenCountMethod: 'api_count' | 'estimation' = 'estimation'
+      
+      try {
+        const { countDocumentTokens } = await import('@/lib/token-counter')
+        const result = await countDocumentTokens(
+          documentId,
+          'gemini-2.0-flash-exp', // Use the model for counting
+          extractedText
+        )
+        actualTokens = result.totalTokens
+        tokenCountMethod = result.method
+        console.log(`[Background] Document tokens: ${actualTokens} (${tokenCountMethod})`)
+      } catch (tokenError) {
+        console.warn(`[Background] Failed to count tokens, will use estimation:`, tokenError)
+        // Estimate as fallback
+        actualTokens = Math.ceil(extractedText.length / 4)
+        tokenCountMethod = 'estimation'
+      }
+
+      // Store the extracted text and token count in the document_content column (using service role)
       await serviceSupabase
         .from('documents')
         .update({
           processing_status: 'completed',
           chunk_count: 1, // For now, we store as one chunk
-          document_content: extractedText // Store the full text
+          document_content: extractedText, // Store the full text
+          actual_tokens: actualTokens,
+          token_count_method: tokenCountMethod
         })
         .eq('id', documentId)
 
-      console.log(`[Background] PDF text extraction completed for document ${documentId}`)
+      console.log(`[Background] PDF text extraction completed for document ${documentId} (${actualTokens} tokens, ${tokenCountMethod})`)
 
     } catch (textError) {
       console.error(`[Background] Text extraction failed, but marking as completed:`, textError)
